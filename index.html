@@ -3971,6 +3971,10 @@ function drawQuestButton() {
 
 let questOpen = false;
 
+// 일일 퀘스트 패널 버튼은 그리는 위치와 실제 터치/클릭 영역을 같은 사각형으로 사용합니다.
+const QUEST_REROLL_BUTTON = { x: WIDTH / 2 - 105, y: 496, w: 210, h: 40 };
+const QUEST_CLOSE_BUTTON = { x: WIDTH / 2 - 90, y: 544, w: 180, h: 30 };
+
 function getDailyQuestProgressInfo(quest) {
     const p = dailyQuestState.progress || createDailyQuestProgress();
     let current = 0;
@@ -4150,10 +4154,22 @@ function drawQuestPanel() {
 
     const canReroll = dailyQuestState.rerolls > 0 && dailyQuestState.quests.some(id => !isDailyQuestCompleted(id));
     ctx.globalAlpha = canReroll ? 1 : 0.45;
-    drawSettingsButton(WIDTH / 2 - 105, 499, 210, 34, `퀘스트 다시 뽑기 ${dailyQuestState.rerolls}/${DAILY_QUEST_REROLL_COUNT}`);
+    drawSettingsButton(
+        QUEST_REROLL_BUTTON.x,
+        QUEST_REROLL_BUTTON.y,
+        QUEST_REROLL_BUTTON.w,
+        QUEST_REROLL_BUTTON.h,
+        `퀘스트 다시 뽑기 ${dailyQuestState.rerolls}/${DAILY_QUEST_REROLL_COUNT}`
+    );
     ctx.globalAlpha = 1;
 
-    drawSettingsButton(WIDTH / 2 - 80, 539, 160, 26, "닫기");
+    drawSettingsButton(
+        QUEST_CLOSE_BUTTON.x,
+        QUEST_CLOSE_BUTTON.y,
+        QUEST_CLOSE_BUTTON.w,
+        QUEST_CLOSE_BUTTON.h,
+        "닫기"
+    );
     ctx.restore();
 }
 
@@ -9515,11 +9531,11 @@ function handleSettingsTap(x, y) {
             }
         }
 
-        if (isInsideRect(x, y, { x: WIDTH / 2 - 105, y: 505, w: 210, h: 34 })) {
+        if (isInsideRect(x, y, QUEST_REROLL_BUTTON)) {
             rerollDailyQuests();
             return true;
         }
-        if (isInsideRect(x, y, { x: WIDTH / 2 - 80, y: 545, w: 160, h: 26 })) {
+        if (isInsideRect(x, y, QUEST_CLOSE_BUTTON)) {
             questOpen = false;
             return true;
         }
