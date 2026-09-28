@@ -1662,6 +1662,7 @@ function useEnergyRecovery(amount) {
     itemInventory.energyRecovery -= amount;
     mapSkips = Math.min(MAX_MAP_SKIPS, recovered);
     energyRecoveryUsed = true;
+    onDailyQuestEnergyRecoveryUse();
     energyRecoveryChoiceOpen = false;
 
     saveItemInventory();
@@ -3567,12 +3568,603 @@ function resetPlayer() {
 }
 
 
+
+/* =========================================================
+   일일 퀘스트 시스템
+========================================================= */
+
+const DAILY_QUEST_STORAGE_KEY = "slidingMazeDailyQuest_v2";
+const DAILY_QUEST_COUNT = 5;
+const DAILY_QUEST_REROLL_COUNT = 5;
+
+const DAILY_QUEST_POOL = [
+    { id:1, name:"슬라이딩 입문자", description:"맵 3개 클리어", reward:3 },
+    { id:2, name:"슬라이딩 숙련자", description:"맵 10개 클리어", reward:6 },
+    { id:3, name:"슬라이딩 마스터", description:"맵 20개 클리어", reward:10 },
+    { id:4, name:"연속 질주", description:"5맵 연속 클리어", reward:5 },
+    { id:5, name:"멈추지 않는 질주", description:"10맵 연속 클리어", reward:10 },
+    { id:6, name:"시간과의 싸움", description:"제한시간 10초 이하 상태에서 3맵 클리어", reward:7 },
+    { id:7, name:"마지막 순간", description:"제한시간 3초 이하 상태에서 1맵 클리어", reward:5 },
+    { id:8, name:"완벽한 출발", description:"목숨을 한 번도 잃지 않고 5맵 클리어", reward:6 },
+    { id:9, name:"생존왕", description:"목숨 3개를 유지한 상태로 10맵 클리어", reward:10 },
+    { id:10, name:"위험 회피자", description:"목숨을 잃지 않고 10맵 클리어", reward:10 },
+    { id:11, name:"위험 구역 돌파", description:"위험 블록이 있는 맵 5개 클리어", reward:6 },
+    { id:12, name:"아슬아슬", description:"위험 블록이 있는 맵을 3개 클리어", reward:5 },
+    { id:13, name:"꾸준한 도전", description:"맵 8개 클리어", reward:5 },
+    { id:14, name:"맵 정복자", description:"맵 12개 클리어", reward:7 },
+    { id:15, name:"시간 조작", description:"시간 조작 시계 사용 상태로 3맵 클리어", reward:5 },
+    { id:16, name:"철벽 방어", description:"에너지 보호막으로 충돌 1회 방어", reward:5 },
+    { id:17, name:"길잡이", description:"경로 안내 사용 상태로 3맵 클리어", reward:5 },
+    { id:18, name:"응급 구조", description:"응급 처치 발동 후 맵 1개 클리어", reward:6 },
+    { id:19, name:"에너지 관리", description:"에너지 복구 장치 사용", reward:4 },
+    { id:20, name:"아이템 없이", description:"아이템 없이 5맵 클리어", reward:6 },
+    { id:21, name:"첫 대결", description:"2인 경쟁 경기 1회 완료", reward:3 },
+    { id:22, name:"경쟁자", description:"2인 경쟁에서 1회 승리", reward:5 },
+    { id:23, name:"연승 행진", description:"2인 경쟁 3연승", reward:8 },
+    { id:24, name:"라이벌", description:"2인 경쟁 라운드 5회 진행", reward:6 },
+    { id:25, name:"끝까지 살아남기", description:"상대보다 먼저 탈락하지 않고 경기 종료", reward:6 },
+    { id:26, name:"역전극", description:"목숨 1개 상태에서 라운드 승리", reward:8 },
+    { id:27, name:"무너지지 않는 자", description:"한 번도 탈락하지 않고 경기 승리", reward:7 },
+    { id:28, name:"라운드 정복자", description:"2인 경쟁에서 5라운드 승리", reward:10 },
+    { id:29, name:"빠른 대전", description:"빠른 대전 경기 1회 완료", reward:4 },
+    { id:30, name:"라이벌과의 결투", description:"방 코드로 친구와 경기 1회 완료", reward:4 },
+    { id:31, name:"끈기의 달인", description:"맵 넘기기를 사용하지 않고 10맵 클리어", reward:7 },
+    { id:32, name:"다시 일어나기", description:"맵 넘기기를 3회 이상 사용한 뒤 3맵 연속 클리어", reward:6 },
+    { id:33, name:"불굴의 의지", description:"목숨을 1개 잃은 맵을 클리어하고 이후 2맵 추가 클리어", reward:6 },
+    { id:34, name:"아슬아슬한 생존", description:"목숨 1개 상태에서 3맵 연속 클리어", reward:8 },
+    { id:35, name:"빠르게 빠르게", description:"제한시간의 50% 이상을 남기고 3맵 클리어", reward:7 },
+    { id:36, name:"장거리 여행", description:"누적 20맵 클리어", reward:8 },
+    { id:37, name:"여러 번 도전", description:"서로 다른 게임 3회 시작하고 각 게임에서 2맵 이상 클리어", reward:6 },
+    { id:38, name:"오늘도 달린다", description:"하루 동안 15맵 클리어", reward:8 },
+    { id:39, name:"시간과의 싸움", description:"제한시간 10초 이하 상태에서 5맵 클리어", reward:10 },
+    { id:40, name:"흔들리지 않는 마음", description:"목숨을 한 번도 잃지 않고 10맵 연속 클리어", reward:10 },
+    { id:41, name:"마지막 기회", description:"맵 넘기기를 3회 이상 사용한 뒤 5맵 클리어", reward:9 },
+    { id:42, name:"끝까지 살아남기", description:"목숨 1개 상태로 5맵 연속 클리어", reward:10 },
+    { id:43, name:"극한 질주", description:"제한시간의 50% 이상을 남기고 5맵 클리어", reward:10 }
+];
+
+let dailyQuestState = null;
+
+function createDailyQuestProgress() {
+    return {
+        dailyClears: 0,
+        noDeathStreak: 0,
+        oneLifeStreak: 0,
+        noSkipStreak: 0,
+        postSkipStreak: 0,
+        fastClears: 0,
+        lowTimeClears: 0,
+        noItemClears: 0,
+        dangerMapClears: 0,
+        timeClockClears: 0,
+        pathGuideClears: 0,
+        firstAidClears: 0,
+        shieldBlocks: 0,
+        energyRecoveryUses: 0,
+        skipsUsed: 0,
+        lostLifeMapActive: false,
+        lostLifeMapCleared: false,
+        postLostLifeClears: 0,
+        gamesStarted: 0,
+        qualifiedGames: 0,
+        currentGameHadDeath: false,
+        currentGameHadSkip: false,
+        gameStartCounted: false,
+        rerollHistory: []
+    };
+}
+
+function shuffleArray(array) {
+    const a = array.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+}
+
+function getQuestDateKey() {
+    return getLocalDateKey();
+}
+
+function getQuestById(id) {
+    return DAILY_QUEST_POOL.find(q => q.id === id) || null;
+}
+
+function createFreshDailyQuestState() {
+    const ids = shuffleArray(DAILY_QUEST_POOL.map(q => q.id));
+    return {
+        date: getQuestDateKey(),
+        quests: ids.slice(0, DAILY_QUEST_COUNT),
+        completed: [],
+        rewardClaimed: [],
+        rerolls: DAILY_QUEST_REROLL_COUNT,
+        progress: createDailyQuestProgress()
+    };
+}
+
+function saveDailyQuestState() {
+    try {
+        localStorage.setItem(DAILY_QUEST_STORAGE_KEY, JSON.stringify(dailyQuestState));
+    } catch (error) {}
+}
+
+function loadDailyQuestState() {
+    let saved = null;
+    try {
+        saved = JSON.parse(localStorage.getItem(DAILY_QUEST_STORAGE_KEY) || "null");
+    } catch (error) {}
+
+    if (!saved || saved.date !== getQuestDateKey() || !Array.isArray(saved.quests) || saved.quests.length !== DAILY_QUEST_COUNT) {
+        dailyQuestState = createFreshDailyQuestState();
+        saveDailyQuestState();
+        return;
+    }
+
+    dailyQuestState = saved;
+    if (!Array.isArray(dailyQuestState.completed)) dailyQuestState.completed = [];
+    if (!Array.isArray(dailyQuestState.rewardClaimed)) dailyQuestState.rewardClaimed = [];
+    if (!dailyQuestState.progress) dailyQuestState.progress = createDailyQuestProgress();
+    if (typeof dailyQuestState.rerolls !== "number") dailyQuestState.rerolls = DAILY_QUEST_REROLL_COUNT;
+}
+
+function refreshDailyQuestIfNeeded() {
+    if (!dailyQuestState || dailyQuestState.date !== getQuestDateKey()) {
+        dailyQuestState = createFreshDailyQuestState();
+        saveDailyQuestState();
+        return true;
+    }
+    return false;
+}
+
+loadDailyQuestState();
+
+function isDailyQuestCompleted(id) {
+    return dailyQuestState.completed.includes(id);
+}
+
+function completeDailyQuest(id) {
+    if (isDailyQuestCompleted(id)) return;
+    const quest = getQuestById(id);
+    if (!quest) return;
+
+    dailyQuestState.completed.push(id);
+    saveDailyQuestState();
+    setMessage(`퀘스트 완료! ${quest.name} · 보상을 받을 수 있습니다.`);
+}
+
+function isDailyQuestRewardClaimed(id) {
+    return dailyQuestState.rewardClaimed.includes(id);
+}
+
+function claimDailyQuestReward(id) {
+    if (!isDailyQuestCompleted(id) || isDailyQuestRewardClaimed(id)) return;
+    const quest = getQuestById(id);
+    if (!quest) return;
+
+    dailyQuestState.rewardClaimed.push(id);
+    coins += quest.reward;
+    saveCoins();
+    saveDailyQuestState();
+    setMessage(`퀘스트 보상 수령! ${quest.name} · 🪙 +${quest.reward}`);
+}
+
+function rerollDailyQuests() {
+    refreshDailyQuestIfNeeded();
+
+    if (dailyQuestState.rerolls <= 0) {
+        setMessage("오늘의 퀘스트 뽑기를 모두 사용했습니다.");
+        return false;
+    }
+
+    const incompleteSlots = dailyQuestState.quests
+        .map((id, index) => ({ id, index }))
+        .filter(item => !isDailyQuestCompleted(item.id));
+
+    if (incompleteSlots.length === 0) {
+        setMessage("모든 일일 퀘스트를 완료했습니다.");
+        return false;
+    }
+
+    // 완료된 퀘스트는 그대로 고정하고, 미완료 퀘스트만 한 번에 전부 다시 뽑습니다.
+    const fixedCompletedIds = new Set(
+        dailyQuestState.quests.filter(id => isDailyQuestCompleted(id))
+    );
+
+    const candidates = shuffleArray(DAILY_QUEST_POOL.map(q => q.id))
+        .filter(id => !isDailyQuestCompleted(id) && !fixedCompletedIds.has(id));
+
+    if (candidates.length < incompleteSlots.length) {
+        setMessage("뽑을 수 있는 다른 퀘스트가 부족합니다.");
+        return false;
+    }
+
+    incompleteSlots.forEach((slot, index) => {
+        dailyQuestState.quests[slot.index] = candidates[index];
+    });
+
+    dailyQuestState.rerolls--;
+    dailyQuestState.progress.rerollHistory.push(...candidates.slice(0, incompleteSlots.length));
+    saveDailyQuestState();
+    setMessage(`미완료 퀘스트 ${incompleteSlots.length}개를 다시 뽑았습니다.`);
+    return true;
+}
+
+function resetQuestRunProgress() {
+    const p = dailyQuestState.progress;
+    p.noDeathStreak = 0;
+    p.oneLifeStreak = 0;
+    p.noSkipStreak = 0;
+    p.postSkipStreak = 0;
+    p.fastClears = 0;
+    p.lowTimeClears = 0;
+    p.noItemClears = 0;
+    p.dangerMapClears = 0;
+    p.timeClockClears = 0;
+    p.pathGuideClears = 0;
+    p.firstAidClears = 0;
+    p.shieldBlocks = 0;
+    p.energyRecoveryUses = 0;
+    p.skipsUsed = 0;
+    p.lostLifeMapActive = false;
+    p.lostLifeMapCleared = false;
+    p.postLostLifeClears = 0;
+    p.currentGameHadDeath = false;
+    p.currentGameHadSkip = false;
+    p.gameStartCounted = false;
+}
+
+function onDailyQuestGameStart() {
+    refreshDailyQuestIfNeeded();
+    const p = dailyQuestState.progress;
+    p.gamesStarted++;
+    p.currentGameHadDeath = false;
+    p.currentGameHadSkip = false;
+    p.gameStartCounted = true;
+    saveDailyQuestState();
+}
+
+function onDailyQuestMapSkip() {
+    refreshDailyQuestIfNeeded();
+    const p = dailyQuestState.progress;
+    p.skipsUsed++;
+    p.currentGameHadSkip = true;
+    p.noSkipStreak = 0;
+    p.postSkipStreak = 0;
+    saveDailyQuestState();
+}
+
+function onDailyQuestDeath() {
+    refreshDailyQuestIfNeeded();
+    const p = dailyQuestState.progress;
+    p.currentGameHadDeath = true;
+    p.lostLifeMapActive = true;
+    p.lostLifeMapCleared = false;
+    p.postLostLifeClears = 0;
+    p.noDeathStreak = 0;
+    p.oneLifeStreak = 0;
+    p.noSkipStreak = 0;
+    p.postSkipStreak = 0;
+    saveDailyQuestState();
+}
+
+function onDailyQuestClear() {
+    refreshDailyQuestIfNeeded();
+    const p = dailyQuestState.progress;
+    const stageLimit = getStageTimeLimit() + activeTimeBonus;
+
+    p.dailyClears++;
+    p.noDeathStreak++;
+    p.noSkipStreak++;
+
+    if (p.skipsUsed >= 3) p.postSkipStreak++;
+
+    if (lives === 1) p.oneLifeStreak++;
+    else p.oneLifeStreak = 0;
+
+    if (remainingTime >= stageLimit * 0.5) p.fastClears++;
+    else p.fastClears = 0;
+
+    if (remainingTime <= 10) p.lowTimeClears++;
+
+    if (!activeItem) p.noItemClears++;
+    else p.noItemClears = 0;
+
+    if (dangers.size > 0) p.dangerMapClears++;
+
+    if (activeItem === "timeClock") p.timeClockClears++;
+    if (activeItem === "pathGuide") p.pathGuideClears++;
+    if (activeItem === "firstAid" && firstAidCharged) p.firstAidClears++;
+
+    if (p.lostLifeMapActive) {
+        p.lostLifeMapCleared = true;
+        p.lostLifeMapActive = false;
+        p.postLostLifeClears = 0;
+    } else if (p.lostLifeMapCleared) {
+        p.postLostLifeClears++;
+    }
+
+    if (p.dailyClears >= 3) completeDailyQuest(1);
+    if (p.dailyClears >= 10) completeDailyQuest(2);
+    if (p.dailyClears >= 20) completeDailyQuest(3);
+    if (p.noDeathStreak >= 5) completeDailyQuest(4);
+    if (p.noDeathStreak >= 10) completeDailyQuest(5);
+    if (p.lowTimeClears >= 3) completeDailyQuest(6);
+    if (remainingTime <= 3) completeDailyQuest(7);
+    if (p.noDeathStreak >= 5) completeDailyQuest(8);
+    if (lives === MAX_LIVES && p.dailyClears >= 10) completeDailyQuest(9);
+    if (p.noDeathStreak >= 10) completeDailyQuest(10);
+    if (p.dangerMapClears >= 5) completeDailyQuest(11);
+    if (p.dangerMapClears >= 3) completeDailyQuest(12);
+    if (p.dailyClears >= 8) completeDailyQuest(13);
+    if (p.dailyClears >= 12) completeDailyQuest(14);
+    if (p.timeClockClears >= 3) completeDailyQuest(15);
+    if (p.shieldBlocks >= 1) completeDailyQuest(16);
+    if (p.pathGuideClears >= 3) completeDailyQuest(17);
+    if (p.firstAidClears >= 1) completeDailyQuest(18);
+    if (p.energyRecoveryUses >= 1) completeDailyQuest(19);
+    if (p.noItemClears >= 5) completeDailyQuest(20);
+
+    if (p.noSkipStreak >= 10) completeDailyQuest(31);
+    if (p.postSkipStreak >= 3) completeDailyQuest(32);
+    if (p.lostLifeMapCleared && p.postLostLifeClears >= 2) completeDailyQuest(33);
+    if (p.oneLifeStreak >= 3) completeDailyQuest(34);
+    if (p.fastClears >= 3) completeDailyQuest(35);
+    if (p.dailyClears >= 20) completeDailyQuest(36);
+    if (p.qualifiedGames >= 3) completeDailyQuest(37);
+    if (p.dailyClears >= 15) completeDailyQuest(38);
+    if (p.lowTimeClears >= 5) completeDailyQuest(39);
+    if (p.noDeathStreak >= 10) completeDailyQuest(40);
+    if (p.postSkipStreak >= 5) completeDailyQuest(41);
+    if (p.oneLifeStreak >= 5) completeDailyQuest(42);
+    if (p.fastClears >= 5) completeDailyQuest(43);
+
+    saveDailyQuestState();
+}
+
+function onDailyQuestGameEnd() {
+    refreshDailyQuestIfNeeded();
+    const p = dailyQuestState.progress;
+    if (p.gameStartCounted && clearCount >= 2) {
+        p.qualifiedGames++;
+        if (p.qualifiedGames >= 3) completeDailyQuest(37);
+    }
+    p.gameStartCounted = false;
+    saveDailyQuestState();
+}
+
+function onDailyQuestEnergyRecoveryUse() {
+    refreshDailyQuestIfNeeded();
+    dailyQuestState.progress.energyRecoveryUses++;
+    completeDailyQuest(19);
+    saveDailyQuestState();
+}
+
+function onDailyQuestShieldBlock() {
+    refreshDailyQuestIfNeeded();
+    dailyQuestState.progress.shieldBlocks++;
+    completeDailyQuest(16);
+    saveDailyQuestState();
+}
+
+function getQuestButton() {
+    return { x: WIDTH - 234, y: 28, w: 42, h: 42 };
+}
+
+function drawQuestButton() {
+    const b = getQuestButton();
+    ctx.save();
+    ctx.fillStyle = "rgba(255,255,255,0.10)";
+    ctx.strokeStyle = "rgba(255,255,255,0.25)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(b.x, b.y, b.w, b.h, 12);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "#f0f3f6";
+    ctx.font = "bold 22px Arial, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("📜", b.x + b.w / 2, b.y + b.h / 2 + 1);
+    ctx.restore();
+}
+
+let questOpen = false;
+
+function getDailyQuestProgressInfo(quest) {
+    const p = dailyQuestState.progress || createDailyQuestProgress();
+    let current = 0;
+    let target = quest.target || 0;
+
+    switch (quest.id) {
+        case 1: current = p.dailyClears; target = 3; break;
+        case 2: current = p.dailyClears; target = 10; break;
+        case 3: current = p.dailyClears; target = 20; break;
+        case 4: current = p.noDeathStreak; target = 5; break;
+        case 5: current = p.noDeathStreak; target = 10; break;
+        case 6: current = p.lowTimeClears; target = 3; break;
+        case 7: current = p.lowTimeClears > 0 ? 1 : 0; target = 1; break;
+        case 8: current = p.noDeathStreak; target = 5; break;
+        case 9: current = lives === MAX_LIVES ? p.dailyClears : 0; target = 10; break;
+        case 10: current = p.noDeathStreak; target = 10; break;
+        case 11: current = p.dangerMapClears; target = 5; break;
+        case 12: current = p.dangerMapClears; target = 3; break;
+        case 13: current = p.dailyClears; target = 8; break;
+        case 14: current = p.dailyClears; target = 12; break;
+        case 15: current = p.timeClockClears; target = 3; break;
+        case 16: current = p.shieldBlocks; target = 1; break;
+        case 17: current = p.pathGuideClears; target = 3; break;
+        case 18: current = p.firstAidClears; target = 1; break;
+        case 19: current = p.energyRecoveryUses; target = 1; break;
+        case 20: current = p.noItemClears; target = 5; break;
+        case 21: current = 0; target = 1; break;
+        case 22: current = 0; target = 1; break;
+        case 23: current = 0; target = 3; break;
+        case 24: current = 0; target = 5; break;
+        case 25: current = 0; target = 1; break;
+        case 26: current = 0; target = 1; break;
+        case 27: current = 0; target = 1; break;
+        case 28: current = 0; target = 5; break;
+        case 29: current = 0; target = 1; break;
+        case 30: current = 0; target = 1; break;
+        case 31: current = p.noSkipStreak; target = 10; break;
+        case 32: current = p.postSkipStreak; target = 3; break;
+        case 33: current = p.lostLifeMapCleared ? 1 + p.postLostLifeClears : 0; target = 3; break;
+        case 34: current = p.oneLifeStreak; target = 3; break;
+        case 35: current = p.fastClears; target = 3; break;
+        case 36: current = p.dailyClears; target = 20; break;
+        case 37: current = p.qualifiedGames; target = 3; break;
+        case 38: current = p.dailyClears; target = 15; break;
+        case 39: current = p.lowTimeClears; target = 5; break;
+        case 40: current = p.noDeathStreak; target = 10; break;
+        case 41: current = p.postSkipStreak; target = 5; break;
+        case 42: current = p.oneLifeStreak; target = 5; break;
+        case 43: current = p.fastClears; target = 5; break;
+        default: current = 0; target = quest.target || 1;
+    }
+
+    if (isDailyQuestCompleted(quest.id)) current = target;
+    current = Math.max(0, Math.min(target, current));
+    return { current, target, percent: target > 0 ? Math.round((current / target) * 100) : 0 };
+}
+
+function drawQuestPanel() {
+    refreshDailyQuestIfNeeded();
+    ctx.save();
+    ctx.fillStyle = "rgba(0,0,0,0.78)";
+    ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+    const panel = { x: 35, y: 25, w: 730, h: 550 };
+    ctx.fillStyle = "#171c25";
+    ctx.strokeStyle = "#394352";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(panel.x, panel.y, panel.w, panel.h, 20);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "#f3f5f7";
+    ctx.font = "bold 28px Pretendard, Noto Sans KR, sans-serif";
+    ctx.fillText("📜 일일 퀘스트", WIDTH / 2, 65);
+
+    ctx.fillStyle = "#ffd76a";
+    ctx.font = "600 14px Pretendard, Noto Sans KR, sans-serif";
+    ctx.fillText(`🪙 ${coins}코인   ·   다시 뽑기 ${dailyQuestState.rerolls}/${DAILY_QUEST_REROLL_COUNT}`, WIDTH / 2, 97);
+
+    for (let i = 0; i < DAILY_QUEST_COUNT; i++) {
+        const id = dailyQuestState.quests[i];
+        const q = getQuestById(id);
+        if (!q) continue;
+
+        const completed = isDailyQuestCompleted(id);
+        const claimed = completed && isDailyQuestRewardClaimed(q.id);
+        const info = getDailyQuestProgressInfo(q);
+        const y = 122 + i * 77;
+
+        ctx.fillStyle = claimed
+            ? "rgba(255,255,255,0.018)"
+            : completed
+                ? "rgba(100,210,130,0.13)"
+                : "rgba(255,255,255,0.045)";
+        ctx.strokeStyle = claimed
+            ? "rgba(255,255,255,0.055)"
+            : completed
+                ? "rgba(100,220,140,0.45)"
+                : "rgba(255,255,255,0.12)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.roundRect(58, y, 684, 64, 12);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.textAlign = "left";
+        ctx.fillStyle = claimed
+            ? "rgba(243,245,247,0.38)"
+            : completed
+                ? "#7dff9d"
+                : "#f3f5f7";
+        ctx.font = "bold 15px Pretendard, Noto Sans KR, sans-serif";
+        ctx.fillText(`${i + 1}. ${q.name}`, 75, y + 15);
+
+        ctx.fillStyle = claimed ? "rgba(159,170,183,0.38)" : "#9faab7";
+        ctx.font = "11px Pretendard, Noto Sans KR, sans-serif";
+        ctx.fillText(q.description, 75, y + 31);
+
+        // 현재 달성치 / 목표치를 % 막대 위에 표시
+        ctx.textAlign = "right";
+        ctx.fillStyle = claimed
+            ? "rgba(220,229,239,0.34)"
+            : completed
+                ? "#7dff9d"
+                : "#dce5ef";
+        ctx.font = "600 11px Pretendard, Noto Sans KR, sans-serif";
+        ctx.fillText(`${info.current}/${info.target} · ${info.percent}%`, 565, y + 44);
+
+        // 진행도 % 바
+        const barX = 75;
+        const barY = y + 51;
+        const barW = 480;
+        const barH = 7;
+        ctx.fillStyle = claimed ? "rgba(255,255,255,0.055)" : "rgba(255,255,255,0.10)";
+        ctx.beginPath();
+        ctx.roundRect(barX, barY, barW, barH, 4);
+        ctx.fill();
+        ctx.fillStyle = claimed
+            ? "rgba(110,232,139,0.20)"
+            : completed
+                ? "#6ee88b"
+                : "#5eb7ff";
+        ctx.beginPath();
+        ctx.roundRect(barX, barY, barW * (info.percent / 100), barH, 4);
+        ctx.fill();
+
+        if (claimed) {
+            ctx.textAlign = "right";
+            ctx.fillStyle = "rgba(125,255,157,0.38)";
+            ctx.font = "bold 12px Pretendard, Noto Sans KR, sans-serif";
+            ctx.fillText("보상 수령 완료 ✓", 718, y + 18);
+        } else {
+            // 미완료 퀘스트도 보상 받기 버튼을 항상 표시하되,
+            // 완료 전에는 가방의 미보유 아이템처럼 어둡고 희미하게 표시합니다.
+            ctx.textAlign = "left";
+            ctx.fillStyle = completed ? "#ffd76a" : "rgba(255,215,106,0.38)";
+            ctx.font = "600 11px Pretendard, Noto Sans KR, sans-serif";
+            ctx.fillText(`🪙 +${q.reward}코인`, 585, y + 14);
+
+            ctx.fillStyle = completed ? "rgba(99,184,255,0.72)" : "rgba(99,184,255,0.12)";
+            ctx.strokeStyle = completed ? "rgba(99,184,255,0.55)" : "rgba(99,184,255,0.18)";
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.roundRect(585, y + 25, 133, 25, 7);
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.textAlign = "center";
+            ctx.fillStyle = completed ? "#ffffff" : "rgba(255,255,255,0.28)";
+            ctx.font = "bold 12px Pretendard, Noto Sans KR, sans-serif";
+            ctx.fillText("보상 받기", 651.5, y + 37.5);
+        }
+    }
+
+    const canReroll = dailyQuestState.rerolls > 0 && dailyQuestState.quests.some(id => !isDailyQuestCompleted(id));
+    ctx.globalAlpha = canReroll ? 1 : 0.45;
+    drawSettingsButton(WIDTH / 2 - 105, 510, 210, 34, "퀘스트 다시 뽑기");
+    ctx.globalAlpha = 1;
+
+    drawSettingsButton(WIDTH / 2 - 80, 552, 160, 26, "닫기");
+    ctx.restore();
+}
+
 /* =========================================================
    새 게임
 ========================================================= */
 
 function startNewGame() {
 
+    refreshDailyQuestIfNeeded();
+    questOpen = false;
     settingsOpen = false;
 
     clearTimeout(
@@ -3604,6 +4196,7 @@ function startNewGame() {
     runStartTime =
         new Date();
 
+    onDailyQuestGameStart();
     activateItemForRun();
 
     resetRecoil();
@@ -3693,6 +4286,7 @@ function skipMap() {
     );
 
     mapSkips--;
+    onDailyQuestMapSkip();
 
     if (mapSkips === 0) {
         openEnergyRecoveryChoice();
@@ -4017,6 +4611,7 @@ function clearGame() {
     movement = null;
 
     clearCount++;
+    onDailyQuestClear();
 
     if (
         clearCount >
@@ -4123,6 +4718,7 @@ function dieGame() {
 
     if (activeItem === "energyShield" && shieldCharges > 0) {
         shieldCharges--;
+        onDailyQuestShieldBlock();
         dangers.delete(dangerKey);
         applyImpactRecoil(130, 9, 0.25);
         flash.color = "#69c8ff";
@@ -4134,6 +4730,7 @@ function dieGame() {
     }
 
     lives--;
+    onDailyQuestDeath();
 
     if (tryAutoFirstAid()) {
         gameState = "playing";
@@ -4334,6 +4931,8 @@ function finishGameOver() {
 
     gameState =
         "gameover";
+
+    onDailyQuestGameEnd();
 
     movement = null;
 
@@ -5123,6 +5722,7 @@ canvas.addEventListener(
 ========================================================= */
 
 function update(delta) {
+    refreshDailyQuestIfNeeded();
 
     if (multiplayerMatchActive) {
         multiplayerSendAccumulator += delta;
@@ -8837,6 +9437,8 @@ function drawEffectPreviewInBox(
 ========================================================= */
 
 function handleSettingsTap(x, y) {
+    refreshDailyQuestIfNeeded();
+    const questButton = getQuestButton();
     const shopButton = getShopButton();
     const inventoryButton = getInventoryButton();
     const gear = getStartSettingsButton();
@@ -8895,7 +9497,39 @@ function handleSettingsTap(x, y) {
         return true;
     }
 
-    if (!shopOpen && !inventoryOpen && !settingsOpen && isInsideRect(x, y, shopButton)) {
+    if (!shopOpen && !inventoryOpen && !settingsOpen && !multiplayerOpen && !questOpen && isInsideRect(x, y, questButton)) {
+        questOpen = true;
+        return true;
+    }
+
+    if (questOpen) {
+        refreshDailyQuestIfNeeded();
+
+        for (let i = 0; i < DAILY_QUEST_COUNT; i++) {
+            const id = dailyQuestState.quests[i];
+            if (!id || !isDailyQuestCompleted(id) || isDailyQuestRewardClaimed(id)) continue;
+            const y = 122 + i * 77;
+            if (isInsideRect(x, y, { x: 585, y: y + 25, w: 133, h: 25 })) {
+                claimDailyQuestReward(id);
+                return true;
+            }
+        }
+
+        if (isInsideRect(x, y, { x: WIDTH / 2 - 105, y: 510, w: 210, h: 34 })) {
+            rerollDailyQuests();
+            return true;
+        }
+        if (isInsideRect(x, y, { x: WIDTH / 2 - 80, y: 552, w: 160, h: 26 })) {
+            questOpen = false;
+            return true;
+        }
+        if (x < 35 || x > 765 || y < 25 || y > 575) {
+            questOpen = false;
+        }
+        return true;
+    }
+
+    if (!shopOpen && !inventoryOpen && !settingsOpen && !multiplayerOpen && isInsideRect(x, y, shopButton)) {
         shopOpen = true;
         shopPage = 0;
         return true;
@@ -9288,6 +9922,7 @@ function drawStartScreen() {
     );
 
 
+    drawQuestButton();
     drawShopButton();
     drawInventoryButton();
     drawSettingsGear();
@@ -9296,7 +9931,9 @@ function drawStartScreen() {
     drawSettingsButton(570, 350, 200, 38, "⚔ 2인용 경쟁");
 
 
-    if (shopOpen) {
+    if (questOpen) {
+        drawQuestPanel();
+    } else if (shopOpen) {
         drawShopPanel();
     } else if (inventoryOpen) {
         drawInventoryPanel();
@@ -9518,7 +10155,9 @@ function draw(now = performance.now()) {
         // 설정 화면은 정적인 UI이므로 내용이 바뀔 때만 다시 그립니다.
         // 미리보기의 모양/강도는 그대로 유지하면서, 매 프레임 반복되는
         // Canvas 연산을 없애 화살표 입력 시 발생하는 순간적인 지연을 줄입니다.
-        if (settingsOpen) {
+        if (questOpen) {
+            drawStartScreen();
+        } else if (settingsOpen) {
             const previewFrameInterval = 1000 / 24;
 
             if (
