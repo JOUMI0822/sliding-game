@@ -4150,10 +4150,10 @@ function drawQuestPanel() {
 
     const canReroll = dailyQuestState.rerolls > 0 && dailyQuestState.quests.some(id => !isDailyQuestCompleted(id));
     ctx.globalAlpha = canReroll ? 1 : 0.45;
-    drawSettingsButton(WIDTH / 2 - 105, 410, 210, 38, `퀘스트 다시 뽑기 ${dailyQuestState.rerolls}/${DAILY_QUEST_REROLL_COUNT}`);
+    drawSettingsButton(WIDTH / 2 - 105, 390, 210, 38, `퀘스트 다시 뽑기 ${dailyQuestState.rerolls}/${DAILY_QUEST_REROLL_COUNT}`);
     ctx.globalAlpha = 1;
 
-    drawSettingsButton(WIDTH / 2 - 80, 465, 160, 32, "닫기");
+    drawSettingsButton(WIDTH / 2 - 80, 480, 160, 32, "닫기");
     ctx.restore();
 }
 
