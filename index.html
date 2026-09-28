@@ -4051,7 +4051,7 @@ function drawQuestPanel() {
 
     ctx.fillStyle = "#ffd76a";
     ctx.font = "600 14px Pretendard, Noto Sans KR, sans-serif";
-    ctx.fillText(`🪙 ${coins}코인   ·   다시 뽑기 ${dailyQuestState.rerolls}/${DAILY_QUEST_REROLL_COUNT}`, WIDTH / 2, 97);
+    ctx.fillText(`🪙 ${coins}코인`, WIDTH / 2, 97);
 
     for (let i = 0; i < DAILY_QUEST_COUNT; i++) {
         const id = dailyQuestState.quests[i];
@@ -4150,10 +4150,10 @@ function drawQuestPanel() {
 
     const canReroll = dailyQuestState.rerolls > 0 && dailyQuestState.quests.some(id => !isDailyQuestCompleted(id));
     ctx.globalAlpha = canReroll ? 1 : 0.45;
-    drawSettingsButton(WIDTH / 2 - 105, 510, 210, 34, "퀘스트 다시 뽑기");
+    drawSettingsButton(WIDTH / 2 - 105, 505, 210, 34, `퀘스트 다시 뽑기 ${dailyQuestState.rerolls}/${DAILY_QUEST_REROLL_COUNT}`);
     ctx.globalAlpha = 1;
 
-    drawSettingsButton(WIDTH / 2 - 80, 552, 160, 26, "닫기");
+    drawSettingsButton(WIDTH / 2 - 80, 545, 160, 26, "닫기");
     ctx.restore();
 }
 
@@ -9515,11 +9515,11 @@ function handleSettingsTap(x, y) {
             }
         }
 
-        if (isInsideRect(x, y, { x: WIDTH / 2 - 105, y: 510, w: 210, h: 34 })) {
+        if (isInsideRect(x, y, { x: WIDTH / 2 - 105, y: 505, w: 210, h: 34 })) {
             rerollDailyQuests();
             return true;
         }
-        if (isInsideRect(x, y, { x: WIDTH / 2 - 80, y: 552, w: 160, h: 26 })) {
+        if (isInsideRect(x, y, { x: WIDTH / 2 - 80, y: 545, w: 160, h: 26 })) {
             questOpen = false;
             return true;
         }
