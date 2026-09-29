@@ -162,12 +162,12 @@ canvas {
 
 #effectVolumeRange {
     position: fixed;
-    z-index: 50;
+    z-index: 9999;
     display: none;
     height: 42px;
     margin: 0;
     padding: 0;
-    touch-action: pan-x;
+    touch-action: none;
     -webkit-user-select: none;
     user-select: none;
     accent-color: #7ddcff;
@@ -222,6 +222,13 @@ function positionEffectVolumeRange() {
 }
 
 if (effectVolumeRange) {
+    // 네이티브 range가 부모 게임의 스와이프 핸들러에 가로채이지 않게 한다.
+    ["touchstart", "touchmove", "touchend", "pointerdown", "pointermove", "pointerup", "pointercancel"].forEach(type => {
+        effectVolumeRange.addEventListener(type, event => {
+            event.stopPropagation();
+        }, { passive: false });
+    });
+
     effectVolumeRange.addEventListener("input", event => {
         setEffectVolume(Number(event.target.value) / 100);
         requestSettingsRender();
@@ -5376,6 +5383,7 @@ gameWrapper.addEventListener(
     "touchstart",
     event => {
 
+        if (event.target === effectVolumeRange) return;
         event.preventDefault();
 
         if (
@@ -5416,6 +5424,8 @@ gameWrapper.addEventListener(
     "touchmove",
     event => {
 
+        if (event.target === effectVolumeRange) return;
+
         if (settingsOpen && event.touches.length === 1) {
             const touch = event.touches[0];
             if (volumeSliderDragging) {
@@ -5436,6 +5446,7 @@ gameWrapper.addEventListener(
     "touchend",
     event => {
 
+        if (event.target === effectVolumeRange) return;
         event.preventDefault();
 
         if (
