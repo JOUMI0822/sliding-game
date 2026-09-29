@@ -162,15 +162,21 @@ canvas {
 
 #effectVolumeRange {
     position: fixed;
-    z-index: 9999;
+    z-index: 50;
     display: none;
     height: 42px;
     margin: 0;
     padding: 0;
-    touch-action: none;
+    touch-action: pan-x;
     -webkit-user-select: none;
     user-select: none;
-    accent-color: #7ddcff;
+    opacity: 0;
+    background: transparent;
+    border: 0;
+    color: transparent;
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
 }
 #effectVolumeValue {
     position: fixed;
@@ -182,6 +188,27 @@ canvas {
     color: #ffffff;
     text-shadow: 0 2px 4px rgba(0,0,0,.8);
     white-space: nowrap;
+}
+
+#effectVolumeRange::-webkit-slider-runnable-track {
+    background: transparent;
+    border: 0;
+}
+#effectVolumeRange::-webkit-slider-thumb {
+    background: transparent;
+    border: 0;
+    opacity: 0;
+    -webkit-appearance: none;
+    appearance: none;
+}
+#effectVolumeRange::-moz-range-track {
+    background: transparent;
+    border: 0;
+}
+#effectVolumeRange::-moz-range-thumb {
+    background: transparent;
+    border: 0;
+    opacity: 0;
 }
 </style>
 </head>
