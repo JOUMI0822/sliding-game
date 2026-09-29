@@ -200,6 +200,141 @@ const WIDTH = 800;
 const HEIGHT = 600;
 
 const TIME_LIMIT = 20;
+/* =========================================================
+   게임 오디오
+========================================================= */
+
+const GAME_BGM_SRC = "sliding_bgm.m4a";
+const GAME_OVER_BGM_SRC = "gameover.mp3";
+
+const gameBgm = new Audio(GAME_BGM_SRC);
+const gameOverBgm = new Audio(GAME_OVER_BGM_SRC);
+
+gameBgm.loop = true;
+gameBgm.preload = "auto";
+gameBgm.volume = 0;
+
+gameOverBgm.loop = false;
+gameOverBgm.preload = "auto";
+gameOverBgm.volume = 1;
+
+let bgmFadeFrame = null;
+
+function cancelBgmFade() {
+    if (bgmFadeFrame !== null) {
+        cancelAnimationFrame(bgmFadeFrame);
+        bgmFadeFrame = null;
+    }
+}
+
+function fadeAudio(audio, from, to, duration, onComplete = null) {
+    cancelBgmFade();
+
+    const start = performance.now();
+    const startVolume = Math.max(0, Math.min(1, from));
+    const targetVolume = Math.max(0, Math.min(1, to));
+
+    audio.volume = startVolume;
+
+    function step(now) {
+        const progress = Math.min(
+            1,
+            (now - start) / Math.max(1, duration)
+        );
+
+        const eased = 1 - Math.pow(1 - progress, 3);
+
+        audio.volume =
+            startVolume +
+            (targetVolume - startVolume) * eased;
+
+        if (progress < 1) {
+            bgmFadeFrame = requestAnimationFrame(step);
+            return;
+        }
+
+        audio.volume = targetVolume;
+        bgmFadeFrame = null;
+
+        if (onComplete) {
+            onComplete();
+        }
+    }
+
+    bgmFadeFrame = requestAnimationFrame(step);
+}
+
+function startGameBgm() {
+    cancelBgmFade();
+
+    try {
+        gameOverBgm.pause();
+        gameOverBgm.currentTime = 0;
+        gameBgm.currentTime = 0;
+    } catch (error) {}
+
+    gameBgm.volume = 0;
+
+    const playPromise = gameBgm.play();
+
+    if (playPromise && typeof playPromise.catch === "function") {
+        playPromise.catch(() => {});
+    }
+
+    fadeAudio(
+        gameBgm,
+        0,
+        0.72,
+        1200
+    );
+}
+
+function endGameBgmAndPlayGameOver() {
+    cancelBgmFade();
+
+    fadeAudio(
+        gameBgm,
+        gameBgm.volume,
+        0,
+        900,
+        () => {
+            try {
+                gameBgm.pause();
+                gameBgm.currentTime = 0;
+            } catch (error) {}
+
+            try {
+                gameOverBgm.pause();
+                gameOverBgm.currentTime = 0;
+                gameOverBgm.volume = 1;
+
+                const playPromise = gameOverBgm.play();
+
+                if (
+                    playPromise &&
+                    typeof playPromise.catch === "function"
+                ) {
+                    playPromise.catch(() => {});
+                }
+            } catch (error) {}
+        }
+    );
+}
+
+function stopAllGameAudio() {
+    cancelBgmFade();
+
+    try {
+        gameBgm.pause();
+        gameBgm.currentTime = 0;
+        gameBgm.volume = 0;
+
+        gameOverBgm.pause();
+        gameOverBgm.currentTime = 0;
+    } catch (error) {}
+}
+
+
 
 /* 클리어 횟수에 따른 제한 시간
    0~4회: 20초 / 5~9회: 17초 / 10~19회: 15초
@@ -238,7 +373,8 @@ const MAX_PREVIOUS_LAYOUTS = 180;
    게임 상태
 ========================================================= */
 
-let gameState = "start";
+let stopAllGameAudio();
+ gameState = "start";
 
 /* =========================================================
    2인용 경쟁 모드 준비 상태
@@ -381,6 +517,8 @@ function connectMultiplayerSocket(onConnected) {
         multiplayerPeerJoined = false;
         if (multiplayerMatchActive) {
             multiplayerMatchActive = false;
+            stopAllGameAudio();
+
             gameState = "start";
             multiplayerOpen = false;
             setMessage("상대 플레이어와의 연결이 끊어졌습니다.");
@@ -4150,10 +4288,10 @@ function drawQuestPanel() {
 
     const canReroll = dailyQuestState.rerolls > 0 && dailyQuestState.quests.some(id => !isDailyQuestCompleted(id));
     ctx.globalAlpha = canReroll ? 1 : 0.45;
-    drawSettingsButton(WIDTH / 2 - 105, 390, 210, 38, `퀘스트 다시 뽑기 ${dailyQuestState.rerolls}/${DAILY_QUEST_REROLL_COUNT}`);
+    drawSettingsButton(WIDTH / 2 - 105, 410, 210, 38, `퀘스트 다시 뽑기 ${dailyQuestState.rerolls}/${DAILY_QUEST_REROLL_COUNT}`);
     ctx.globalAlpha = 1;
 
-    drawSettingsButton(WIDTH / 2 - 80, 480, 160, 32, "닫기");
+    drawSettingsButton(WIDTH / 2 - 80, 465, 160, 32, "닫기");
     ctx.restore();
 }
 
@@ -4172,6 +4310,8 @@ function startNewGame() {
     );
 
     gameState = "playing";
+
+    startGameBgm();
 
     lives =
         MAX_LIVES;
@@ -4932,6 +5072,8 @@ function finishGameOver() {
     gameState =
         "gameover";
 
+    endGameBgmAndPlayGameOver();
+
     onDailyQuestGameEnd();
 
     movement = null;
@@ -5188,6 +5330,9 @@ window.addEventListener(
                     multiplayerResult = null;
                 }
 
+                stopAllGameAudio();
+
+
                 gameState = "start";
 
                 settingsOpen =
@@ -5391,6 +5536,8 @@ gameWrapper.addEventListener(
                 multiplayerOpen = false;
                 multiplayerRole = null;
                 multiplayerResult = null;
+                stopAllGameAudio();
+
                 gameState = "start";
                 setMessage("");
                 updateUI();
@@ -5505,6 +5652,9 @@ gameWrapper.addEventListener(
             ) {
 
                 lastTapTime = 0;
+
+                stopAllGameAudio();
+
 
                 gameState = "start";
 
