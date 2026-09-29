@@ -932,7 +932,7 @@ const STREAK_EFFECTS = [
 const SETTINGS_KEY = "slidingMazeVisualSettings_v2";
 
 /* =========================================================
-   효과음 시스템
+   효과음: 필요할 때만 생성하여 초기 화면 로딩을 방해하지 않음
 ========================================================= */
 const AUDIO_FILES = {
     wallHit: "wall_hit.m4a",
@@ -940,40 +940,29 @@ const AUDIO_FILES = {
     itemUse: "item_use.m4a",
     gameOver: "gameover.m4a"
 };
-
 const EFFECT_VOLUME_KEY = "slidingMazeEffectVolume_v1";
 let effectVolume = 0.70;
-
 try {
-    const savedEffectVolume = Number(localStorage.getItem(EFFECT_VOLUME_KEY));
-    if (Number.isFinite(savedEffectVolume)) {
-        effectVolume = Math.max(0, Math.min(1, savedEffectVolume));
-    }
+    const saved = Number(localStorage.getItem(EFFECT_VOLUME_KEY));
+    if (Number.isFinite(saved)) effectVolume = Math.max(0, Math.min(1, saved));
 } catch (error) {}
-
 function saveEffectVolume() {
-    try {
-        localStorage.setItem(EFFECT_VOLUME_KEY, String(effectVolume));
-    } catch (error) {}
+    try { localStorage.setItem(EFFECT_VOLUME_KEY, String(effectVolume)); } catch (error) {}
 }
-
 function setEffectVolume(value) {
     effectVolume = Math.max(0, Math.min(1, Number(value) || 0));
     saveEffectVolume();
+    requestSettingsRender();
 }
-
 function playEffectSound(type) {
     const src = AUDIO_FILES[type];
     if (!src || effectVolume <= 0) return;
-
     try {
         const audio = new Audio(src);
-        audio.volume = effectVolume;
         audio.preload = "none";
+        audio.volume = effectVolume;
         const promise = audio.play();
-        if (promise && typeof promise.catch === "function") {
-            promise.catch(() => {});
-        }
+        if (promise && promise.catch) promise.catch(() => {});
     } catch (error) {}
 }
 
@@ -1624,9 +1613,7 @@ function getSelectedItemLabel() {
 
 function activateItemForRun() {
     activeItem = selectedItem;
-    if (activeItem) {
-        playEffectSound("itemUse");
-    }
+    if (activeItem) playEffectSound("itemUse");
     activeTimeBonus =
         activeItem === "timeClock"
             ? Math.max(0, Math.min(5, selectedTimeClocks))
@@ -5365,6 +5352,15 @@ gameWrapper.addEventListener(
         touchStartTime =
             performance.now();
 
+        if (settingsOpen) {
+            const rect = canvas.getBoundingClientRect();
+            const x = (touch.clientX - rect.left) * (WIDTH / rect.width);
+            const y = (touch.clientY - rect.top) * (HEIGHT / rect.height);
+            const bar = { x: WIDTH / 2 - 130, y: 516, w: 260, h: 8 };
+            volumeSliderDragging = x >= bar.x - 20 && x <= bar.x + bar.w + 20 && y >= bar.y - 24 && y <= bar.y + 32;
+            if (volumeSliderDragging) updateVolumeFromPointer(touch.clientX, touch.clientY);
+        }
+
     },
     {
         passive: false
@@ -5375,6 +5371,13 @@ gameWrapper.addEventListener(
 gameWrapper.addEventListener(
     "touchmove",
     event => {
+
+        if (settingsOpen && event.touches.length === 1) {
+            const touch = event.touches[0];
+            if (volumeSliderDragging) {
+                updateVolumeFromPointer(touch.clientX, touch.clientY);
+            }
+        }
 
         event.preventDefault();
 
@@ -5423,6 +5426,12 @@ gameWrapper.addEventListener(
         const duration =
             performance.now() -
             touchStartTime;
+
+        if (volumeSliderDragging) {
+            updateVolumeFromPointer(touch.clientX, touch.clientY);
+            volumeSliderDragging = false;
+            return;
+        }
 
         if (energyRecoveryChoiceOpen) {
             if (distance < SWIPE_MIN_DISTANCE && duration <= TAP_MAX_DURATION) {
@@ -5723,6 +5732,47 @@ gameWrapper.addEventListener(
     }
 );
 
+
+let volumeSliderDragging = false;
+
+function updateVolumeFromPointer(clientX, clientY) {
+    if (!settingsOpen) return false;
+    const rect = canvas.getBoundingClientRect();
+    const x = (clientX - rect.left) * (WIDTH / rect.width);
+    const y = (clientY - rect.top) * (HEIGHT / rect.height);
+    const bar = { x: WIDTH / 2 - 130, y: 516, w: 260, h: 8 };
+    const hit = x >= bar.x - 20 && x <= bar.x + bar.w + 20 && y >= bar.y - 24 && y <= bar.y + 32;
+    if (!hit && !volumeSliderDragging) return false;
+    setEffectVolume((x - bar.x) / bar.w);
+    return true;
+}
+
+canvas.addEventListener("pointerdown", event => {
+    if (!settingsOpen) return;
+    if (updateVolumeFromPointer(event.clientX, event.clientY)) {
+        volumeSliderDragging = true;
+        try { canvas.setPointerCapture(event.pointerId); } catch (error) {}
+        event.preventDefault();
+        event.stopPropagation();
+    }
+}, true);
+
+canvas.addEventListener("pointermove", event => {
+    if (!volumeSliderDragging) return;
+    updateVolumeFromPointer(event.clientX, event.clientY);
+    event.preventDefault();
+}, true);
+
+canvas.addEventListener("pointerup", event => {
+    if (!volumeSliderDragging) return;
+    volumeSliderDragging = false;
+    try { canvas.releasePointerCapture(event.pointerId); } catch (error) {}
+    event.preventDefault();
+}, true);
+
+canvas.addEventListener("pointercancel", () => {
+    volumeSliderDragging = false;
+}, true);
 
 let lastSettingsPointerTime = 0;
 
@@ -9321,14 +9371,21 @@ function drawSettingsPanel() {
     ctx.fillText(
         "1연속부터 적용(연속 클리어 횟수가 높을수록 효과가 강해집니다)",
         WIDTH / 2,
-        490
+        508
     );
+
+
+    ctx.fillStyle =
+        "#8f9aa8";
+
+    ctx.font =
+        "13px Pretendard, Noto Sans KR, sans-serif";
 
     ctx.fillStyle = "#aeb8c5";
     ctx.font = "600 13px Pretendard, Noto Sans KR, sans-serif";
-    ctx.fillText(`효과음 크기  ${Math.round(effectVolume * 100)}%`, WIDTH / 2, 507);
+    ctx.fillText(`효과음 크기  ${Math.round(effectVolume * 100)}%`, WIDTH / 2, 500);
 
-    const volumeBar = { x: WIDTH / 2 - 130, y: 518, w: 260, h: 8 };
+    const volumeBar = { x: WIDTH / 2 - 130, y: 516, w: 260, h: 8 };
     ctx.fillStyle = "rgba(255,255,255,0.10)";
     ctx.beginPath();
     ctx.roundRect(volumeBar.x, volumeBar.y, volumeBar.w, volumeBar.h, 5);
@@ -9342,24 +9399,19 @@ function drawSettingsPanel() {
     ctx.arc(volumeBar.x + volumeBar.w * effectVolume, volumeBar.y + volumeBar.h / 2, 8, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.fillStyle =
-        "#8f9aa8";
-
-    ctx.font =
-        "13px Pretendard, Noto Sans KR, sans-serif";
-
+    ctx.fillStyle = "#8f9aa8";
+    ctx.font = "13px Pretendard, Noto Sans KR, sans-serif";
     ctx.fillText(
         "설정은 자동으로 저장됩니다.",
         WIDTH / 2,
-        537
+        542
     );
-
 
     drawSettingsButton(
         WIDTH / 2 - 80,
-        546,
+        550,
         160,
-        30,
+        26,
         "닫기"
     );
 
@@ -9742,15 +9794,14 @@ function handleSettingsTap(x, y) {
 
     const panel = { x: 70, y: 20, w: 660, h: 560 };
 
-    if (isInsideRect(x, y, { x: WIDTH / 2 - 80, y: 546, w: 160, h: 30 })) {
+    if (isInsideRect(x, y, { x: WIDTH / 2 - 80, y: 550, w: 160, h: 26 })) {
         settingsOpen = false;
         return true;
     }
 
-    const volumeBar = { x: WIDTH / 2 - 130, y: 518, w: 260, h: 8 };
-    if (isInsideRect(x, y, { x: volumeBar.x - 14, y: volumeBar.y - 14, w: volumeBar.w + 28, h: 36 })) {
+    const volumeBar = { x: WIDTH / 2 - 130, y: 516, w: 260, h: 8 };
+    if (isInsideRect(x, y, { x: volumeBar.x - 18, y: volumeBar.y - 18, w: volumeBar.w + 36, h: 44 })) {
         setEffectVolume((x - volumeBar.x) / volumeBar.w);
-        requestSettingsRender();
         return true;
     }
 
