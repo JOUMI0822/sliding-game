@@ -332,11 +332,19 @@ function startGameBgm() {
         gameOverBgm.pause();
         gameOverBgm.currentTime = 0;
         gameOverBgm.volume = 0;
-        gameBgm.currentTime = 0;
     } catch (error) {}
 
     if (audioSettings.music <= 0) {
         gameBgm.volume = 0;
+        return;
+    }
+
+    // 이미 재생 중이면 맵이 바뀌어도 음악을 처음부터 다시 시작하지 않는다.
+    // 따라서 스테이지 전환 시 배경음이 끊기거나 처음으로 돌아가지 않는다.
+    const alreadyPlaying = !gameBgm.paused && !gameBgm.ended;
+
+    if (alreadyPlaying) {
+        gameBgm.volume = audioSettings.music;
         return;
     }
 
@@ -355,6 +363,24 @@ function startGameBgm() {
         1200
     );
 }
+
+// 일부 모바일 브라우저에서는 loop 속성만으로 반복 재생이 안정적이지 않을 수 있어
+// 게임 플레이 중 음악이 끝나면 즉시 다시 재생한다.
+gameBgm.addEventListener("ended", () => {
+    if (
+        audioSettings.music > 0 &&
+        (gameState === "playing" || multiplayerMatchActive)
+    ) {
+        try {
+            gameBgm.currentTime = 0;
+            gameBgm.volume = audioSettings.music;
+            const playPromise = gameBgm.play();
+            if (playPromise && typeof playPromise.catch === "function") {
+                playPromise.catch(() => {});
+            }
+        } catch (error) {}
+    }
+});
 
 function endGameBgmAndPlayGameOver() {
     cancelBgmFade();
