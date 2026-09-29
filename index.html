@@ -1243,8 +1243,92 @@ let visualSettingsSaveTimer = null;
 let settingsRenderRequested = true;
 let lastSettingsRenderTime = 0;
 
+const volumeTouchArea = document.createElement("div");
+volumeTouchArea.id = "volumeTouchArea";
+Object.assign(volumeTouchArea.style, {
+    position: "fixed",
+    zIndex: "60",
+    display: "none",
+    margin: "0",
+    padding: "0",
+    background: "transparent",
+    border: "0",
+    outline: "0",
+    touchAction: "none",
+    userSelect: "none",
+    WebkitUserSelect: "none"
+});
+document.body.appendChild(volumeTouchArea);
+
+let volumeTouchPointerId = null;
+
+function positionVolumeTouchArea() {
+    if (!volumeTouchArea || !canvas) return;
+    if (!settingsOpen) {
+        volumeTouchArea.style.display = "none";
+        return;
+    }
+
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = rect.width / WIDTH;
+    const scaleY = rect.height / HEIGHT;
+    const bar = { x: WIDTH / 2 - 130, y: 516, w: 260, h: 8 };
+
+    // A modest touch target around the original thin graphic slider.
+    volumeTouchArea.style.display = "block";
+    volumeTouchArea.style.left = `${rect.left + (bar.x - 16) * scaleX}px`;
+    volumeTouchArea.style.top = `${rect.top + (bar.y - 22) * scaleY}px`;
+    volumeTouchArea.style.width = `${(bar.w + 32) * scaleX}px`;
+    volumeTouchArea.style.height = `${52 * scaleY}px`;
+}
+
+function setVolumeFromClientX(clientX) {
+    const rect = canvas.getBoundingClientRect();
+    const bar = { x: WIDTH / 2 - 130, w: 260 };
+    const x = (clientX - rect.left) * (WIDTH / rect.width);
+    setEffectVolume((x - bar.x) / bar.w);
+    requestSettingsRender();
+}
+
+volumeTouchArea.addEventListener("pointerdown", event => {
+    if (!settingsOpen) return;
+    volumeTouchPointerId = event.pointerId;
+    try { volumeTouchArea.setPointerCapture(event.pointerId); } catch (error) {}
+    setVolumeFromClientX(event.clientX);
+    event.preventDefault();
+    event.stopPropagation();
+}, { passive: false });
+
+volumeTouchArea.addEventListener("pointermove", event => {
+    if (volumeTouchPointerId !== event.pointerId) return;
+    setVolumeFromClientX(event.clientX);
+    event.preventDefault();
+    event.stopPropagation();
+}, { passive: false });
+
+function endVolumePointer(event) {
+    if (volumeTouchPointerId !== event.pointerId) return;
+    setVolumeFromClientX(event.clientX);
+    try { volumeTouchArea.releasePointerCapture(event.pointerId); } catch (error) {}
+    volumeTouchPointerId = null;
+    event.preventDefault();
+    event.stopPropagation();
+}
+volumeTouchArea.addEventListener("pointerup", endVolumePointer, { passive: false });
+volumeTouchArea.addEventListener("pointercancel", endVolumePointer, { passive: false });
+
+["touchstart","touchmove","touchend","touchcancel"].forEach(type => {
+    volumeTouchArea.addEventListener(type, event => {
+        event.stopPropagation();
+    }, { passive: false });
+});
+
+window.addEventListener("resize", positionVolumeTouchArea);
+window.addEventListener("orientationchange", positionVolumeTouchArea);
+
 function requestSettingsRender() {
     settingsRenderRequested = true;
+    positionVolumeTouchArea();
 }
 
 function saveVisualSettingsDelayed() {
@@ -5370,15 +5454,6 @@ gameWrapper.addEventListener(
         touchStartTime =
             performance.now();
 
-        if (settingsOpen) {
-            const rect = canvas.getBoundingClientRect();
-            const x = (touch.clientX - rect.left) * (WIDTH / rect.width);
-            const y = (touch.clientY - rect.top) * (HEIGHT / rect.height);
-            const bar = { x: WIDTH / 2 - 130, y: 516, w: 260, h: 8 };
-            volumeSliderDragging = x >= bar.x - 20 && x <= bar.x + bar.w + 20 && y >= bar.y - 24 && y <= bar.y + 32;
-            if (volumeSliderDragging) updateVolumeFromPointer(touch.clientX, touch.clientY);
-        }
-
     },
     {
         passive: false
@@ -5390,13 +5465,6 @@ gameWrapper.addEventListener(
     "touchmove",
     event => {
 
-
-        if (settingsOpen && event.touches.length === 1) {
-            const touch = event.touches[0];
-            if (volumeSliderDragging) {
-                updateVolumeFromPointer(touch.clientX, touch.clientY);
-            }
-        }
 
         event.preventDefault();
 
@@ -5445,12 +5513,6 @@ gameWrapper.addEventListener(
         const duration =
             performance.now() -
             touchStartTime;
-
-        if (volumeSliderDragging) {
-            updateVolumeFromPointer(touch.clientX, touch.clientY);
-            volumeSliderDragging = false;
-            return;
-        }
 
         if (energyRecoveryChoiceOpen) {
             if (distance < SWIPE_MIN_DISTANCE && duration <= TAP_MAX_DURATION) {
@@ -5754,45 +5816,6 @@ gameWrapper.addEventListener(
 
 
 let volumeSliderDragging = false;
-
-function updateVolumeFromPointer(clientX, clientY) {
-    if (!settingsOpen) return false;
-    const rect = canvas.getBoundingClientRect();
-    const x = (clientX - rect.left) * (WIDTH / rect.width);
-    const y = (clientY - rect.top) * (HEIGHT / rect.height);
-    const bar = { x: WIDTH / 2 - 130, y: 516, w: 260, h: 8 };
-    const hit = x >= bar.x - 20 && x <= bar.x + bar.w + 20 && y >= bar.y - 24 && y <= bar.y + 32;
-    if (!hit && !volumeSliderDragging) return false;
-    setEffectVolume((x - bar.x) / bar.w);
-    return true;
-}
-
-canvas.addEventListener("pointerdown", event => {
-    if (!settingsOpen) return;
-    if (updateVolumeFromPointer(event.clientX, event.clientY)) {
-        volumeSliderDragging = true;
-        try { canvas.setPointerCapture(event.pointerId); } catch (error) {}
-        event.preventDefault();
-        event.stopPropagation();
-    }
-}, true);
-
-canvas.addEventListener("pointermove", event => {
-    if (!volumeSliderDragging) return;
-    updateVolumeFromPointer(event.clientX, event.clientY);
-    event.preventDefault();
-}, true);
-
-canvas.addEventListener("pointerup", event => {
-    if (!volumeSliderDragging) return;
-    volumeSliderDragging = false;
-    try { canvas.releasePointerCapture(event.pointerId); } catch (error) {}
-    event.preventDefault();
-}, true);
-
-canvas.addEventListener("pointercancel", () => {
-    volumeSliderDragging = false;
-}, true);
 
 let lastSettingsPointerTime = 0;
 
@@ -9807,7 +9830,7 @@ function handleSettingsTap(x, y) {
     if (!settingsOpen && isInsideRect(x, y, gear)) {
         settingsOpen = true;
         requestSettingsRender();
-        positionEffectVolumeRange();
+        positionVolumeTouchArea();
         return true;
     }
 
@@ -9817,13 +9840,7 @@ function handleSettingsTap(x, y) {
 
     if (isInsideRect(x, y, { x: WIDTH / 2 - 80, y: 550, w: 160, h: 26 })) {
         settingsOpen = false;
-        positionEffectVolumeRange();
-        return true;
-    }
-
-    const volumeBar = { x: WIDTH / 2 - 130, y: 516, w: 260, h: 8 };
-    if (isInsideRect(x, y, { x: volumeBar.x - 18, y: volumeBar.y - 18, w: volumeBar.w + 36, h: 44 })) {
-        setEffectVolume((x - volumeBar.x) / volumeBar.w);
+        positionVolumeTouchArea();
         return true;
     }
 
