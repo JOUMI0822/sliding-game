@@ -159,6 +159,19 @@ canvas {
         aspect-ratio: 4 / 3;
     }
 }
+
+#effectVolumeRange {
+    position: fixed;
+    z-index: 50;
+    display: none;
+    height: 42px;
+    margin: 0;
+    padding: 0;
+    touch-action: pan-x;
+    -webkit-user-select: none;
+    user-select: none;
+    accent-color: #7ddcff;
+}
 </style>
 </head>
 
@@ -178,6 +191,7 @@ canvas {
     </div>
 
     <canvas id="game" width="800" height="600"></canvas>
+<input id="effectVolumeRange" type="range" min="0" max="100" value="70" aria-label="효과음 크기">
 
 </div>
 
@@ -189,6 +203,35 @@ canvas {
 ========================================================= */
 
 const canvas = document.getElementById("game");
+const effectVolumeRange = document.getElementById("effectVolumeRange");
+
+function positionEffectVolumeRange() {
+    if (!effectVolumeRange) return;
+    if (!settingsOpen) {
+        effectVolumeRange.style.display = "none";
+        return;
+    }
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = rect.width / WIDTH;
+    const scaleY = rect.height / HEIGHT;
+    effectVolumeRange.style.display = "block";
+    effectVolumeRange.style.left = `${rect.left + 270 * scaleX}px`;
+    effectVolumeRange.style.top = `${rect.top + 496 * scaleY}px`;
+    effectVolumeRange.style.width = `${260 * scaleX}px`;
+    effectVolumeRange.value = String(Math.round(effectVolume * 100));
+}
+
+if (effectVolumeRange) {
+    effectVolumeRange.addEventListener("input", event => {
+        setEffectVolume(Number(event.target.value) / 100);
+        requestSettingsRender();
+    });
+    effectVolumeRange.addEventListener("change", event => {
+        setEffectVolume(Number(event.target.value) / 100);
+        requestSettingsRender();
+    });
+}
+
 const gameWrapper = document.getElementById("gameWrapper");
 const ctx = canvas.getContext("2d");
 
@@ -1243,6 +1286,7 @@ let lastSettingsRenderTime = 0;
 
 function requestSettingsRender() {
     settingsRenderRequested = true;
+    if (typeof positionEffectVolumeRange === "function") positionEffectVolumeRange();
 }
 
 function saveVisualSettingsDelayed() {
@@ -5733,6 +5777,9 @@ gameWrapper.addEventListener(
 );
 
 
+window.addEventListener("resize", positionEffectVolumeRange);
+window.addEventListener("orientationchange", positionEffectVolumeRange);
+
 let volumeSliderDragging = false;
 
 function updateVolumeFromPointer(clientX, clientY) {
@@ -9787,6 +9834,7 @@ function handleSettingsTap(x, y) {
     if (!settingsOpen && isInsideRect(x, y, gear)) {
         settingsOpen = true;
         requestSettingsRender();
+        positionEffectVolumeRange();
         return true;
     }
 
@@ -9796,6 +9844,7 @@ function handleSettingsTap(x, y) {
 
     if (isInsideRect(x, y, { x: WIDTH / 2 - 80, y: 550, w: 160, h: 26 })) {
         settingsOpen = false;
+        positionEffectVolumeRange();
         return true;
     }
 
