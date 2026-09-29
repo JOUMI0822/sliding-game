@@ -202,6 +202,8 @@ const HEIGHT = 600;
 const TIME_LIMIT = 20;
 /* =========================================================
    게임 오디오
+   - 오디오 파일이 없거나 브라우저에서 재생이 막혀도
+     게임 화면/게임 로직에는 영향을 주지 않도록 안전하게 처리
 ========================================================= */
 
 const GAME_BGM_SRC = "sliding_bgm.m4a";
@@ -210,18 +212,42 @@ const WALL_HIT_SFX_SRC = "wall_hit.m4a";
 const DAMAGE_SFX_SRC = "damage.m4a";
 const ITEM_USE_SFX_SRC = "item_use.m4a";
 
-const gameBgm = new Audio(GAME_BGM_SRC);
-const gameOverBgm = new Audio(GAME_OVER_BGM_SRC);
-const wallHitSfx = new Audio(WALL_HIT_SFX_SRC);
-const damageSfx = new Audio(DAMAGE_SFX_SRC);
-const itemUseSfx = new Audio(ITEM_USE_SFX_SRC);
+let gameBgm = null;
+let gameOverBgm = null;
+let wallHitSfx = null;
+let damageSfx = null;
+let itemUseSfx = null;
 
-for (const sfx of [wallHitSfx, damageSfx, itemUseSfx]) {
-    sfx.preload = "auto";
-    sfx.volume = 0.9;
+function makeAudio(src, loop = false, volume = 1) {
+    try {
+        const audio = new Audio();
+        audio.src = src;
+        audio.preload = "auto";
+        audio.loop = loop;
+        audio.volume = volume;
+        return audio;
+    } catch (error) {
+        return null;
+    }
+}
+
+function ensureGameAudio() {
+    if (gameBgm && gameOverBgm && wallHitSfx && damageSfx && itemUseSfx) {
+        return;
+    }
+
+    gameBgm = gameBgm || makeAudio(GAME_BGM_SRC, true, 0);
+    gameOverBgm = gameOverBgm || makeAudio(GAME_OVER_BGM_SRC, false, 1);
+    wallHitSfx = wallHitSfx || makeAudio(WALL_HIT_SFX_SRC, false, 0.9);
+    damageSfx = damageSfx || makeAudio(DAMAGE_SFX_SRC, false, 0.9);
+    itemUseSfx = itemUseSfx || makeAudio(ITEM_USE_SFX_SRC, false, 0.9);
 }
 
 function playSfx(audio) {
+    if (!audio) {
+        ensureGameAudio();
+        return;
+    }
     try {
         audio.pause();
         audio.currentTime = 0;
@@ -231,14 +257,6 @@ function playSfx(audio) {
         }
     } catch (error) {}
 }
-
-gameBgm.loop = true;
-gameBgm.preload = "auto";
-gameBgm.volume = 0;
-
-gameOverBgm.loop = false;
-gameOverBgm.preload = "auto";
-gameOverBgm.volume = 1;
 
 let bgmFadeFrame = null;
 
@@ -250,25 +268,22 @@ function cancelBgmFade() {
 }
 
 function fadeAudio(audio, from, to, duration, onComplete = null) {
+    if (!audio) {
+        if (onComplete) onComplete();
+        return;
+    }
+
     cancelBgmFade();
 
     const start = performance.now();
     const startVolume = Math.max(0, Math.min(1, from));
     const targetVolume = Math.max(0, Math.min(1, to));
-
     audio.volume = startVolume;
 
     function step(now) {
-        const progress = Math.min(
-            1,
-            (now - start) / Math.max(1, duration)
-        );
-
+        const progress = Math.min(1, (now - start) / Math.max(1, duration));
         const eased = 1 - Math.pow(1 - progress, 3);
-
-        audio.volume =
-            startVolume +
-            (targetVolume - startVolume) * eased;
+        audio.volume = startVolume + (targetVolume - startVolume) * eased;
 
         if (progress < 1) {
             bgmFadeFrame = requestAnimationFrame(step);
@@ -277,85 +292,79 @@ function fadeAudio(audio, from, to, duration, onComplete = null) {
 
         audio.volume = targetVolume;
         bgmFadeFrame = null;
-
-        if (onComplete) {
-            onComplete();
-        }
+        if (onComplete) onComplete();
     }
 
     bgmFadeFrame = requestAnimationFrame(step);
 }
 
 function startGameBgm() {
+    ensureGameAudio();
+    if (!gameBgm) return;
+
     cancelBgmFade();
 
     try {
-        gameOverBgm.pause();
-        gameOverBgm.currentTime = 0;
+        if (gameOverBgm) {
+            gameOverBgm.pause();
+            gameOverBgm.currentTime = 0;
+        }
         gameBgm.currentTime = 0;
     } catch (error) {}
 
     gameBgm.volume = 0;
 
-    const playPromise = gameBgm.play();
+    try {
+        const playPromise = gameBgm.play();
+        if (playPromise && typeof playPromise.catch === "function") {
+            playPromise.catch(() => {});
+        }
+    } catch (error) {}
 
-    if (playPromise && typeof playPromise.catch === "function") {
-        playPromise.catch(() => {});
-    }
-
-    fadeAudio(
-        gameBgm,
-        0,
-        0.72,
-        1200
-    );
+    fadeAudio(gameBgm, 0, 0.72, 1200);
 }
 
 function endGameBgmAndPlayGameOver() {
+    ensureGameAudio();
     cancelBgmFade();
 
-    fadeAudio(
-        gameBgm,
-        gameBgm.volume,
-        0,
-        900,
-        () => {
-            try {
+    fadeAudio(gameBgm, gameBgm ? gameBgm.volume : 0, 0, 900, () => {
+        try {
+            if (gameBgm) {
                 gameBgm.pause();
                 gameBgm.currentTime = 0;
-            } catch (error) {}
+            }
+        } catch (error) {}
 
-            try {
+        try {
+            if (gameOverBgm) {
                 gameOverBgm.pause();
                 gameOverBgm.currentTime = 0;
                 gameOverBgm.volume = 1;
-
                 const playPromise = gameOverBgm.play();
-
-                if (
-                    playPromise &&
-                    typeof playPromise.catch === "function"
-                ) {
+                if (playPromise && typeof playPromise.catch === "function") {
                     playPromise.catch(() => {});
                 }
-            } catch (error) {}
-        }
-    );
+            }
+        } catch (error) {}
+    });
 }
 
 function stopAllGameAudio() {
     cancelBgmFade();
 
     try {
-        gameBgm.pause();
-        gameBgm.currentTime = 0;
-        gameBgm.volume = 0;
-
-        gameOverBgm.pause();
-        gameOverBgm.currentTime = 0;
+        if (gameBgm) {
+            gameBgm.pause();
+            gameBgm.currentTime = 0;
+            gameBgm.volume = 0;
+        }
+        if (gameOverBgm) {
+            gameOverBgm.pause();
+            gameOverBgm.currentTime = 0;
+        }
     } catch (error) {}
 }
-
 
 
 /* 클리어 횟수에 따른 제한 시간
@@ -4506,6 +4515,7 @@ function startMove(
     dc,
     dr
 ) {
+    ensureGameAudio();
 
     if (
         gameState !== "playing"
@@ -4871,6 +4881,7 @@ function clearGame() {
 ========================================================= */
 
 function dieGame() {
+    ensureGameAudio();
 
     if (
         gameState !== "playing"
