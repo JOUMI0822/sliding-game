@@ -203,32 +203,23 @@ const TIME_LIMIT = 20;
 /* =========================================================
    게임 효과음
    배경음/게임오버 음악은 사용하지 않고 효과음만 재생한다.
+   ※ 페이지 로딩 때 오디오 파일을 미리 디코딩하지 않는다.
+   ※ 모바일 Safari에서 오디오 로딩 때문에 첫 화면이 멈추는 것을 방지한다.
 ========================================================= */
 const WALL_HIT_SFX_SRC = "wall_hit.m4a";
 const DAMAGE_SFX_SRC = "damage.m4a";
 const ITEM_USE_SFX_SRC = "item_use.m4a";
 
-const wallHitSfx = new Audio(WALL_HIT_SFX_SRC);
-const damageSfx = new Audio(DAMAGE_SFX_SRC);
-const itemUseSfx = new Audio(ITEM_USE_SFX_SRC);
-
-for (const audio of [wallHitSfx, damageSfx, itemUseSfx]) {
-    audio.preload = "auto";
-}
-
 const AUDIO_SETTINGS_KEY = "slidingMazeAudioSettings_v2";
-let audioSettings = {
-    sfx: 0.90
-};
+let audioSettings = { sfx: 0.90 };
 let audioSettingsOpen = false;
 
 try {
     const savedAudioSettings = JSON.parse(
         localStorage.getItem(AUDIO_SETTINGS_KEY) || "null"
     );
-    if (savedAudioSettings) {
+    if (savedAudioSettings && Number.isFinite(Number(savedAudioSettings.sfx))) {
         audioSettings.sfx = Math.max(0, Math.min(1, Number(savedAudioSettings.sfx)));
-        if (!Number.isFinite(audioSettings.sfx)) audioSettings.sfx = 0.90;
     }
 } catch (error) {}
 
@@ -238,60 +229,44 @@ function saveAudioSettings() {
     } catch (error) {}
 }
 
-function applyAudioSettings() {
-    wallHitSfx.volume = audioSettings.sfx;
-    damageSfx.volume = audioSettings.sfx;
-    itemUseSfx.volume = audioSettings.sfx;
+// 효과음은 실제로 필요할 때만 생성한다. 페이지 시작 시 파일을 읽지 않는다.
+const sfxCache = new Map();
 
-    for (const poolData of sfxPools.values()) {
-        for (const player of poolData.players) {
-            player.volume = audioSettings.sfx;
-        }
+function getSfx(src) {
+    let audio = sfxCache.get(src);
+    if (!audio) {
+        audio = new Audio(src);
+        audio.preload = "none";
+        audio.volume = audioSettings.sfx;
+        sfxCache.set(src, audio);
     }
+    audio.volume = audioSettings.sfx;
+    return audio;
 }
 
-// 짧은 효과음은 여러 플레이어를 순환시켜 연속 입력에서도 즉시 재생한다.
-const sfxPools = new Map();
-const SFX_POOL_SIZE = 5;
-
-function getSfxPool(sourceAudio) {
-    if (sfxPools.has(sourceAudio)) return sfxPools.get(sourceAudio);
-
-    const pool = [];
-    for (let i = 0; i < SFX_POOL_SIZE; i++) {
-        const player = new Audio(sourceAudio.src);
-        player.preload = "auto";
-        player.volume = audioSettings.sfx;
-        pool.push(player);
-    }
-    const data = { players: pool, index: 0 };
-    sfxPools.set(sourceAudio, data);
-    return data;
-}
-
-function playSfx(audio) {
+function playSfx(src) {
     if (audioSettings.sfx <= 0) return;
-
     try {
-        const pool = getSfxPool(audio);
-        const player = pool.players[pool.index];
-        pool.index = (pool.index + 1) % pool.players.length;
-        player.volume = audioSettings.sfx;
-        player.currentTime = 0;
-        const playPromise = player.play();
-        if (playPromise && typeof playPromise.catch === "function") {
-            playPromise.catch(() => {});
+        const audio = getSfx(src);
+        audio.currentTime = 0;
+        const promise = audio.play();
+        if (promise && typeof promise.catch === "function") {
+            promise.catch(() => {});
         }
     } catch (error) {}
 }
 
-// 기존 게임 로직의 호출부는 그대로 두고, 음악은 사용하지 않는다.
+function applyAudioSettings() {
+    for (const audio of sfxCache.values()) {
+        audio.volume = audioSettings.sfx;
+    }
+}
+
 function startGameBgm() {}
 function endGameBgmAndPlayGameOver() {}
 function stopAllGameAudio() {}
 
 applyAudioSettings();
-
 
 /* 클리어 횟수에 따른 제한 시간
    0~4회: 20초 / 5~9회: 17초 / 10~19회: 15초
@@ -1223,6 +1198,21 @@ try {
 
 } catch (error) {}
 
+// 예전 버전에서 저장된 값이 현재 스킨 목록 범위를 벗어나도
+// 게임 렌더링이 멈추지 않도록 인덱스를 안전하게 보정한다.
+if (!Number.isInteger(visualSettings.wall) || visualSettings.wall < 0 || visualSettings.wall >= WALL_COLORS.length) {
+    visualSettings.wall = 1;
+}
+if (!Number.isInteger(visualSettings.background) || visualSettings.background < 0 || visualSettings.background >= BACKGROUND_COLORS.length) {
+    visualSettings.background = 0;
+}
+if (!Number.isInteger(visualSettings.dangerSkin) || visualSettings.dangerSkin < 0 || visualSettings.dangerSkin >= DANGER_SKINS.length) {
+    visualSettings.dangerSkin = 1;
+}
+if (!Number.isInteger(visualSettings.streakEffect) || visualSettings.streakEffect < 0 || visualSettings.streakEffect >= STREAK_EFFECTS.length) {
+    visualSettings.streakEffect = 1;
+}
+
 if (isValidHexColor(visualSettings.customWall)) {
     visualSettings.wall = WALL_COLORS.length - 1;
 }
@@ -1703,7 +1693,7 @@ function useEnergyRecovery(amount) {
     itemInventory.energyRecovery -= amount;
     mapSkips = Math.min(MAX_MAP_SKIPS, recovered);
     energyRecoveryUsed = true;
-    playSfx(itemUseSfx);
+    playSfx(ITEM_USE_SFX_SRC);
     onDailyQuestEnergyRecoveryUse();
     energyRecoveryChoiceOpen = false;
 
@@ -1881,7 +1871,7 @@ function useSecondPathGuide() {
     }
 
     if (showPathGuide()) {
-        playSfx(itemUseSfx);
+        playSfx(ITEM_USE_SFX_SRC);
         pathGuideUses = 2;
         itemInventory.pathGuide--;
         saveItemInventory();
@@ -1903,7 +1893,7 @@ function tryAutoFirstAid() {
     }
 
     lives = Math.min(MAX_LIVES, lives + 1);
-    playSfx(itemUseSfx);
+    playSfx(ITEM_USE_SFX_SRC);
     firstAidCharged = false;
     showItemWarning("응급 처치 장치 발동 · 목숨 +1");
     updateUI();
@@ -4413,7 +4403,7 @@ function startMove(
         destination.r === player.r
     ) {
 
-        playSfx(wallHitSfx);
+        playSfx(WALL_HIT_SFX_SRC);
 
         applyRecoil(
             dc,
@@ -4767,7 +4757,7 @@ function dieGame() {
 
     if (activeItem === "energyShield" && shieldCharges > 0) {
         shieldCharges--;
-        playSfx(itemUseSfx);
+        playSfx(ITEM_USE_SFX_SRC);
         onDailyQuestShieldBlock();
         dangers.delete(dangerKey);
         applyImpactRecoil(130, 9, 0.25);
@@ -4780,7 +4770,7 @@ function dieGame() {
     }
 
     lives--;
-    playSfx(damageSfx);
+    playSfx(DAMAGE_SFX_SRC);
     onDailyQuestDeath();
 
     if (tryAutoFirstAid()) {
@@ -4884,7 +4874,7 @@ function timeoutGame() {
     remainingTime = 0;
 
     lives--;
-    playSfx(damageSfx);
+    playSfx(DAMAGE_SFX_SRC);
 
     if (tryAutoFirstAid()) {
         gameState = "playing";
@@ -5172,35 +5162,6 @@ function updateUI() {
 }
 
 
-let audioUnlocked = false;
-function unlockGameAudio() {
-    if (audioUnlocked) return;
-    audioUnlocked = true;
-
-    // 첫 사용자 입력 순간에 효과음 플레이어를 미리 활성화한다.
-    for (const sourceAudio of [wallHitSfx, damageSfx, itemUseSfx]) {
-        try {
-            const pool = getSfxPool(sourceAudio);
-            for (const player of pool.players) {
-                player.muted = true;
-                const p = player.play();
-                if (p && typeof p.then === "function") {
-                    p.then(() => {
-                        player.pause();
-                        player.currentTime = 0;
-                        player.muted = false;
-                    }).catch(() => {
-                        player.muted = false;
-                    });
-                } else {
-                    player.pause();
-                    player.currentTime = 0;
-                    player.muted = false;
-                }
-            }
-        } catch (error) {}
-    }
-}
 
 /* =========================================================
    PC 키보드
@@ -5209,8 +5170,6 @@ function unlockGameAudio() {
 window.addEventListener(
     "keydown",
     event => {
-
-        unlockGameAudio();
 
         const key =
             event.key.toLowerCase();
@@ -5767,8 +5726,6 @@ let lastSettingsPointerTime = 0;
 canvas.addEventListener(
     "pointerup",
     event => {
-        unlockGameAudio();
-
         if (
             gameState !== "start"
         ) {
@@ -7987,10 +7944,13 @@ function drawGame() {
        위험 블록
     ===================================================== */
 
-    const dangerSkin =
-        DANGER_SKINS[
-            visualSettings.dangerSkin
-        ].value;
+    const dangerSkinIndex = Number.isInteger(visualSettings.dangerSkin) &&
+        visualSettings.dangerSkin >= 0 &&
+        visualSettings.dangerSkin < DANGER_SKINS.length
+        ? visualSettings.dangerSkin
+        : 0;
+
+    const dangerSkin = DANGER_SKINS[dangerSkinIndex].value;
 
     for (
         const danger
