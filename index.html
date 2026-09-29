@@ -162,7 +162,7 @@ canvas {
 
 #effectVolumeRange {
     position: fixed;
-    z-index: 50;
+    z-index: 9999;
     display: none;
     height: 42px;
     margin: 0;
@@ -170,21 +170,42 @@ canvas {
     touch-action: none;
     -webkit-user-select: none;
     user-select: none;
-    accent-color: #7ddcff;
-    opacity: 1;
+    opacity: 0;
+    background: transparent;
+    border: 0;
+    color: transparent;
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
 }
 #effectVolumeValue {
     position: fixed;
     z-index: 51;
-    display: none;
+    display: none !important;
     pointer-events: none;
-    transform: translateX(-50%);
-    font: 700 18px Arial, sans-serif;
-    color: #ffffff;
-    text-shadow: 0 2px 4px rgba(0,0,0,.8);
-    white-space: nowrap;
+    visibility: hidden;
 }
 
+#effectVolumeRange::-webkit-slider-runnable-track {
+    background: transparent;
+    border: 0;
+}
+#effectVolumeRange::-webkit-slider-thumb {
+    background: transparent;
+    border: 0;
+    opacity: 0;
+    -webkit-appearance: none;
+    appearance: none;
+}
+#effectVolumeRange::-moz-range-track {
+    background: transparent;
+    border: 0;
+}
+#effectVolumeRange::-moz-range-thumb {
+    background: transparent;
+    border: 0;
+    opacity: 0;
+}
 </style>
 </head>
 
@@ -9494,9 +9515,19 @@ function drawSettingsPanel() {
     ctx.font = "600 13px Pretendard, Noto Sans KR, sans-serif";
     ctx.fillText(`효과음 크기  ${Math.round(effectVolume * 100)}%`, WIDTH / 2, 500);
 
-    // 화면에 그려지는 기존 볼륨 슬라이더는 숨김.
-    // 실제 터치 조작은 HTML range가 담당한다.
     const volumeBar = { x: WIDTH / 2 - 130, y: 516, w: 260, h: 8 };
+    ctx.fillStyle = "rgba(255,255,255,0.10)";
+    ctx.beginPath();
+    ctx.roundRect(volumeBar.x, volumeBar.y, volumeBar.w, volumeBar.h, 5);
+    ctx.fill();
+    ctx.fillStyle = "#7ddcff";
+    ctx.beginPath();
+    ctx.roundRect(volumeBar.x, volumeBar.y, volumeBar.w * effectVolume, volumeBar.h, 5);
+    ctx.fill();
+    ctx.fillStyle = "#dfe5ea";
+    ctx.beginPath();
+    ctx.arc(volumeBar.x + volumeBar.w * effectVolume, volumeBar.y + volumeBar.h / 2, 8, 0, Math.PI * 2);
+    ctx.fill();
 
     ctx.fillStyle = "#8f9aa8";
     ctx.font = "13px Pretendard, Noto Sans KR, sans-serif";
