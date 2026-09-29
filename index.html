@@ -172,6 +172,17 @@ canvas {
     user-select: none;
     accent-color: #7ddcff;
 }
+#effectVolumeValue {
+    position: fixed;
+    z-index: 51;
+    display: none;
+    pointer-events: none;
+    transform: translateX(-50%);
+    font: 700 18px Arial, sans-serif;
+    color: #ffffff;
+    text-shadow: 0 2px 4px rgba(0,0,0,.8);
+    white-space: nowrap;
+}
 </style>
 </head>
 
@@ -192,6 +203,7 @@ canvas {
 
     <canvas id="game" width="800" height="600"></canvas>
 <input id="effectVolumeRange" type="range" min="0" max="100" value="70" aria-label="효과음 크기">
+<div id="effectVolumeValue" aria-live="polite"></div>
 
 </div>
 
@@ -219,6 +231,23 @@ function positionEffectVolumeRange() {
     effectVolumeRange.style.top = `${rect.top + 496 * scaleY}px`;
     effectVolumeRange.style.width = `${260 * scaleX}px`;
     effectVolumeRange.value = String(Math.round(effectVolume * 100));
+    positionEffectVolumeValue();
+}
+
+function positionEffectVolumeValue() {
+    const label = document.getElementById("effectVolumeValue");
+    if (!label) return;
+    if (!settingsOpen) {
+        label.style.display = "none";
+        return;
+    }
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = rect.width / WIDTH;
+    const scaleY = rect.height / HEIGHT;
+    label.style.display = "block";
+    label.style.left = `${rect.left + 400 * scaleX}px`;
+    label.style.top = `${rect.top + 472 * scaleY}px`;
+    label.textContent = `효과음 크기  ${Math.round(effectVolume * 100)}%`;
 }
 
 if (effectVolumeRange) {
@@ -1294,6 +1323,10 @@ let lastSettingsRenderTime = 0;
 function requestSettingsRender() {
     settingsRenderRequested = true;
     if (typeof positionEffectVolumeRange === "function") positionEffectVolumeRange();
+
+    // Show the exact current volume immediately, including while dragging.
+    const volumeLabel = document.querySelector("[data-effect-volume-label]");
+    if (volumeLabel) volumeLabel.textContent = `효과음 크기  ${Math.round(effectVolume * 100)}%`;
 }
 
 function saveVisualSettingsDelayed() {
@@ -4624,6 +4657,22 @@ function updateMovement(
 
         movement = null;
 
+        // 슬라이딩 이동 후 앞쪽의 벽/맵 경계에 실제로 부딪혀 멈춘 경우
+        // 이동 시작 시 제자리에서 막힌 경우와 별도로 벽 충돌 효과음을 재생합니다.
+        const hitC =
+            finishedMovement.toC +
+            finishedMovement.dc;
+        const hitR =
+            finishedMovement.toR +
+            finishedMovement.dr;
+
+        if (
+            !isInside(hitC, hitR) ||
+            walls.has(keyOf(hitC, hitR))
+        ) {
+            playEffectSound("wallHit");
+        }
+
         applyRecoil(
             finishedMovement.dc,
             finishedMovement.dr,
@@ -5788,8 +5837,8 @@ gameWrapper.addEventListener(
 );
 
 
-window.addEventListener("resize", positionEffectVolumeRange);
-window.addEventListener("orientationchange", positionEffectVolumeRange);
+window.addEventListener("resize", () => { positionEffectVolumeRange(); positionEffectVolumeValue(); });
+window.addEventListener("orientationchange", () => { positionEffectVolumeRange(); positionEffectVolumeValue(); });
 
 let volumeSliderDragging = false;
 
