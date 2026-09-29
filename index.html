@@ -201,28 +201,23 @@ const HEIGHT = 600;
 
 const TIME_LIMIT = 20;
 /* =========================================================
-   게임 오디오
+   게임 효과음
+   배경음/게임오버 음악은 사용하지 않고 효과음만 재생한다.
 ========================================================= */
-
-const GAME_BGM_SRC = "sliding_bgm.m4a";
-const GAME_OVER_BGM_SRC = "gameover.m4a";
 const WALL_HIT_SFX_SRC = "wall_hit.m4a";
 const DAMAGE_SFX_SRC = "damage.m4a";
 const ITEM_USE_SFX_SRC = "item_use.m4a";
 
-const gameBgm = new Audio(GAME_BGM_SRC);
-const gameOverBgm = new Audio(GAME_OVER_BGM_SRC);
 const wallHitSfx = new Audio(WALL_HIT_SFX_SRC);
 const damageSfx = new Audio(DAMAGE_SFX_SRC);
 const itemUseSfx = new Audio(ITEM_USE_SFX_SRC);
 
-for (const audio of [gameBgm, gameOverBgm, wallHitSfx, damageSfx, itemUseSfx]) {
+for (const audio of [wallHitSfx, damageSfx, itemUseSfx]) {
     audio.preload = "auto";
 }
 
-const AUDIO_SETTINGS_KEY = "slidingMazeAudioSettings_v1";
+const AUDIO_SETTINGS_KEY = "slidingMazeAudioSettings_v2";
 let audioSettings = {
-    music: 0.72,
     sfx: 0.90
 };
 let audioSettingsOpen = false;
@@ -232,9 +227,7 @@ try {
         localStorage.getItem(AUDIO_SETTINGS_KEY) || "null"
     );
     if (savedAudioSettings) {
-        audioSettings.music = Math.max(0, Math.min(1, Number(savedAudioSettings.music)));
         audioSettings.sfx = Math.max(0, Math.min(1, Number(savedAudioSettings.sfx)));
-        if (!Number.isFinite(audioSettings.music)) audioSettings.music = 0.72;
         if (!Number.isFinite(audioSettings.sfx)) audioSettings.sfx = 0.90;
     }
 } catch (error) {}
@@ -250,19 +243,16 @@ function applyAudioSettings() {
     damageSfx.volume = audioSettings.sfx;
     itemUseSfx.volume = audioSettings.sfx;
 
-    if (gameBgm.paused) {
-        gameBgm.volume = 0;
-    }
-    if (gameOverBgm.paused) {
-        gameOverBgm.volume = 0;
+    for (const poolData of sfxPools.values()) {
+        for (const player of poolData.players) {
+            player.volume = audioSettings.sfx;
+        }
     }
 }
 
-// 효과음은 한 개의 Audio 객체를 매번 pause/seek해서 재사용하면
-// 모바일 Safari에서 재생 시작이 늦어질 수 있다.
-// 여러 개의 미리 준비된 플레이어를 순환 사용해 벽 충돌음을 즉시 재생한다.
+// 짧은 효과음은 여러 플레이어를 순환시켜 연속 입력에서도 즉시 재생한다.
 const sfxPools = new Map();
-const SFX_POOL_SIZE = 4;
+const SFX_POOL_SIZE = 5;
 
 function getSfxPool(sourceAudio) {
     if (sfxPools.has(sourceAudio)) return sfxPools.get(sourceAudio);
@@ -274,8 +264,9 @@ function getSfxPool(sourceAudio) {
         player.volume = audioSettings.sfx;
         pool.push(player);
     }
-    sfxPools.set(sourceAudio, { players: pool, index: 0 });
-    return sfxPools.get(sourceAudio);
+    const data = { players: pool, index: 0 };
+    sfxPools.set(sourceAudio, data);
+    return data;
 }
 
 function playSfx(audio) {
@@ -285,10 +276,8 @@ function playSfx(audio) {
         const pool = getSfxPool(audio);
         const player = pool.players[pool.index];
         pool.index = (pool.index + 1) % pool.players.length;
-
         player.volume = audioSettings.sfx;
         player.currentTime = 0;
-
         const playPromise = player.play();
         if (playPromise && typeof playPromise.catch === "function") {
             playPromise.catch(() => {});
@@ -296,166 +285,12 @@ function playSfx(audio) {
     } catch (error) {}
 }
 
-gameBgm.loop = true;
-gameBgm.preload = "auto";
-gameBgm.volume = 0;
-
-gameOverBgm.loop = false;
-gameOverBgm.preload = "auto";
-gameOverBgm.volume = 0;
-
-let bgmFadeFrame = null;
-
-function cancelBgmFade() {
-    if (bgmFadeFrame !== null) {
-        cancelAnimationFrame(bgmFadeFrame);
-        bgmFadeFrame = null;
-    }
-}
-
-function fadeAudio(audio, from, to, duration, onComplete = null) {
-    cancelBgmFade();
-
-    const start = performance.now();
-    const startVolume = Math.max(0, Math.min(1, from));
-    const targetVolume = Math.max(0, Math.min(1, to));
-
-    audio.volume = startVolume;
-
-    function step(now) {
-        const progress = Math.min(
-            1,
-            (now - start) / Math.max(1, duration)
-        );
-
-        const eased = 1 - Math.pow(1 - progress, 3);
-
-        audio.volume =
-            startVolume +
-            (targetVolume - startVolume) * eased;
-
-        if (progress < 1) {
-            bgmFadeFrame = requestAnimationFrame(step);
-            return;
-        }
-
-        audio.volume = targetVolume;
-        bgmFadeFrame = null;
-
-        if (onComplete) {
-            onComplete();
-        }
-    }
-
-    bgmFadeFrame = requestAnimationFrame(step);
-}
-
-function startGameBgm() {
-    cancelBgmFade();
-
-    try {
-        gameOverBgm.pause();
-        gameOverBgm.currentTime = 0;
-        gameOverBgm.volume = 0;
-    } catch (error) {}
-
-    if (audioSettings.music <= 0) {
-        gameBgm.volume = 0;
-        return;
-    }
-
-    // 이미 재생 중이면 맵이 바뀌어도 음악을 처음부터 다시 시작하지 않는다.
-    // 따라서 스테이지 전환 시 배경음이 끊기거나 처음으로 돌아가지 않는다.
-    const alreadyPlaying = !gameBgm.paused && !gameBgm.ended;
-
-    if (alreadyPlaying) {
-        gameBgm.volume = audioSettings.music;
-        return;
-    }
-
-    gameBgm.volume = 0;
-
-    const playPromise = gameBgm.play();
-
-    if (playPromise && typeof playPromise.catch === "function") {
-        playPromise.catch(() => {});
-    }
-
-    fadeAudio(
-        gameBgm,
-        0,
-        audioSettings.music,
-        1200
-    );
-}
-
-// 일부 모바일 브라우저에서는 loop 속성만으로 반복 재생이 안정적이지 않을 수 있어
-// 게임 플레이 중 음악이 끝나면 즉시 다시 재생한다.
-gameBgm.addEventListener("ended", () => {
-    if (
-        audioSettings.music > 0 &&
-        (gameState === "playing" || multiplayerMatchActive)
-    ) {
-        try {
-            gameBgm.currentTime = 0;
-            gameBgm.volume = audioSettings.music;
-            const playPromise = gameBgm.play();
-            if (playPromise && typeof playPromise.catch === "function") {
-                playPromise.catch(() => {});
-            }
-        } catch (error) {}
-    }
-});
-
-function endGameBgmAndPlayGameOver() {
-    cancelBgmFade();
-
-    fadeAudio(
-        gameBgm,
-        gameBgm.volume,
-        0,
-        900,
-        () => {
-            try {
-                gameBgm.pause();
-                gameBgm.currentTime = 0;
-            } catch (error) {}
-
-            if (audioSettings.music <= 0) return;
-
-            try {
-                gameOverBgm.pause();
-                gameOverBgm.currentTime = 0;
-                gameOverBgm.volume = audioSettings.music;
-
-                const playPromise = gameOverBgm.play();
-
-                if (
-                    playPromise &&
-                    typeof playPromise.catch === "function"
-                ) {
-                    playPromise.catch(() => {});
-                }
-            } catch (error) {}
-        }
-    );
-}
-
-function stopAllGameAudio() {
-    cancelBgmFade();
-
-    try {
-        gameBgm.pause();
-        gameBgm.currentTime = 0;
-        gameBgm.volume = 0;
-
-        gameOverBgm.pause();
-        gameOverBgm.currentTime = 0;
-    } catch (error) {}
-}
+// 기존 게임 로직의 호출부는 그대로 두고, 음악은 사용하지 않는다.
+function startGameBgm() {}
+function endGameBgmAndPlayGameOver() {}
+function stopAllGameAudio() {}
 
 applyAudioSettings();
-
 
 
 /* 클리어 횟수에 따른 제한 시간
@@ -1113,7 +948,7 @@ function drawAudioSettingsPanel() {
     ctx.fillStyle = "rgba(0,0,0,0.72)";
     ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
-    const panel = { x: 120, y: 95, w: 560, h: 410 };
+    const panel = { x: 120, y: 130, w: 560, h: 330 };
 
     ctx.fillStyle = "#171c25";
     ctx.strokeStyle = "#394352";
@@ -1127,245 +962,48 @@ function drawAudioSettingsPanel() {
     ctx.textBaseline = "middle";
     ctx.fillStyle = "#ffffff";
     ctx.font = "bold 28px Pretendard, Noto Sans KR, sans-serif";
-    ctx.fillText("🔊 소리 설정", WIDTH / 2, 145);
+    ctx.fillText("🔊 효과음 설정", WIDTH / 2, 180);
 
-    const rows = [
-        { label: "음악 크기", key: "music", y: 230 },
-        { label: "효과음 크기", key: "sfx", y: 315 }
-    ];
+    const row = { label: "효과음 크기", key: "sfx", y: 285 };
 
-    rows.forEach(row => {
-        ctx.fillStyle = "#aeb8c5";
-        ctx.font = "600 16px Pretendard, Noto Sans KR, sans-serif";
-        ctx.fillText(row.label, WIDTH / 2, row.y - 35);
+    ctx.fillStyle = "#aeb8c5";
+    ctx.font = "600 16px Pretendard, Noto Sans KR, sans-serif";
+    ctx.fillText(row.label, WIDTH / 2, row.y - 35);
 
-        drawSettingsButton(panel.x + 55, row.y - 21, 70, 42, "−");
-        drawSettingsButton(panel.x + panel.w - 125, row.y - 21, 70, 42, "+");
+    drawSettingsButton(panel.x + 55, row.y - 21, 70, 42, "−");
+    drawSettingsButton(panel.x + panel.w - 125, row.y - 21, 70, 42, "+");
 
-        const bar = { x: WIDTH / 2 - 145, y: row.y - 7, w: 290, h: 14 };
-        ctx.fillStyle = "#27313e";
-        ctx.beginPath();
-        ctx.roundRect(bar.x, bar.y, bar.w, bar.h, 7);
-        ctx.fill();
+    const bar = { x: WIDTH / 2 - 145, y: row.y - 7, w: 290, h: 14 };
+    ctx.fillStyle = "#27313e";
+    ctx.beginPath();
+    ctx.roundRect(bar.x, bar.y, bar.w, bar.h, 7);
+    ctx.fill();
 
-        ctx.fillStyle = "#7ddcff";
-        ctx.beginPath();
-        ctx.roundRect(bar.x, bar.y, bar.w * audioSettings[row.key], bar.h, 7);
-        ctx.fill();
+    ctx.fillStyle = "#7ddcff";
+    ctx.beginPath();
+    ctx.roundRect(bar.x, bar.y, bar.w * audioSettings.sfx, bar.h, 7);
+    ctx.fill();
 
-        ctx.fillStyle = "#f0f3f6";
-        ctx.font = "bold 15px Pretendard, Noto Sans KR, sans-serif";
-        ctx.fillText(formatVolume(audioSettings[row.key]), WIDTH / 2, row.y + 30);
-    });
+    ctx.fillStyle = "#f0f3f6";
+    ctx.font = "bold 15px Pretendard, Noto Sans KR, sans-serif";
+    ctx.fillText(formatVolume(audioSettings.sfx), WIDTH / 2, row.y + 30);
 
     ctx.fillStyle = "#7f8b99";
     ctx.font = "13px Pretendard, Noto Sans KR, sans-serif";
-    ctx.fillText("설정은 자동으로 저장됩니다.", WIDTH / 2, 410);
+    ctx.fillText("배경음악은 사용하지 않습니다.", WIDTH / 2, 380);
+    ctx.fillText("설정은 자동으로 저장됩니다.", WIDTH / 2, 405);
 
-    drawSettingsButton(WIDTH / 2 - 80, 445, 160, 36, "닫기");
+    drawSettingsButton(WIDTH / 2 - 80, 425, 160, 36, "닫기");
     ctx.restore();
 }
 
 function changeAudioVolume(key, direction) {
+    if (key !== "sfx") return;
     const step = 0.10;
-    audioSettings[key] = Math.max(0, Math.min(1, audioSettings[key] + direction * step));
+    audioSettings.sfx = Math.max(0, Math.min(1, audioSettings.sfx + direction * step));
     saveAudioSettings();
-
-    if (key === "sfx") {
-        applyAudioSettings();
-    } else {
-        if (gameState === "playing" || multiplayerMatchActive) {
-            if (audioSettings.music <= 0) {
-                cancelBgmFade();
-                gameBgm.volume = 0;
-            } else if (!gameBgm.paused) {
-                cancelBgmFade();
-                gameBgm.volume = audioSettings.music;
-            }
-        }
-        if (!gameOverBgm.paused) {
-            gameOverBgm.volume = audioSettings.music;
-        }
-    }
+    applyAudioSettings();
 }
-
-/* =========================================================
-   화면 설정
-========================================================= */
-
-const WALL_COLORS = [
-    { name: "어두운 회색", value: "#252d38" },
-    { name: "밝은 회색", value: "#3f4b5a" },
-    { name: "푸른 회색", value: "#34495e" },
-    { name: "보라", value: "#4a3f5c" },
-    { name: "청록", value: "#31545a" },
-    { name: "갈색", value: "#59483d" }
-];
-
-const BACKGROUND_COLORS = [
-    { name: "기본", value: "#0d1117" },
-    { name: "짙은 파랑", value: "#0b1424" },
-    { name: "보라", value: "#171022" },
-    { name: "청록", value: "#0b1b1d" },
-    { name: "갈색", value: "#1c1510" },
-    { name: "검정", value: "#080a0e" }
-];
-
-/* 기존 색상 목록의 마지막에 "사용자 지정"을 추가 */
-WALL_COLORS.push({
-    name: "사용자 지정",
-    value: null,
-    custom: true
-});
-
-BACKGROUND_COLORS.push({
-    name: "사용자 지정",
-    value: null,
-    custom: true
-});
-
-
-/* =========================================================
-   위험 블록 스킨
-========================================================= */
-
-const DANGER_SKINS = [
-    {
-        name: "기본",
-        value: "solid"
-    },
-    {
-        name: "X 경고",
-        value: "x"
-    },
-    {
-        name: "경고",
-        value: "warning"
-    },
-    {
-        name: "위험",
-        value: "hazard"
-    },
-    {
-        name: "화염",
-        value: "fire"
-    },
-    {
-        name: "해골",
-        value: "skull"
-    },
-    {
-        name: "네온",
-        value: "neon"
-    },
-    {
-        name: "위험선",
-        value: "stripe"
-    },
-    {
-        name: "글리치",
-        value: "glitch"
-    }
-];
-
-
-const STREAK_EFFECTS = [
-    { name: "없음", value: "none" },
-    { name: "무지개", value: "rainbow" },
-    { name: "네온", value: "neon" },
-    { name: "화염", value: "fire" },
-    { name: "빙결", value: "ice" },
-    { name: "파동", value: "wave" },
-    { name: "별빛", value: "stars" },
-    { name: "글리치", value: "glitch" }
-];
-
-
-const SETTINGS_KEY = "slidingMazeVisualSettings_v2";
-
-/* =========================================================
-   아이템 시스템
-========================================================= */
-
-const ITEM_PRICES = {
-    timeClock: 2,
-    energyShield: 5,
-    pathGuide: 10,
-    firstAid: 5,
-    energyRecovery: 3
-};
-
-const ITEM_DATA = {
-    timeClock: {
-        name: "시간 조작 시계",
-        icon: "🕒",
-        description: "활성화한 개수만큼 제한시간 +1초 (최대 5개 사용 가능)"
-    },
-    energyShield: {
-        name: "에너지 보호막 시스템",
-        icon: "🔰",
-        description: "위험 블록 충돌 1회 방어 · 3스테이지 마다 복구"
-    },
-    pathGuide: {
-        name: "경로 안내 장치",
-        icon: "🧭",
-        description: "스테이지 시작 자동 안내 · 재사용은 더블 터치(맵 당 1회 제한)"
-    },
-   firstAid: {
-        name: "응급 처치 장치",
-        icon: "💊",
-        description: "4스테이지마다 충전 · 목숨이 3개 미만일 시 발동"
-    },
-    energyRecovery: {
-        name: "에너지 복구 장치",
-        icon: "🔋",
-        description: "맵 넘기기 모두 소모 시 한 번만 작동 · (1개 3회복 / 2개 5회복)"
-    }
-};
-
-const ITEM_STORAGE_KEY = "slidingMazeItems_v1";
-
-let itemInventory = {
-    timeClock: 0,
-    energyShield: 0,
-    pathGuide: 0,
-    firstAid: 0,
-    energyRecovery: 0
-};
-
-let selectedItem = null;
-let selectedTimeClocks = 1;
-let selectedEnergyRecovery = 1;
-let activeEnergyRecoveryChoice = 1;
-let shopOpen = false;
-let shopPage = 0;
-const SHOP_PAGE_SIZE = 3;
-let inventoryOpen = false;
-let inventoryDetailType = null;
-const purchaseQuantities = {
-    timeClock: 1,
-    energyShield: 1,
-    pathGuide: 1,
-    firstAid: 1,
-    energyRecovery: 1
-};
-
-let activeItem = null;
-let activeTimeBonus = 0;
-let shieldCharges = 0;
-let firstAidCharged = false;
-let pathGuideUses = 0;
-let pathGuideVisibleUntil = 0;
-let pathGuideFadeStart = 0;
-let pathGuideAutoFadeAt = 0;
-const PATH_GUIDE_FADE_DURATION = 0.18;
-let pathGuidePath = [];
-let pathGuideZeroWarningShown = false;
-let energyRecoveryUsed = false;
-let energyRecoveryChoiceOpen = false;
-let itemWarningText = "";
-let itemWarningUntil = 0;
-
 function loadItemInventory() {
     try {
         const saved = JSON.parse(
@@ -5488,45 +5126,26 @@ function unlockGameAudio() {
     if (audioUnlocked) return;
     audioUnlocked = true;
 
-    try {
-        const wasMuted = gameBgm.muted;
-        gameBgm.muted = true;
-        const promise = gameBgm.play();
-        if (promise && typeof promise.then === "function") {
-            promise.then(() => {
-                gameBgm.pause();
-                gameBgm.currentTime = 0;
-                gameBgm.muted = wasMuted;
-            }).catch(() => {
-                gameBgm.muted = wasMuted;
-            });
-        } else {
-            gameBgm.pause();
-            gameBgm.currentTime = 0;
-            gameBgm.muted = wasMuted;
-        }
-    } catch (error) {}
-
-    // 첫 사용자 입력 순간에 효과음 플레이어도 미리 활성화한다.
-    // 이후 벽 충돌 같은 짧은 효과음의 첫 재생 지연을 줄인다.
+    // 첫 사용자 입력 순간에 효과음 플레이어를 미리 활성화한다.
     for (const sourceAudio of [wallHitSfx, damageSfx, itemUseSfx]) {
         try {
             const pool = getSfxPool(sourceAudio);
-            const player = pool.players[0];
-            player.muted = true;
-            const p = player.play();
-            if (p && typeof p.then === "function") {
-                p.then(() => {
+            for (const player of pool.players) {
+                player.muted = true;
+                const p = player.play();
+                if (p && typeof p.then === "function") {
+                    p.then(() => {
+                        player.pause();
+                        player.currentTime = 0;
+                        player.muted = false;
+                    }).catch(() => {
+                        player.muted = false;
+                    });
+                } else {
                     player.pause();
                     player.currentTime = 0;
                     player.muted = false;
-                }).catch(() => {
-                    player.muted = false;
-                });
-            } else {
-                player.pause();
-                player.currentTime = 0;
-                player.muted = false;
+                }
             }
         } catch (error) {}
     }
@@ -10126,30 +9745,22 @@ function handleSettingsTap(x, y) {
     }
 
     if (audioSettingsOpen) {
-        if (isInsideRect(x, y, { x: WIDTH / 2 - 80, y: 445, w: 160, h: 36 })) {
+        if (isInsideRect(x, y, { x: WIDTH / 2 - 80, y: 425, w: 160, h: 36 })) {
             audioSettingsOpen = false;
             return true;
         }
 
-        const audioPanel = { x: 120, y: 95, w: 560, h: 410 };
+        const audioPanel = { x: 120, y: 130, w: 560, h: 330 };
         if (x < audioPanel.x || x > audioPanel.x + audioPanel.w || y < audioPanel.y || y > audioPanel.y + audioPanel.h) {
             audioSettingsOpen = false;
             return true;
         }
 
-        if (isInsideRect(x, y, { x: audioPanel.x + 55, y: 230 - 21, w: 70, h: 42 })) {
-            changeAudioVolume("music", -1);
-            return true;
-        }
-        if (isInsideRect(x, y, { x: audioPanel.x + audioPanel.w - 125, y: 230 - 21, w: 70, h: 42 })) {
-            changeAudioVolume("music", 1);
-            return true;
-        }
-        if (isInsideRect(x, y, { x: audioPanel.x + 55, y: 315 - 21, w: 70, h: 42 })) {
+        if (isInsideRect(x, y, { x: audioPanel.x + 55, y: 285 - 21, w: 70, h: 42 })) {
             changeAudioVolume("sfx", -1);
             return true;
         }
-        if (isInsideRect(x, y, { x: audioPanel.x + audioPanel.w - 125, y: 315 - 21, w: 70, h: 42 })) {
+        if (isInsideRect(x, y, { x: audioPanel.x + audioPanel.w - 125, y: 285 - 21, w: 70, h: 42 })) {
             changeAudioVolume("sfx", 1);
             return true;
         }
