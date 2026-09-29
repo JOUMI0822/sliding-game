@@ -205,10 +205,32 @@ const TIME_LIMIT = 20;
 ========================================================= */
 
 const GAME_BGM_SRC = "sliding_bgm.m4a";
-const GAME_OVER_BGM_SRC = "gameover.mp3";
+const GAME_OVER_BGM_SRC = "gameover.m4a";
+const WALL_HIT_SFX_SRC = "wall_hit.m4a";
+const DAMAGE_SFX_SRC = "damage.m4a";
+const ITEM_USE_SFX_SRC = "item_use.m4a";
 
 const gameBgm = new Audio(GAME_BGM_SRC);
 const gameOverBgm = new Audio(GAME_OVER_BGM_SRC);
+const wallHitSfx = new Audio(WALL_HIT_SFX_SRC);
+const damageSfx = new Audio(DAMAGE_SFX_SRC);
+const itemUseSfx = new Audio(ITEM_USE_SFX_SRC);
+
+for (const sfx of [wallHitSfx, damageSfx, itemUseSfx]) {
+    sfx.preload = "auto";
+    sfx.volume = 0.9;
+}
+
+function playSfx(audio) {
+    try {
+        audio.pause();
+        audio.currentTime = 0;
+        const playPromise = audio.play();
+        if (playPromise && typeof playPromise.catch === "function") {
+            playPromise.catch(() => {});
+        }
+    } catch (error) {}
+}
 
 gameBgm.loop = true;
 gameBgm.preload = "auto";
@@ -373,8 +395,7 @@ const MAX_PREVIOUS_LAYOUTS = 180;
    게임 상태
 ========================================================= */
 
-let stopAllGameAudio();
- gameState = "start";
+let gameState = "start";
 
 /* =========================================================
    2인용 경쟁 모드 준비 상태
@@ -1800,6 +1821,7 @@ function useEnergyRecovery(amount) {
     itemInventory.energyRecovery -= amount;
     mapSkips = Math.min(MAX_MAP_SKIPS, recovered);
     energyRecoveryUsed = true;
+    playSfx(itemUseSfx);
     onDailyQuestEnergyRecoveryUse();
     energyRecoveryChoiceOpen = false;
 
@@ -1977,6 +1999,7 @@ function useSecondPathGuide() {
     }
 
     if (showPathGuide()) {
+        playSfx(itemUseSfx);
         pathGuideUses = 2;
         itemInventory.pathGuide--;
         saveItemInventory();
@@ -1998,6 +2021,7 @@ function tryAutoFirstAid() {
     }
 
     lives = Math.min(MAX_LIVES, lives + 1);
+    playSfx(itemUseSfx);
     firstAidCharged = false;
     showItemWarning("응급 처치 장치 발동 · 목숨 +1");
     updateUI();
@@ -4506,6 +4530,8 @@ function startMove(
         destination.r === player.r
     ) {
 
+        playSfx(wallHitSfx);
+
         applyRecoil(
             dc,
             dr,
@@ -4858,6 +4884,7 @@ function dieGame() {
 
     if (activeItem === "energyShield" && shieldCharges > 0) {
         shieldCharges--;
+        playSfx(itemUseSfx);
         onDailyQuestShieldBlock();
         dangers.delete(dangerKey);
         applyImpactRecoil(130, 9, 0.25);
@@ -4870,6 +4897,7 @@ function dieGame() {
     }
 
     lives--;
+    playSfx(damageSfx);
     onDailyQuestDeath();
 
     if (tryAutoFirstAid()) {
@@ -4973,6 +5001,7 @@ function timeoutGame() {
     remainingTime = 0;
 
     lives--;
+    playSfx(damageSfx);
 
     if (tryAutoFirstAid()) {
         gameState = "playing";
