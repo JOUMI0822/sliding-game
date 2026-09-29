@@ -202,8 +202,6 @@ const HEIGHT = 600;
 const TIME_LIMIT = 20;
 /* =========================================================
    게임 오디오
-   - 오디오 파일이 없거나 브라우저에서 재생이 막혀도
-     게임 화면/게임 로직에는 영향을 주지 않도록 안전하게 처리
 ========================================================= */
 
 const GAME_BGM_SRC = "sliding_bgm.m4a";
@@ -212,51 +210,74 @@ const WALL_HIT_SFX_SRC = "wall_hit.m4a";
 const DAMAGE_SFX_SRC = "damage.m4a";
 const ITEM_USE_SFX_SRC = "item_use.m4a";
 
-let gameBgm = null;
-let gameOverBgm = null;
-let wallHitSfx = null;
-let damageSfx = null;
-let itemUseSfx = null;
+const gameBgm = new Audio(GAME_BGM_SRC);
+const gameOverBgm = new Audio(GAME_OVER_BGM_SRC);
+const wallHitSfx = new Audio(WALL_HIT_SFX_SRC);
+const damageSfx = new Audio(DAMAGE_SFX_SRC);
+const itemUseSfx = new Audio(ITEM_USE_SFX_SRC);
 
-function makeAudio(src, loop = false, volume = 1) {
-    try {
-        const audio = new Audio();
-        audio.src = src;
-        audio.preload = "auto";
-        audio.loop = loop;
-        audio.volume = volume;
-        return audio;
-    } catch (error) {
-        return null;
-    }
+for (const audio of [gameBgm, gameOverBgm, wallHitSfx, damageSfx, itemUseSfx]) {
+    audio.preload = "auto";
 }
 
-function ensureGameAudio() {
-    if (gameBgm && gameOverBgm && wallHitSfx && damageSfx && itemUseSfx) {
-        return;
-    }
+const AUDIO_SETTINGS_KEY = "slidingMazeAudioSettings_v1";
+let audioSettings = {
+    music: 0.72,
+    sfx: 0.90
+};
+let audioSettingsOpen = false;
 
-    gameBgm = gameBgm || makeAudio(GAME_BGM_SRC, true, 0);
-    gameOverBgm = gameOverBgm || makeAudio(GAME_OVER_BGM_SRC, false, 1);
-    wallHitSfx = wallHitSfx || makeAudio(WALL_HIT_SFX_SRC, false, 0.9);
-    damageSfx = damageSfx || makeAudio(DAMAGE_SFX_SRC, false, 0.9);
-    itemUseSfx = itemUseSfx || makeAudio(ITEM_USE_SFX_SRC, false, 0.9);
+try {
+    const savedAudioSettings = JSON.parse(
+        localStorage.getItem(AUDIO_SETTINGS_KEY) || "null"
+    );
+    if (savedAudioSettings) {
+        audioSettings.music = Math.max(0, Math.min(1, Number(savedAudioSettings.music)));
+        audioSettings.sfx = Math.max(0, Math.min(1, Number(savedAudioSettings.sfx)));
+        if (!Number.isFinite(audioSettings.music)) audioSettings.music = 0.72;
+        if (!Number.isFinite(audioSettings.sfx)) audioSettings.sfx = 0.90;
+    }
+} catch (error) {}
+
+function saveAudioSettings() {
+    try {
+        localStorage.setItem(AUDIO_SETTINGS_KEY, JSON.stringify(audioSettings));
+    } catch (error) {}
+}
+
+function applyAudioSettings() {
+    wallHitSfx.volume = audioSettings.sfx;
+    damageSfx.volume = audioSettings.sfx;
+    itemUseSfx.volume = audioSettings.sfx;
+
+    if (gameBgm.paused) {
+        gameBgm.volume = 0;
+    }
+    if (gameOverBgm.paused) {
+        gameOverBgm.volume = 0;
+    }
 }
 
 function playSfx(audio) {
-    if (!audio) {
-        ensureGameAudio();
-        return;
-    }
+    if (audioSettings.sfx <= 0) return;
     try {
         audio.pause();
         audio.currentTime = 0;
+        audio.volume = audioSettings.sfx;
         const playPromise = audio.play();
         if (playPromise && typeof playPromise.catch === "function") {
             playPromise.catch(() => {});
         }
     } catch (error) {}
 }
+
+gameBgm.loop = true;
+gameBgm.preload = "auto";
+gameBgm.volume = 0;
+
+gameOverBgm.loop = false;
+gameOverBgm.preload = "auto";
+gameOverBgm.volume = 0;
 
 let bgmFadeFrame = null;
 
@@ -268,22 +289,25 @@ function cancelBgmFade() {
 }
 
 function fadeAudio(audio, from, to, duration, onComplete = null) {
-    if (!audio) {
-        if (onComplete) onComplete();
-        return;
-    }
-
     cancelBgmFade();
 
     const start = performance.now();
     const startVolume = Math.max(0, Math.min(1, from));
     const targetVolume = Math.max(0, Math.min(1, to));
+
     audio.volume = startVolume;
 
     function step(now) {
-        const progress = Math.min(1, (now - start) / Math.max(1, duration));
+        const progress = Math.min(
+            1,
+            (now - start) / Math.max(1, duration)
+        );
+
         const eased = 1 - Math.pow(1 - progress, 3);
-        audio.volume = startVolume + (targetVolume - startVolume) * eased;
+
+        audio.volume =
+            startVolume +
+            (targetVolume - startVolume) * eased;
 
         if (progress < 1) {
             bgmFadeFrame = requestAnimationFrame(step);
@@ -292,79 +316,95 @@ function fadeAudio(audio, from, to, duration, onComplete = null) {
 
         audio.volume = targetVolume;
         bgmFadeFrame = null;
-        if (onComplete) onComplete();
+
+        if (onComplete) {
+            onComplete();
+        }
     }
 
     bgmFadeFrame = requestAnimationFrame(step);
 }
 
 function startGameBgm() {
-    ensureGameAudio();
-    if (!gameBgm) return;
-
     cancelBgmFade();
 
     try {
-        if (gameOverBgm) {
-            gameOverBgm.pause();
-            gameOverBgm.currentTime = 0;
-        }
+        gameOverBgm.pause();
+        gameOverBgm.currentTime = 0;
+        gameOverBgm.volume = 0;
         gameBgm.currentTime = 0;
     } catch (error) {}
 
+    if (audioSettings.music <= 0) {
+        gameBgm.volume = 0;
+        return;
+    }
+
     gameBgm.volume = 0;
 
-    try {
-        const playPromise = gameBgm.play();
-        if (playPromise && typeof playPromise.catch === "function") {
-            playPromise.catch(() => {});
-        }
-    } catch (error) {}
+    const playPromise = gameBgm.play();
 
-    fadeAudio(gameBgm, 0, 0.72, 1200);
+    if (playPromise && typeof playPromise.catch === "function") {
+        playPromise.catch(() => {});
+    }
+
+    fadeAudio(
+        gameBgm,
+        0,
+        audioSettings.music,
+        1200
+    );
 }
 
 function endGameBgmAndPlayGameOver() {
-    ensureGameAudio();
     cancelBgmFade();
 
-    fadeAudio(gameBgm, gameBgm ? gameBgm.volume : 0, 0, 900, () => {
-        try {
-            if (gameBgm) {
+    fadeAudio(
+        gameBgm,
+        gameBgm.volume,
+        0,
+        900,
+        () => {
+            try {
                 gameBgm.pause();
                 gameBgm.currentTime = 0;
-            }
-        } catch (error) {}
+            } catch (error) {}
 
-        try {
-            if (gameOverBgm) {
+            if (audioSettings.music <= 0) return;
+
+            try {
                 gameOverBgm.pause();
                 gameOverBgm.currentTime = 0;
-                gameOverBgm.volume = 1;
+                gameOverBgm.volume = audioSettings.music;
+
                 const playPromise = gameOverBgm.play();
-                if (playPromise && typeof playPromise.catch === "function") {
+
+                if (
+                    playPromise &&
+                    typeof playPromise.catch === "function"
+                ) {
                     playPromise.catch(() => {});
                 }
-            }
-        } catch (error) {}
-    });
+            } catch (error) {}
+        }
+    );
 }
 
 function stopAllGameAudio() {
     cancelBgmFade();
 
     try {
-        if (gameBgm) {
-            gameBgm.pause();
-            gameBgm.currentTime = 0;
-            gameBgm.volume = 0;
-        }
-        if (gameOverBgm) {
-            gameOverBgm.pause();
-            gameOverBgm.currentTime = 0;
-        }
+        gameBgm.pause();
+        gameBgm.currentTime = 0;
+        gameBgm.volume = 0;
+
+        gameOverBgm.pause();
+        gameOverBgm.currentTime = 0;
     } catch (error) {}
 }
+
+applyAudioSettings();
+
 
 
 /* 클리어 횟수에 따른 제한 시간
@@ -649,6 +689,7 @@ function handleMultiplayerMessage(data) {
         multiplayerPeerJoined = false;
         multiplayerMatchActive = false;
         multiplayerResult = data.winner || multiplayerResult || "draw";
+        endGameBgmAndPlayGameOver();
         gameState = "multiplayerResult";
         movement = null;
         multiplayerOpen = false;
@@ -699,6 +740,7 @@ function handleMultiplayerMessage(data) {
         }
 
         gameState = "playing";
+        startGameBgm();
         remainingTime = getStageTimeLimit() + activeTimeBonus;
         stageStart = data.startPosition && Number.isFinite(Number(data.startPosition.c)) && Number.isFinite(Number(data.startPosition.r))
             ? { c: Number(data.startPosition.c), r: Number(data.startPosition.r) }
@@ -768,6 +810,7 @@ function handleMultiplayerMessage(data) {
         if (!multiplayerMatchActive && gameState !== "multiplayerWaitingResult") return;
         multiplayerMatchActive = false;
         multiplayerResult = data.winner || "draw";
+        endGameBgmAndPlayGameOver();
         gameState = "multiplayerResult";
         movement = null;
         multiplayerOpen = false;
@@ -1004,6 +1047,96 @@ function drawMultiplayerMenu() {
     ctx.restore();
 }
 
+
+/* =========================================================
+   소리 설정
+========================================================= */
+
+function formatVolume(value) {
+    return `${Math.round(value * 100)}%`;
+}
+
+function drawAudioSettingsPanel() {
+    ctx.save();
+
+    ctx.fillStyle = "rgba(0,0,0,0.72)";
+    ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+    const panel = { x: 120, y: 95, w: 560, h: 410 };
+
+    ctx.fillStyle = "#171c25";
+    ctx.strokeStyle = "#394352";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(panel.x, panel.y, panel.w, panel.h, 20);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 28px Pretendard, Noto Sans KR, sans-serif";
+    ctx.fillText("🔊 소리 설정", WIDTH / 2, 145);
+
+    const rows = [
+        { label: "음악 크기", key: "music", y: 230 },
+        { label: "효과음 크기", key: "sfx", y: 315 }
+    ];
+
+    rows.forEach(row => {
+        ctx.fillStyle = "#aeb8c5";
+        ctx.font = "600 16px Pretendard, Noto Sans KR, sans-serif";
+        ctx.fillText(row.label, WIDTH / 2, row.y - 35);
+
+        drawSettingsButton(panel.x + 55, row.y - 21, 70, 42, "−");
+        drawSettingsButton(panel.x + panel.w - 125, row.y - 21, 70, 42, "+");
+
+        const bar = { x: WIDTH / 2 - 145, y: row.y - 7, w: 290, h: 14 };
+        ctx.fillStyle = "#27313e";
+        ctx.beginPath();
+        ctx.roundRect(bar.x, bar.y, bar.w, bar.h, 7);
+        ctx.fill();
+
+        ctx.fillStyle = "#7ddcff";
+        ctx.beginPath();
+        ctx.roundRect(bar.x, bar.y, bar.w * audioSettings[row.key], bar.h, 7);
+        ctx.fill();
+
+        ctx.fillStyle = "#f0f3f6";
+        ctx.font = "bold 15px Pretendard, Noto Sans KR, sans-serif";
+        ctx.fillText(formatVolume(audioSettings[row.key]), WIDTH / 2, row.y + 30);
+    });
+
+    ctx.fillStyle = "#7f8b99";
+    ctx.font = "13px Pretendard, Noto Sans KR, sans-serif";
+    ctx.fillText("설정은 자동으로 저장됩니다.", WIDTH / 2, 410);
+
+    drawSettingsButton(WIDTH / 2 - 80, 445, 160, 36, "닫기");
+    ctx.restore();
+}
+
+function changeAudioVolume(key, direction) {
+    const step = 0.10;
+    audioSettings[key] = Math.max(0, Math.min(1, audioSettings[key] + direction * step));
+    saveAudioSettings();
+
+    if (key === "sfx") {
+        applyAudioSettings();
+    } else {
+        if (gameState === "playing" || multiplayerMatchActive) {
+            if (audioSettings.music <= 0) {
+                cancelBgmFade();
+                gameBgm.volume = 0;
+            } else if (!gameBgm.paused) {
+                cancelBgmFade();
+                gameBgm.volume = audioSettings.music;
+            }
+        }
+        if (!gameOverBgm.paused) {
+            gameOverBgm.volume = audioSettings.music;
+        }
+    }
+}
 
 /* =========================================================
    화면 설정
@@ -4337,6 +4470,7 @@ function startNewGame() {
     refreshDailyQuestIfNeeded();
     questOpen = false;
     settingsOpen = false;
+    audioSettingsOpen = false;
 
     clearTimeout(
         roundTimer
@@ -4515,7 +4649,6 @@ function startMove(
     dc,
     dr
 ) {
-    ensureGameAudio();
 
     if (
         gameState !== "playing"
@@ -4881,7 +5014,6 @@ function clearGame() {
 ========================================================= */
 
 function dieGame() {
-    ensureGameAudio();
 
     if (
         gameState !== "playing"
@@ -5300,6 +5432,30 @@ function updateUI() {
 }
 
 
+let audioUnlocked = false;
+function unlockGameAudio() {
+    if (audioUnlocked) return;
+    audioUnlocked = true;
+    try {
+        const wasMuted = gameBgm.muted;
+        gameBgm.muted = true;
+        const promise = gameBgm.play();
+        if (promise && typeof promise.then === "function") {
+            promise.then(() => {
+                gameBgm.pause();
+                gameBgm.currentTime = 0;
+                gameBgm.muted = wasMuted;
+            }).catch(() => {
+                gameBgm.muted = wasMuted;
+            });
+        } else {
+            gameBgm.pause();
+            gameBgm.currentTime = 0;
+            gameBgm.muted = wasMuted;
+        }
+    } catch (error) {}
+}
+
 /* =========================================================
    PC 키보드
 ========================================================= */
@@ -5307,6 +5463,8 @@ function updateUI() {
 window.addEventListener(
     "keydown",
     event => {
+
+        unlockGameAudio();
 
         const key =
             event.key.toLowerCase();
@@ -5863,6 +6021,7 @@ let lastSettingsPointerTime = 0;
 canvas.addEventListener(
     "pointerup",
     event => {
+        unlockGameAudio();
 
         if (
             gameState !== "start"
@@ -8555,9 +8714,17 @@ function drawShopButton() {
 }
 
 function getStartSettingsButton() {
-
     return {
         x: WIDTH - 72,
+        y: 28,
+        w: 42,
+        h: 42
+    };
+}
+
+function getVisualSettingsButton() {
+    return {
+        x: WIDTH - 124,
         y: 28,
         w: 42,
         h: 42
@@ -8621,7 +8788,7 @@ function drawSettingsGear() {
         "middle";
 
     ctx.fillText(
-        "⚙",
+        "🔊",
         button.x +
         button.w / 2,
         button.y +
@@ -8631,6 +8798,26 @@ function drawSettingsGear() {
     ctx.restore();
 }
 
+
+function drawVisualSettingsButton() {
+    const button = getVisualSettingsButton();
+
+    ctx.save();
+    ctx.fillStyle = "rgba(255,255,255,0.10)";
+    ctx.strokeStyle = "rgba(255,255,255,0.25)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(button.x, button.y, button.w, button.h, 12);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = "#dfe5ea";
+    ctx.font = "bold 23px Arial, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("🎨", button.x + button.w / 2, button.y + button.h / 2 + 1);
+    ctx.restore();
+}
 
 function drawSettingsButton(
     x,
@@ -9632,6 +9819,7 @@ function handleSettingsTap(x, y) {
     const shopButton = getShopButton();
     const inventoryButton = getInventoryButton();
     const gear = getStartSettingsButton();
+    const visualGear = getVisualSettingsButton();
 
     // 2인용 메뉴가 열려 있으면 다른 시작 화면 기능보다 먼저 처리
     if (multiplayerOpen) {
@@ -9687,7 +9875,7 @@ function handleSettingsTap(x, y) {
         return true;
     }
 
-    if (!shopOpen && !inventoryOpen && !settingsOpen && !multiplayerOpen && !questOpen && isInsideRect(x, y, questButton)) {
+    if (!shopOpen && !inventoryOpen && !settingsOpen && !audioSettingsOpen && !multiplayerOpen && !questOpen && isInsideRect(x, y, questButton)) {
         questOpen = true;
         return true;
     }
@@ -9719,13 +9907,13 @@ function handleSettingsTap(x, y) {
         return true;
     }
 
-    if (!shopOpen && !inventoryOpen && !settingsOpen && !multiplayerOpen && isInsideRect(x, y, shopButton)) {
+    if (!shopOpen && !inventoryOpen && !settingsOpen && !audioSettingsOpen && !multiplayerOpen && isInsideRect(x, y, shopButton)) {
         shopOpen = true;
         shopPage = 0;
         return true;
     }
 
-    if (!shopOpen && !inventoryOpen && !settingsOpen && isInsideRect(x, y, inventoryButton)) {
+    if (!shopOpen && !inventoryOpen && !settingsOpen && !audioSettingsOpen && isInsideRect(x, y, inventoryButton)) {
         inventoryOpen = true;
         inventoryDetailType = null;
         return true;
@@ -9843,14 +10031,53 @@ function handleSettingsTap(x, y) {
         return true;
     }
 
-    if (!settingsOpen && isInsideRect(x, y, { x: 570, y: 350, w: 200, h: 38 })) {
+    if (!settingsOpen && !audioSettingsOpen && isInsideRect(x, y, { x: 570, y: 350, w: 200, h: 38 })) {
         openMultiplayerMenu();
         return true;
     }
 
-    if (!settingsOpen && isInsideRect(x, y, gear)) {
+    if (!settingsOpen && !audioSettingsOpen && isInsideRect(x, y, visualGear)) {
         settingsOpen = true;
+        audioSettingsOpen = false;
         requestSettingsRender();
+        return true;
+    }
+
+    if (!settingsOpen && !audioSettingsOpen && isInsideRect(x, y, gear)) {
+        audioSettingsOpen = true;
+        settingsOpen = false;
+        return true;
+    }
+
+    if (audioSettingsOpen) {
+        if (isInsideRect(x, y, { x: WIDTH / 2 - 80, y: 445, w: 160, h: 36 })) {
+            audioSettingsOpen = false;
+            return true;
+        }
+
+        const audioPanel = { x: 120, y: 95, w: 560, h: 410 };
+        if (x < audioPanel.x || x > audioPanel.x + audioPanel.w || y < audioPanel.y || y > audioPanel.y + audioPanel.h) {
+            audioSettingsOpen = false;
+            return true;
+        }
+
+        if (isInsideRect(x, y, { x: audioPanel.x + 55, y: 230 - 21, w: 70, h: 42 })) {
+            changeAudioVolume("music", -1);
+            return true;
+        }
+        if (isInsideRect(x, y, { x: audioPanel.x + audioPanel.w - 125, y: 230 - 21, w: 70, h: 42 })) {
+            changeAudioVolume("music", 1);
+            return true;
+        }
+        if (isInsideRect(x, y, { x: audioPanel.x + 55, y: 315 - 21, w: 70, h: 42 })) {
+            changeAudioVolume("sfx", -1);
+            return true;
+        }
+        if (isInsideRect(x, y, { x: audioPanel.x + audioPanel.w - 125, y: 315 - 21, w: 70, h: 42 })) {
+            changeAudioVolume("sfx", 1);
+            return true;
+        }
+
         return true;
     }
 
@@ -10115,6 +10342,7 @@ function drawStartScreen() {
     drawQuestButton();
     drawShopButton();
     drawInventoryButton();
+    drawVisualSettingsButton();
     drawSettingsGear();
 
     // 2인용 경쟁 버튼
@@ -10129,6 +10357,8 @@ function drawStartScreen() {
         drawInventoryPanel();
     } else if (settingsOpen) {
         drawSettingsPanel();
+    } else if (audioSettingsOpen) {
+        drawAudioSettingsPanel();
     } else if (multiplayerOpen) {
         drawMultiplayerMenu();
     }
