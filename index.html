@@ -258,13 +258,38 @@ function applyAudioSettings() {
     }
 }
 
+// 효과음은 한 개의 Audio 객체를 매번 pause/seek해서 재사용하면
+// 모바일 Safari에서 재생 시작이 늦어질 수 있다.
+// 여러 개의 미리 준비된 플레이어를 순환 사용해 벽 충돌음을 즉시 재생한다.
+const sfxPools = new Map();
+const SFX_POOL_SIZE = 4;
+
+function getSfxPool(sourceAudio) {
+    if (sfxPools.has(sourceAudio)) return sfxPools.get(sourceAudio);
+
+    const pool = [];
+    for (let i = 0; i < SFX_POOL_SIZE; i++) {
+        const player = new Audio(sourceAudio.src);
+        player.preload = "auto";
+        player.volume = audioSettings.sfx;
+        pool.push(player);
+    }
+    sfxPools.set(sourceAudio, { players: pool, index: 0 });
+    return sfxPools.get(sourceAudio);
+}
+
 function playSfx(audio) {
     if (audioSettings.sfx <= 0) return;
+
     try {
-        audio.pause();
-        audio.currentTime = 0;
-        audio.volume = audioSettings.sfx;
-        const playPromise = audio.play();
+        const pool = getSfxPool(audio);
+        const player = pool.players[pool.index];
+        pool.index = (pool.index + 1) % pool.players.length;
+
+        player.volume = audioSettings.sfx;
+        player.currentTime = 0;
+
+        const playPromise = player.play();
         if (playPromise && typeof playPromise.catch === "function") {
             playPromise.catch(() => {});
         }
@@ -5462,6 +5487,7 @@ let audioUnlocked = false;
 function unlockGameAudio() {
     if (audioUnlocked) return;
     audioUnlocked = true;
+
     try {
         const wasMuted = gameBgm.muted;
         gameBgm.muted = true;
@@ -5480,6 +5506,30 @@ function unlockGameAudio() {
             gameBgm.muted = wasMuted;
         }
     } catch (error) {}
+
+    // 첫 사용자 입력 순간에 효과음 플레이어도 미리 활성화한다.
+    // 이후 벽 충돌 같은 짧은 효과음의 첫 재생 지연을 줄인다.
+    for (const sourceAudio of [wallHitSfx, damageSfx, itemUseSfx]) {
+        try {
+            const pool = getSfxPool(sourceAudio);
+            const player = pool.players[0];
+            player.muted = true;
+            const p = player.play();
+            if (p && typeof p.then === "function") {
+                p.then(() => {
+                    player.pause();
+                    player.currentTime = 0;
+                    player.muted = false;
+                }).catch(() => {
+                    player.muted = false;
+                });
+            } else {
+                player.pause();
+                player.currentTime = 0;
+                player.muted = false;
+            }
+        } catch (error) {}
+    }
 }
 
 /* =========================================================
