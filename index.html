@@ -160,52 +160,7 @@ canvas {
     }
 }
 
-#effectVolumeRange {
-    position: fixed;
-    z-index: 9999;
-    display: none;
-    height: 42px;
-    margin: 0;
-    padding: 0;
-    touch-action: none;
-    -webkit-user-select: none;
-    user-select: none;
-    opacity: 0;
-    background: transparent;
-    border: 0;
-    color: transparent;
-    outline: none;
-    -webkit-appearance: none;
-    appearance: none;
-}
-#effectVolumeValue {
-    position: fixed;
-    z-index: 51;
-    display: none !important;
-    pointer-events: none;
-    visibility: hidden;
-}
 
-#effectVolumeRange::-webkit-slider-runnable-track {
-    background: transparent;
-    border: 0;
-}
-#effectVolumeRange::-webkit-slider-thumb {
-    background: transparent;
-    border: 0;
-    opacity: 0;
-    -webkit-appearance: none;
-    appearance: none;
-}
-#effectVolumeRange::-moz-range-track {
-    background: transparent;
-    border: 0;
-}
-#effectVolumeRange::-moz-range-thumb {
-    background: transparent;
-    border: 0;
-    opacity: 0;
-}
 </style>
 </head>
 
@@ -225,8 +180,6 @@ canvas {
     </div>
 
     <canvas id="game" width="800" height="600"></canvas>
-<input id="effectVolumeRange" type="range" min="0" max="100" value="70" aria-label="효과음 크기">
-<div id="effectVolumeValue" aria-live="polite"></div>
 
 </div>
 
@@ -238,59 +191,6 @@ canvas {
 ========================================================= */
 
 const canvas = document.getElementById("game");
-const effectVolumeRange = document.getElementById("effectVolumeRange");
-
-function positionEffectVolumeRange() {
-    if (!effectVolumeRange) return;
-    if (!settingsOpen) {
-        effectVolumeRange.style.display = "none";
-        return;
-    }
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = rect.width / WIDTH;
-    const scaleY = rect.height / HEIGHT;
-    effectVolumeRange.style.display = "block";
-    effectVolumeRange.style.left = `${rect.left + 270 * scaleX}px`;
-    effectVolumeRange.style.top = `${rect.top + 496 * scaleY}px`;
-    effectVolumeRange.style.width = `${260 * scaleX}px`;
-    effectVolumeRange.value = String(Math.round(effectVolume * 100));
-    positionEffectVolumeValue();
-}
-
-function positionEffectVolumeValue() {
-    const label = document.getElementById("effectVolumeValue");
-    if (!label) return;
-    if (!settingsOpen) {
-        label.style.display = "none";
-        return;
-    }
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = rect.width / WIDTH;
-    const scaleY = rect.height / HEIGHT;
-    label.style.display = "block";
-    label.style.left = `${rect.left + 400 * scaleX}px`;
-    label.style.top = `${rect.top + 472 * scaleY}px`;
-    label.textContent = `효과음 크기  ${Math.round(effectVolume * 100)}%`;
-}
-
-if (effectVolumeRange) {
-    // 네이티브 range가 부모 게임의 스와이프 핸들러에 가로채이지 않게 한다.
-    ["touchstart", "touchmove", "touchend", "pointerdown", "pointermove", "pointerup", "pointercancel"].forEach(type => {
-        effectVolumeRange.addEventListener(type, event => {
-            event.stopPropagation();
-        }, { passive: false });
-    });
-
-    effectVolumeRange.addEventListener("input", event => {
-        setEffectVolume(Number(event.target.value) / 100);
-        requestSettingsRender();
-    });
-    effectVolumeRange.addEventListener("change", event => {
-        setEffectVolume(Number(event.target.value) / 100);
-        requestSettingsRender();
-    });
-}
-
 const gameWrapper = document.getElementById("gameWrapper");
 const ctx = canvas.getContext("2d");
 
@@ -1345,11 +1245,6 @@ let lastSettingsRenderTime = 0;
 
 function requestSettingsRender() {
     settingsRenderRequested = true;
-    if (typeof positionEffectVolumeRange === "function") positionEffectVolumeRange();
-
-    // Show the exact current volume immediately, including while dragging.
-    const volumeLabel = document.querySelector("[data-effect-volume-label]");
-    if (volumeLabel) volumeLabel.textContent = `효과음 크기  ${Math.round(effectVolume * 100)}%`;
 }
 
 function saveVisualSettingsDelayed() {
@@ -5455,7 +5350,6 @@ gameWrapper.addEventListener(
     "touchstart",
     event => {
 
-        if (event.target === effectVolumeRange) return;
         event.preventDefault();
 
         if (
@@ -5496,7 +5390,6 @@ gameWrapper.addEventListener(
     "touchmove",
     event => {
 
-        if (event.target === effectVolumeRange) return;
 
         if (settingsOpen && event.touches.length === 1) {
             const touch = event.touches[0];
@@ -5518,7 +5411,6 @@ gameWrapper.addEventListener(
     "touchend",
     event => {
 
-        if (event.target === effectVolumeRange) return;
         event.preventDefault();
 
         if (
@@ -5860,8 +5752,6 @@ gameWrapper.addEventListener(
 );
 
 
-window.addEventListener("resize", () => { positionEffectVolumeRange(); positionEffectVolumeValue(); });
-window.addEventListener("orientationchange", () => { positionEffectVolumeRange(); positionEffectVolumeValue(); });
 
 let volumeSliderDragging = false;
 
