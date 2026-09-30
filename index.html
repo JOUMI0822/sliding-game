@@ -402,10 +402,10 @@ function connectMultiplayerSocket(onConnected) {
 function playMultiplayerResultSound(result) {
     if (multiplayerResultSoundPlayed) return;
     if (result === multiplayerRole) {
-        playEffectSound("versusWin", { oneShotKey: "versus-result" });
+        playEffectSound("versusWin", "versus-result");
         multiplayerResultSoundPlayed = true;
     } else if (result && result !== "draw") {
-        playEffectSound("versusLose", { oneShotKey: "versus-result" });
+        playEffectSound("versusLose", "versus-result");
         multiplayerResultSoundPlayed = true;
     }
 }
@@ -978,14 +978,11 @@ function setEffectVolume(value) {
 }
 const oneShotEffectPlayed = new Set();
 
-function playEffectSound(type, options = {}) {
+function playEffectSound(type, oneShotKey = null) {
     const src = AUDIO_FILES[type];
     if (!src || effectVolume <= 0) return;
-
-    const oneShotKey = options.oneShotKey || null;
     if (oneShotKey && oneShotEffectPlayed.has(oneShotKey)) return;
     if (oneShotKey) oneShotEffectPlayed.add(oneShotKey);
-
     try {
         const audio = new Audio(src);
         audio.preload = "none";
@@ -4328,8 +4325,6 @@ function startNewGame() {
 
     gameState = "playing";
 
-    resetOneShotEffects();
-
     lives =
         MAX_LIVES;
 
@@ -4690,7 +4685,8 @@ function updateMovement(
 
         movement = null;
 
-        // 벽 충돌 반복 효과음은 사용하지 않습니다.
+        // 벽 충돌은 시각적 반동만 적용하고 효과음은 재생하지 않습니다.
+
         applyRecoil(
             finishedMovement.dc,
             finishedMovement.dr,
@@ -4766,7 +4762,7 @@ function clearGame() {
     gameState =
         "cleared";
 
-    playEffectSound("goal");
+    playEffectSound("goal", "goal");
 
     movement = null;
 
