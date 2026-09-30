@@ -1091,6 +1091,31 @@ function playEffectSound(type, oneShotKey = null) {
                 if (oneShotKey) {
                     oneShotEffectPlayed.delete(oneShotKey);
                 }
+
+                // 일부 모바일 브라우저에서는 cloneNode()로 만든 Audio가
+                // 첫 재생에서만 거부되는 경우가 있어, 같은 사용자 동작 안에서
+                // 새 Audio 객체로 한 번만 즉시 재시도합니다.
+                try {
+                    const retryAudio = new Audio(src);
+                    retryAudio.preload = "auto";
+                    retryAudio.volume = effectVolume;
+                    retryAudio.setAttribute("playsinline", "");
+                    retryAudio.currentTime = 0;
+                    activeEffectAudios.add(retryAudio);
+
+                    const retryCleanup = () => {
+                        activeEffectAudios.delete(retryAudio);
+                        retryAudio.onended = null;
+                        retryAudio.onerror = null;
+                    };
+                    retryAudio.onended = retryCleanup;
+                    retryAudio.onerror = retryCleanup;
+
+                    const retryPromise = retryAudio.play();
+                    if (retryPromise && retryPromise.catch) {
+                        retryPromise.catch(() => retryCleanup());
+                    }
+                } catch (retryError) {}
             });
         }
 
@@ -1104,17 +1129,19 @@ function playEffectSound(type, oneShotKey = null) {
 }
 
 function playUIClickSound() {
-    // start 화면의 UI에서만 사용. 게임 플레이 중에는 호출하지 않습니다.
-    if (gameState !== "start") return;
+    // 설정/메뉴 UI에서만 호출되는 함수입니다.
+    // gameState 조건으로 막지 않아 모바일/오버레이 UI에서도 확실히 재생되도록 합니다.
     playEffectSound("uiClick");
 }
 
 function playUIInvalidSound() {
-    if (gameState !== "start") return;
+    // 구매/장착/보상 수령 등 불가능한 UI 동작에서는
+    // 현재 gameState와 관계없이 재생합니다.
     playEffectSound("uiInvalid");
 }
 
 function playGameStartSound() {
+    // 새 게임 버튼/키 입력 직후의 사용자 동작 안에서 바로 호출합니다.
     playEffectSound("gameStart");
 }
 
