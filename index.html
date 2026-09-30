@@ -262,6 +262,7 @@ let multiplayerConnected = false;
 let multiplayerPeerJoined = false;
 let multiplayerMatchActive = false;
 let multiplayerResult = null;
+let multiplayerResultSoundPlayed = false;
 let multiplayerStatus = "서버 연결 중...";
 let multiplayerSendAccumulator = 0;
 let multiplayerEliminatedSent = false;
@@ -398,6 +399,17 @@ function connectMultiplayerSocket(onConnected) {
     });
 }
 
+function playMultiplayerResultSound(result) {
+    if (multiplayerResultSoundPlayed) return;
+    if (result === multiplayerRole) {
+        playEffectSound("versusWin", { oneShotKey: "versus-result" });
+        multiplayerResultSoundPlayed = true;
+    } else if (result && result !== "draw") {
+        playEffectSound("versusLose", { oneShotKey: "versus-result" });
+        multiplayerResultSoundPlayed = true;
+    }
+}
+
 function handleMultiplayerMessage(data) {
     if (data.type === "error") {
         multiplayerStatus = data.message || "서버 오류";
@@ -483,6 +495,7 @@ function handleMultiplayerMessage(data) {
         multiplayerPeerJoined = false;
         multiplayerMatchActive = false;
         multiplayerResult = data.winner || multiplayerResult || "draw";
+        playMultiplayerResultSound(multiplayerResult);
         gameState = "multiplayerResult";
         movement = null;
         multiplayerOpen = false;
@@ -508,6 +521,8 @@ function handleMultiplayerMessage(data) {
         if (multiplayerRole !== "guest") return;
         multiplayerMatchActive = true;
         multiplayerResult = null;
+        multiplayerResultSoundPlayed = false;
+        resetOneShotEffects();
         multiplayerEliminatedSent = false;
         multiplayerRoundTransition = false;
         multiplayerPlayerVisible = true;
@@ -602,6 +617,7 @@ function handleMultiplayerMessage(data) {
         if (!multiplayerMatchActive && gameState !== "multiplayerWaitingResult") return;
         multiplayerMatchActive = false;
         multiplayerResult = data.winner || "draw";
+        playMultiplayerResultSound(multiplayerResult);
         gameState = "multiplayerResult";
         movement = null;
         multiplayerOpen = false;
@@ -619,6 +635,8 @@ function startMultiplayerMatch() {
     multiplayerRound = 1;
     multiplayerMatchActive = true;
     multiplayerResult = null;
+    multiplayerResultSoundPlayed = false;
+    resetOneShotEffects();
     multiplayerEliminatedSent = false;
     multiplayerRoundTransition = false;
     multiplayerOpen = false;
@@ -937,7 +955,9 @@ const SETTINGS_KEY = "slidingMazeVisualSettings_v2";
    효과음: 필요할 때만 생성하여 초기 화면 로딩을 방해하지 않음
 ========================================================= */
 const AUDIO_FILES = {
-    wallHit: "wall_hit.m4a",
+    goal: "goal.m4a",
+    versusWin: "versus_win.m4a",
+    versusLose: "versus_lose.m4a",
     damage: "damage.m4a",
     itemUse: "item_use.m4a",
     gameOver: "gameover.m4a"
@@ -956,9 +976,16 @@ function setEffectVolume(value) {
     saveEffectVolume();
     requestSettingsRender();
 }
-function playEffectSound(type) {
+const oneShotEffectPlayed = new Set();
+
+function playEffectSound(type, options = {}) {
     const src = AUDIO_FILES[type];
     if (!src || effectVolume <= 0) return;
+
+    const oneShotKey = options.oneShotKey || null;
+    if (oneShotKey && oneShotEffectPlayed.has(oneShotKey)) return;
+    if (oneShotKey) oneShotEffectPlayed.add(oneShotKey);
+
     try {
         const audio = new Audio(src);
         audio.preload = "none";
@@ -966,6 +993,10 @@ function playEffectSound(type) {
         const promise = audio.play();
         if (promise && promise.catch) promise.catch(() => {});
     } catch (error) {}
+}
+
+function resetOneShotEffects() {
+    oneShotEffectPlayed.clear();
 }
 
 /* =========================================================
@@ -4297,6 +4328,8 @@ function startNewGame() {
 
     gameState = "playing";
 
+    resetOneShotEffects();
+
     lives =
         MAX_LIVES;
 
@@ -4490,8 +4523,6 @@ function startMove(
         destination.r === player.r
     ) {
 
-        playEffectSound("wallHit");
-
         applyRecoil(
             dc,
             dr,
@@ -4659,22 +4690,7 @@ function updateMovement(
 
         movement = null;
 
-        // 슬라이딩 이동 후 앞쪽의 벽/맵 경계에 실제로 부딪혀 멈춘 경우
-        // 이동 시작 시 제자리에서 막힌 경우와 별도로 벽 충돌 효과음을 재생합니다.
-        const hitC =
-            finishedMovement.toC +
-            finishedMovement.dc;
-        const hitR =
-            finishedMovement.toR +
-            finishedMovement.dr;
-
-        if (
-            !isInside(hitC, hitR) ||
-            walls.has(keyOf(hitC, hitR))
-        ) {
-            playEffectSound("wallHit");
-        }
-
+        // 벽 충돌 반복 효과음은 사용하지 않습니다.
         applyRecoil(
             finishedMovement.dc,
             finishedMovement.dr,
@@ -4749,6 +4765,8 @@ function clearGame() {
 
     gameState =
         "cleared";
+
+    playEffectSound("goal");
 
     movement = null;
 
