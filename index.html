@@ -965,101 +965,83 @@ const AUDIO_FILES = {
     uiClick: "ui_click.m4a",
     gameStart: "game_start.m4a"
 };
-
 const EFFECT_VOLUME_KEY = "slidingMazeEffectVolume_v1";
 let effectVolume = 0.70;
-let audioUnlocked = false;
-let suppressNextUIClickSound = false;
 const oneShotEffectPlayed = new Set();
 
-function resetOneShotEffects() {
-    oneShotEffectPlayed.clear();
-}
-
+function resetOneShotEffects() { oneShotEffectPlayed.clear(); }
 try {
     const saved = Number(localStorage.getItem(EFFECT_VOLUME_KEY));
     if (Number.isFinite(saved)) effectVolume = Math.max(0, Math.min(1, saved));
 } catch (error) {}
-
 function saveEffectVolume() {
-    try {
-        localStorage.setItem(EFFECT_VOLUME_KEY, String(effectVolume));
-    } catch (error) {}
+    try { localStorage.setItem(EFFECT_VOLUME_KEY, String(effectVolume)); } catch (error) {}
 }
-
 function setEffectVolume(value) {
     effectVolume = Math.max(0, Math.min(1, Number(value) || 0));
     saveEffectVolume();
     requestSettingsRender();
 }
 
-/*
- * 모든 효과음은 같은 Audio 객체를 재사용하지 않습니다.
- * 특히 새 UI 효과음은 사용자 입력 이벤트 안에서 직접 호출될 수 있도록
- * playEffectSound() 자체를 단순하게 유지합니다.
- */
+function getSoundVolume(type) {
+    // 새 UI 효과음은 체감 음량을 확실히 낮춥니다.
+    if (type === "uiClick") return effectVolume * 0.10;
+    if (type === "gameStart") return effectVolume * 0.12;
+    return effectVolume;
+}
+
 function playEffectSound(type, oneShotKey = null) {
     const src = AUDIO_FILES[type];
-    if (!src || effectVolume <= 0) return false;
-
-    // UI 클릭/게임 시작음은 다른 효과음보다 작게 재생합니다.
-    const volumeMultiplier =
-        type === "uiClick" ? 0.38 :
-        type === "gameStart" ? 0.42 :
-        1;
-
-    if (oneShotKey && oneShotEffectPlayed.has(oneShotKey)) {
-        return false;
-    }
-
+    if (!src || effectVolume <= 0) return null;
+    if (oneShotKey && oneShotEffectPlayed.has(oneShotKey)) return null;
+    if (oneShotKey) oneShotEffectPlayed.add(oneShotKey);
     try {
         const audio = new Audio(src);
         audio.preload = "auto";
-        audio.volume = Math.max(0, Math.min(1, effectVolume * volumeMultiplier));
+        audio.volume = Math.max(0, Math.min(1, getSoundVolume(type)));
         audio.setAttribute("playsinline", "");
-        audio.currentTime = 0;
-
-        if (oneShotKey) oneShotEffectPlayed.add(oneShotKey);
-
         const promise = audio.play();
-
-        if (promise && typeof promise.catch === "function") {
-            promise.catch(() => {
-                if (oneShotKey) oneShotEffectPlayed.delete(oneShotKey);
-            });
+        if (promise && promise.catch) {
+            promise.catch(() => { if (oneShotKey) oneShotEffectPlayed.delete(oneShotKey); });
         }
-
-        return true;
+        return audio;
     } catch (error) {
         if (oneShotKey) oneShotEffectPlayed.delete(oneShotKey);
-        return false;
+        return null;
     }
 }
 
-function playUIClickSound() {
-    return playEffectSound("uiClick");
+function playUIClickSound() { return playEffectSound("uiClick"); }
+function playUIInvalidSound() { return playEffectSound("uiInvalid"); }
+
+function playGameStartSoundAndThenStart() {
+    const src = AUDIO_FILES.gameStart;
+    if (!src || effectVolume <= 0) { startNewGame(); return; }
+
+    const audio = new Audio(src);
+    audio.preload = "auto";
+    audio.volume = Math.max(0, Math.min(1, getSoundVolume("gameStart")));
+    audio.setAttribute("playsinline", "");
+
+    let transitioned = false;
+    const transition = () => {
+        if (transitioned) return;
+        transitioned = true;
+        startNewGame();
+    };
+
+    audio.onended = transition;
+    // 브라우저가 ended 이벤트를 누락하거나 음원이 너무 길어도 게임이 멈추지 않게 합니다.
+    const fallback = setTimeout(transition, 2500);
+    audio.addEventListener("ended", () => clearTimeout(fallback), { once: true });
+
+    const promise = audio.play();
+    if (promise && promise.catch) promise.catch(transition);
 }
 
-function playUIInvalidSound() {
-    suppressNextUIClickSound = true;
-    return playEffectSound("uiInvalid");
-}
-
-function playGameStartSound() {
-    return playEffectSound("gameStart");
-}
-
-function unlockEffectAudio() {
-    audioUnlocked = true;
-}
-
-/*
- * 사용자 제스처가 시작되는 순간에만 권한을 확보합니다.
- * 여기서는 미리 play()를 하지 않습니다.
- */
-document.addEventListener("pointerdown", unlockEffectAudio, { passive: true });
-document.addEventListener("touchstart", unlockEffectAudio, { passive: true });
-document.addEventListener("keydown", unlockEffectAudio, { passive: true });
+document.addEventListener("pointerdown", () => {}, { once: true, passive: true });
+document.addEventListener("touchstart", () => {}, { once: true, passive: true });
+document.addEventListener("keydown", () => {}, { once: true, passive: true });
 
 /* =========================================================
    아이템 시스템
@@ -1869,7 +1851,6 @@ function useEnergyRecovery(amount) {
     amount = Math.max(1, Math.min(2, amount));
 
     if (itemInventory.energyRecovery < amount) {
-        playUIInvalidSound();
         return false;
     }
 
@@ -3990,7 +3971,6 @@ function rerollDailyQuests() {
 
     if (incompleteSlots.length === 0) {
         setMessage("모든 일일 퀘스트를 완료했습니다.");
-        playUIInvalidSound();
         return false;
     }
 
@@ -4504,6 +4484,7 @@ function skipMap() {
             setMessage(
                 "맵 넘기기 횟수를 모두 사용했습니다."
             );
+            playUIInvalidSound();
         }
 
         return;
@@ -5679,14 +5660,8 @@ gameWrapper.addEventListener(
                     y
                 )
             ) {
-                if (suppressNextUIClickSound) {
-                    suppressNextUIClickSound = false;
-                } else {
-                    playUIClickSound();
-                }
-
+                playUIClickSound();
                 lastTapTime = 0;
-
                 return;
             }
 
@@ -5710,13 +5685,7 @@ gameWrapper.addEventListener(
 
                 lastTapTime = 0;
 
-                // 두 번째 사용자 터치 이벤트 안에서 시작 효과음을 먼저 재생합니다.
-                // 화면 전환은 효과음이 시작된 뒤 아주 짧게 늦춰서,
-                // 게임 화면으로 바뀐 다음 효과음이 들리는 느낌이 나지 않도록 합니다.
-                playGameStartSound();
-                setTimeout(() => {
-                    startNewGame();
-                }, 120);
+                playGameStartSoundAndThenStart();
 
             } else {
 
@@ -5960,12 +5929,7 @@ canvas.addEventListener(
                 y
             )
         ) {
-            if (suppressNextUIClickSound) {
-                suppressNextUIClickSound = false;
-            } else {
-                playUIClickSound();
-            }
-
+            playUIClickSound();
             lastSettingsPointerTime =
                 performance.now();
         }
@@ -9679,8 +9643,6 @@ function drawEffectPreviewInBox(
 ========================================================= */
 
 function handleSettingsTap(x, y) {
-    // 이 함수는 시작 화면/메뉴 UI 입력 전용입니다. 게임 플레이 입력에서는 호출되지 않습니다.
-
     refreshDailyQuestIfNeeded();
     const questButton = getQuestButton();
     const shopButton = getShopButton();
