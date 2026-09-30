@@ -8785,12 +8785,6 @@ function drawShopPanel() {
         if (i < pageCount - 1) dots += "  ";
     }
     ctx.fillText(dots, WIDTH / 2, 505);
-
-    ctx.fillStyle = "#7f8b99";
-    ctx.font = "12px Pretendard, Noto Sans KR, sans-serif";
-    ctx.fillText("상점에서는 구매만 할 수 있습니다. 장착과 해제는 인벤토리에서 할 수 있습니다.", WIDTH / 2, 525);
-    ctx.fillText("가격은 아이템별 개당 가격이며, 선택한 수량의 총 구매 가격과 구매 후 코인을 함께 표시합니다.", WIDTH / 2, 541);
-
     drawSettingsButton(WIDTH / 2 - 80, 550, 160, 26, "닫기");
     ctx.restore();
 }
@@ -9400,24 +9394,6 @@ function drawSettingsPanel() {
             }
         }
     );
-
-
-    ctx.fillStyle =
-        "#7f8b99";
-
-    ctx.font =
-        "12px Pretendard, Noto Sans KR, sans-serif";
-
-    ctx.textAlign =
-        "center";
-
-    ctx.fillText(
-        "1연속부터 적용(연속 클리어 횟수가 높을수록 효과가 강해집니다)",
-        WIDTH / 2,
-        508
-    );
-
-
     ctx.fillStyle =
         "#8f9aa8";
 
@@ -9441,15 +9417,6 @@ function drawSettingsPanel() {
     ctx.beginPath();
     ctx.arc(volumeBar.x + volumeBar.w * effectVolume, volumeBar.y + volumeBar.h / 2, 8, 0, Math.PI * 2);
     ctx.fill();
-
-    ctx.fillStyle = "#8f9aa8";
-    ctx.font = "13px Pretendard, Noto Sans KR, sans-serif";
-    ctx.fillText(
-        "설정은 자동으로 저장됩니다.",
-        WIDTH / 2,
-        542
-    );
-
     drawSettingsButton(
         WIDTH / 2 - 80,
         550,
@@ -9971,25 +9938,10 @@ function drawStartScreen() {
     );
 
     ctx.fillText(
-        "맵 넘기기(기본 5회 가능)",
+        "맵 넘기기 : 더블 터치",
         WIDTH / 2,
         275
     );
-
-
-    ctx.fillStyle =
-        "#8995a3";
-
-    ctx.font =
-        "15px Pretendard, Noto Sans KR, sans-serif";
-
-    ctx.fillText(
-        `맵 넘기기 ${MAX_MAP_SKIPS}회 제공`,
-        WIDTH / 2,
-        310
-    );
-
-
     ctx.fillStyle =
         "#7ddcff";
 
