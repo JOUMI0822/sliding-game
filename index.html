@@ -964,37 +964,72 @@ const AUDIO_FILES = {
 };
 const EFFECT_VOLUME_KEY = "slidingMazeEffectVolume_v1";
 let effectVolume = 0.70;
+const effectAudioCache = new Map();
+let audioUnlocked = false;
+const oneShotEffectPlayed = new Set();
+
+function resetOneShotEffects() {
+    oneShotEffectPlayed.clear();
+}
+
 try {
     const saved = Number(localStorage.getItem(EFFECT_VOLUME_KEY));
     if (Number.isFinite(saved)) effectVolume = Math.max(0, Math.min(1, saved));
 } catch (error) {}
+
 function saveEffectVolume() {
     try { localStorage.setItem(EFFECT_VOLUME_KEY, String(effectVolume)); } catch (error) {}
 }
+
 function setEffectVolume(value) {
     effectVolume = Math.max(0, Math.min(1, Number(value) || 0));
+    for (const audio of effectAudioCache.values()) audio.volume = effectVolume;
     saveEffectVolume();
     requestSettingsRender();
 }
-const oneShotEffectPlayed = new Set();
+
+// 모바일/브라우저의 자동재생 제한을 풀기 위해 첫 사용자 입력에서 오디오를 활성화합니다.
+function unlockEffectAudio() {
+    if (audioUnlocked) return;
+    audioUnlocked = true;
+    try {
+        for (const type of Object.keys(AUDIO_FILES)) {
+            const audio = new Audio(AUDIO_FILES[type]);
+            audio.preload = "auto";
+            audioAudioCacheSet(type, audio);
+            try { audio.load(); } catch (error) {}
+        }
+    } catch (error) {}
+}
+
+function audioAudioCacheSet(type, audio) {
+    effectAudioCache.set(type, audio);
+}
 
 function playEffectSound(type, oneShotKey = null) {
     const src = AUDIO_FILES[type];
     if (!src || effectVolume <= 0) return;
     if (oneShotKey && oneShotEffectPlayed.has(oneShotKey)) return;
     if (oneShotKey) oneShotEffectPlayed.add(oneShotKey);
+
     try {
-        const audio = new Audio(src);
-        audio.preload = "none";
+        let audio = effectAudioCache.get(type);
+        if (!audio) {
+            audio = new Audio(src);
+            audio.preload = "auto";
+            effectAudioCache.set(type, audio);
+        }
         audio.volume = effectVolume;
+        audio.currentTime = 0;
         const promise = audio.play();
         if (promise && promise.catch) promise.catch(() => {});
     } catch (error) {}
 }
 
-function resetOneShotEffects() {
-    oneShotEffectPlayed.clear();
-}
+// 첫 터치/클릭/키보드 입력을 실제 사용자 제스처로 받아 오디오 재생 권한을 확보합니다.
+document.addEventListener("pointerdown", unlockEffectAudio, { once: true, passive: true });
+document.addEventListener("touchstart", unlockEffectAudio, { once: true, passive: true });
+document.addEventListener("keydown", unlockEffectAudio, { once: true, passive: true });
 
 /* =========================================================
    아이템 시스템
