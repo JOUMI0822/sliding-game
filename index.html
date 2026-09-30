@@ -241,8 +241,6 @@ const MAX_PREVIOUS_LAYOUTS = 180;
 ========================================================= */
 
 let gameState = "start";
-let gameStartSoundPlayed = false;
-let goalSoundPlayedForRound = false;
 
 /* =========================================================
    2인용 경쟁 모드 준비 상태
@@ -963,7 +961,6 @@ const AUDIO_FILES = {
     damage: "damage.m4a",
     itemUse: "item_use.m4a",
     gameOver: "gameover.m4a",
-
     uiInvalid: "ui_invalid.m4a",
     uiClick: "ui_click.m4a",
     gameStart: "game_start.m4a"
@@ -971,11 +968,8 @@ const AUDIO_FILES = {
 
 const EFFECT_VOLUME_KEY = "slidingMazeEffectVolume_v1";
 let effectVolume = 0.70;
-
-// 모든 효과음은 매번 새 Audio 객체로 재생합니다.
-const effectAudioTemplates = new Map();
-const activeEffectAudios = new Set();
 let audioUnlocked = false;
+let suppressNextUIClickSound = false;
 const oneShotEffectPlayed = new Set();
 
 function resetOneShotEffects() {
@@ -984,9 +978,7 @@ function resetOneShotEffects() {
 
 try {
     const saved = Number(localStorage.getItem(EFFECT_VOLUME_KEY));
-    if (Number.isFinite(saved)) {
-        effectVolume = Math.max(0, Math.min(1, saved));
-    }
+    if (Number.isFinite(saved)) effectVolume = Math.max(0, Math.min(1, saved));
 } catch (error) {}
 
 function saveEffectVolume() {
@@ -997,157 +989,77 @@ function saveEffectVolume() {
 
 function setEffectVolume(value) {
     effectVolume = Math.max(0, Math.min(1, Number(value) || 0));
-
-    for (const audio of effectAudioTemplates.values()) {
-        audio.volume = effectVolume;
-    }
-
-    for (const audio of activeEffectAudios) {
-        audio.volume = effectVolume;
-    }
-
     saveEffectVolume();
     requestSettingsRender();
 }
 
-function getEffectAudioTemplate(type) {
-    const src = AUDIO_FILES[type];
-    if (!src) return null;
-
-    let template = effectAudioTemplates.get(type);
-
-    if (!template) {
-        try {
-            template = new Audio(src);
-            template.preload = "auto";
-            template.volume = effectVolume;
-            template.setAttribute("playsinline", "");
-            effectAudioTemplates.set(type, template);
-        } catch (error) {
-            return null;
-        }
-    }
-
-    return template;
-}
-
-function unlockEffectAudio() {
-    if (audioUnlocked) return;
-    audioUnlocked = true;
-
-    for (const type of Object.keys(AUDIO_FILES)) {
-        const template = getEffectAudioTemplate(type);
-        if (template) {
-            try { template.load(); } catch (error) {}
-        }
-    }
-}
-
+/*
+ * 모든 효과음은 같은 Audio 객체를 재사용하지 않습니다.
+ * 특히 새 UI 효과음은 사용자 입력 이벤트 안에서 직접 호출될 수 있도록
+ * playEffectSound() 자체를 단순하게 유지합니다.
+ */
 function playEffectSound(type, oneShotKey = null) {
     const src = AUDIO_FILES[type];
-
     if (!src || effectVolume <= 0) return false;
+
+    // UI 클릭/게임 시작음은 다른 효과음보다 작게 재생합니다.
+    const volumeMultiplier =
+        type === "uiClick" ? 0.38 :
+        type === "gameStart" ? 0.42 :
+        1;
 
     if (oneShotKey && oneShotEffectPlayed.has(oneShotKey)) {
         return false;
     }
 
     try {
-        const template = getEffectAudioTemplate(type);
-        const audio = template
-            ? template.cloneNode(true)
-            : new Audio(src);
-
-        audio.volume = effectVolume;
+        const audio = new Audio(src);
         audio.preload = "auto";
+        audio.volume = Math.max(0, Math.min(1, effectVolume * volumeMultiplier));
         audio.setAttribute("playsinline", "");
         audio.currentTime = 0;
 
-        if (oneShotKey) {
-            oneShotEffectPlayed.add(oneShotKey);
-        }
-
-        activeEffectAudios.add(audio);
-
-        const cleanup = () => {
-            activeEffectAudios.delete(audio);
-            audio.onended = null;
-            audio.onerror = null;
-        };
-
-        audio.onended = cleanup;
-        audio.onerror = () => {
-            cleanup();
-            if (oneShotKey) {
-                oneShotEffectPlayed.delete(oneShotKey);
-            }
-        };
+        if (oneShotKey) oneShotEffectPlayed.add(oneShotKey);
 
         const promise = audio.play();
 
-        if (promise && promise.catch) {
+        if (promise && typeof promise.catch === "function") {
             promise.catch(() => {
-                cleanup();
-                if (oneShotKey) {
-                    oneShotEffectPlayed.delete(oneShotKey);
-                }
-
-                // 일부 모바일 브라우저에서는 cloneNode()로 만든 Audio가
-                // 첫 재생에서만 거부되는 경우가 있어, 같은 사용자 동작 안에서
-                // 새 Audio 객체로 한 번만 즉시 재시도합니다.
-                try {
-                    const retryAudio = new Audio(src);
-                    retryAudio.preload = "auto";
-                    retryAudio.volume = effectVolume;
-                    retryAudio.setAttribute("playsinline", "");
-                    retryAudio.currentTime = 0;
-                    activeEffectAudios.add(retryAudio);
-
-                    const retryCleanup = () => {
-                        activeEffectAudios.delete(retryAudio);
-                        retryAudio.onended = null;
-                        retryAudio.onerror = null;
-                    };
-                    retryAudio.onended = retryCleanup;
-                    retryAudio.onerror = retryCleanup;
-
-                    const retryPromise = retryAudio.play();
-                    if (retryPromise && retryPromise.catch) {
-                        retryPromise.catch(() => retryCleanup());
-                    }
-                } catch (retryError) {}
+                if (oneShotKey) oneShotEffectPlayed.delete(oneShotKey);
             });
         }
 
         return true;
     } catch (error) {
-        if (oneShotKey) {
-            oneShotEffectPlayed.delete(oneShotKey);
-        }
+        if (oneShotKey) oneShotEffectPlayed.delete(oneShotKey);
         return false;
     }
 }
 
 function playUIClickSound() {
-    // 설정/메뉴 UI에서만 호출되는 함수입니다.
-    // gameState 조건으로 막지 않아 모바일/오버레이 UI에서도 확실히 재생되도록 합니다.
-    playEffectSound("uiClick");
+    return playEffectSound("uiClick");
 }
 
 function playUIInvalidSound() {
-    // 구매/장착/보상 수령 등 불가능한 UI 동작에서는
-    // 현재 gameState와 관계없이 재생합니다.
-    playEffectSound("uiInvalid");
+    suppressNextUIClickSound = true;
+    return playEffectSound("uiInvalid");
 }
 
 function playGameStartSound() {
-    // 새 게임 버튼/키 입력 직후의 사용자 동작 안에서 바로 호출합니다.
-    playEffectSound("gameStart");
+    return playEffectSound("gameStart");
 }
 
-document.addEventListener("pointerdown", unlockEffectAudio, { once: true, passive: true });
-document.addEventListener("touchstart", unlockEffectAudio, { once: true, passive: true });
-document.addEventListener("keydown", unlockEffectAudio, { once: true, passive: true });
+function unlockEffectAudio() {
+    audioUnlocked = true;
+}
+
+/*
+ * 사용자 제스처가 시작되는 순간에만 권한을 확보합니다.
+ * 여기서는 미리 play()를 하지 않습니다.
+ */
+document.addEventListener("pointerdown", unlockEffectAudio, { passive: true });
+document.addEventListener("touchstart", unlockEffectAudio, { passive: true });
+document.addEventListener("keydown", unlockEffectAudio, { passive: true });
 
 /* =========================================================
    아이템 시스템
@@ -1957,6 +1869,7 @@ function useEnergyRecovery(amount) {
     amount = Math.max(1, Math.min(2, amount));
 
     if (itemInventory.energyRecovery < amount) {
+        playUIInvalidSound();
         return false;
     }
 
@@ -4047,13 +3960,12 @@ function isDailyQuestRewardClaimed(id) {
 function claimDailyQuestReward(id) {
     if (!isDailyQuestCompleted(id) || isDailyQuestRewardClaimed(id)) {
         playUIInvalidSound();
-        return false;
+        return;
     }
-
     const quest = getQuestById(id);
     if (!quest) {
         playUIInvalidSound();
-        return false;
+        return;
     }
 
     dailyQuestState.rewardClaimed.push(id);
@@ -4487,12 +4399,6 @@ function startNewGame() {
         roundTimer
     );
 
-    // 실제로 시작 화면 -> 플레이 화면으로 넘어가는 순간에만 재생
-    if (!gameStartSoundPlayed) {
-        gameStartSoundPlayed = true;
-        playGameStartSound();
-    }
-
     gameState = "playing";
 
     lives =
@@ -4540,8 +4446,6 @@ function startRound() {
     );
 
     gameState = "playing";
-
-    goalSoundPlayedForRound = false;
 
     remainingTime =
         getStageTimeLimit() + activeTimeBonus;
@@ -4600,7 +4504,6 @@ function skipMap() {
             setMessage(
                 "맵 넘기기 횟수를 모두 사용했습니다."
             );
-            playUIInvalidSound();
         }
 
         return;
@@ -4723,17 +4626,6 @@ function startMove(
             destination.r -
             player.r
         );
-
-    // 목표 칸으로 이동하는 순간 바로 효과음을 재생합니다.
-    if (
-        goal &&
-        destination.c === goal.c &&
-        destination.r === goal.r &&
-        !goalSoundPlayedForRound
-    ) {
-        goalSoundPlayedForRound = true;
-        playEffectSound("goal");
-    }
 
     const duration =
         Math.max(
@@ -4946,7 +4838,7 @@ function clearGame() {
     gameState =
         "cleared";
 
-    // goal.m4a는 startMove()에서 이미 즉시 재생됩니다.
+    playEffectSound("goal", "goal");
 
     movement = null;
 
@@ -5533,7 +5425,6 @@ window.addEventListener(
                 }
 
                 gameState = "start";
-                gameStartSoundPlayed = false;
 
                 settingsOpen =
                     false;
@@ -5738,7 +5629,6 @@ gameWrapper.addEventListener(
                 multiplayerRole = null;
                 multiplayerResult = null;
                 gameState = "start";
-                gameStartSoundPlayed = false;
                 setMessage("");
                 updateUI();
             }
@@ -5789,7 +5679,11 @@ gameWrapper.addEventListener(
                     y
                 )
             ) {
-                playUIClickSound();
+                if (suppressNextUIClickSound) {
+                    suppressNextUIClickSound = false;
+                } else {
+                    playUIClickSound();
+                }
 
                 lastTapTime = 0;
 
@@ -5816,7 +5710,13 @@ gameWrapper.addEventListener(
 
                 lastTapTime = 0;
 
-                startNewGame();
+                // 두 번째 사용자 터치 이벤트 안에서 시작 효과음을 먼저 재생합니다.
+                // 화면 전환은 효과음이 시작된 뒤 아주 짧게 늦춰서,
+                // 게임 화면으로 바뀐 다음 효과음이 들리는 느낌이 나지 않도록 합니다.
+                playGameStartSound();
+                setTimeout(() => {
+                    startNewGame();
+                }, 120);
 
             } else {
 
@@ -5855,7 +5755,6 @@ gameWrapper.addEventListener(
                 lastTapTime = 0;
 
                 gameState = "start";
-                gameStartSoundPlayed = false;
 
                 settingsOpen =
                     false;
@@ -6061,7 +5960,11 @@ canvas.addEventListener(
                 y
             )
         ) {
-            playUIClickSound();
+            if (suppressNextUIClickSound) {
+                suppressNextUIClickSound = false;
+            } else {
+                playUIClickSound();
+            }
 
             lastSettingsPointerTime =
                 performance.now();
@@ -9776,6 +9679,8 @@ function drawEffectPreviewInBox(
 ========================================================= */
 
 function handleSettingsTap(x, y) {
+    // 이 함수는 시작 화면/메뉴 UI 입력 전용입니다. 게임 플레이 입력에서는 호출되지 않습니다.
+
     refreshDailyQuestIfNeeded();
     const questButton = getQuestButton();
     const shopButton = getShopButton();
@@ -9846,16 +9751,10 @@ function handleSettingsTap(x, y) {
 
         for (let i = 0; i < DAILY_QUEST_COUNT; i++) {
             const id = dailyQuestState.quests[i];
-            if (!id) continue;
-
+            if (!id || !isDailyQuestCompleted(id) || isDailyQuestRewardClaimed(id)) continue;
             const y = 122 + i * 77;
-
             if (isInsideRect(x, y, { x: 585, y: y + 25, w: 133, h: 25 })) {
-                if (isDailyQuestCompleted(id) && !isDailyQuestRewardClaimed(id)) {
-                    claimDailyQuestReward(id);
-                } else {
-                    playUIInvalidSound();
-                }
+                claimDailyQuestReward(id);
                 return true;
             }
         }
@@ -9907,13 +9806,8 @@ function handleSettingsTap(x, y) {
 
             // 장착 / 해제
             if (isInsideRect(x, y, { x: 410, y: 395, w: 100, h: 38 })) {
-                if (selectedItem === inventoryDetailType) {
-                    unequipItem();
-                } else if (itemInventory[inventoryDetailType] > 0) {
-                    equipItem(inventoryDetailType);
-                } else {
-                    playUIInvalidSound();
-                }
+                if (selectedItem === inventoryDetailType) unequipItem();
+                else if (itemInventory[inventoryDetailType] > 0) equipItem(inventoryDetailType);
                 closeInventoryDetail();
                 return true;
             }
