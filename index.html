@@ -269,6 +269,9 @@ let multiplayerEliminatedSent = false;
 let multiplayerMatchmaking = false;
 let multiplayerRound = 0;
 let multiplayerRoundTransition = false;
+let multiplayerMatchType = null; // "quick" | "friend"
+let multiplayerWasEliminated = false;
+let multiplayerMatchHadRoundWin = false;
 let multiplayerPlayerVisible = true;
 let multiplayerPeerLeftDeadline = 0;
 let multiplayerPeerLeftTimer = null;
@@ -327,6 +330,9 @@ function sendMultiplayerPosition(force = false) {
 
 function startMultiplayerMatchmaking() {
     closeMultiplayerSocket();
+    multiplayerMatchType = "quick";
+    multiplayerWasEliminated = false;
+    multiplayerMatchHadRoundWin = false;
     multiplayerRole = null;
     multiplayerRoomCode = "";
     multiplayerSeed = 0;
@@ -495,6 +501,7 @@ function handleMultiplayerMessage(data) {
         multiplayerPeerJoined = false;
         multiplayerMatchActive = false;
         multiplayerResult = data.winner || multiplayerResult || "draw";
+        onDailyQuestMultiplayerMatchFinished(multiplayerResult);
         playMultiplayerResultSound(multiplayerResult);
         gameState = "multiplayerResult";
         movement = null;
@@ -525,6 +532,8 @@ function handleMultiplayerMessage(data) {
         resetOneShotEffects();
         multiplayerEliminatedSent = false;
         multiplayerRoundTransition = false;
+        multiplayerWasEliminated = false;
+        multiplayerMatchHadRoundWin = false;
         multiplayerPlayerVisible = true;
         multiplayerSeed = Number(data.seed) || 0;
         multiplayerRound = Number(data.round) || (multiplayerRound + 1);
@@ -574,6 +583,7 @@ function handleMultiplayerMessage(data) {
         multiplayerRoundTransition = true;
         multiplayerPlayerVisible = true;
         const winner = data.winner || "draw";
+        onDailyQuestMultiplayerRoundFinished(winner);
 
         if (winner === multiplayerRole) {
             clearCount++;
@@ -617,6 +627,7 @@ function handleMultiplayerMessage(data) {
         if (!multiplayerMatchActive && gameState !== "multiplayerWaitingResult") return;
         multiplayerMatchActive = false;
         multiplayerResult = data.winner || "draw";
+        onDailyQuestMultiplayerMatchFinished(multiplayerResult);
         playMultiplayerResultSound(multiplayerResult);
         gameState = "multiplayerResult";
         movement = null;
@@ -639,6 +650,8 @@ function startMultiplayerMatch() {
     resetOneShotEffects();
     multiplayerEliminatedSent = false;
     multiplayerRoundTransition = false;
+    multiplayerWasEliminated = false;
+    multiplayerMatchHadRoundWin = false;
     multiplayerOpen = false;
     startNewGame();
     multiplayerSend({
@@ -714,6 +727,7 @@ function sendMultiplayerEliminated() {
 
     // 목숨이 0개일 때만 완전 탈락 처리합니다.
     multiplayerEliminatedSent = true;
+    multiplayerWasEliminated = true;
     multiplayerRoundTransition = false;
     gameState = "multiplayerWaitingResult";
     opponent.visible = false;
@@ -748,6 +762,9 @@ function closeMultiplayerMenu() {
 }
 
 function createMultiplayerRoom() {
+    multiplayerMatchType = "friend";
+    multiplayerWasEliminated = false;
+    multiplayerMatchHadRoundWin = false;
     multiplayerRole = "host";
     multiplayerRoomCode = generateRoomCode();
     multiplayerSeed = generateMatchSeed();
@@ -764,6 +781,9 @@ function joinMultiplayerRoom() {
         return;
     }
 
+    multiplayerMatchType = "friend";
+    multiplayerWasEliminated = false;
+    multiplayerMatchHadRoundWin = false;
     multiplayerRole = "guest";
     multiplayerRoomCode = normalized;
     multiplayerSeed = 0;
@@ -3919,6 +3939,18 @@ function createDailyQuestProgress() {
         postLostLifeClears: 0,
         gamesStarted: 0,
         qualifiedGames: 0,
+        fullLifeStreak: 0,
+        fastClearCount: 0,
+        multiplayerMatches: 0,
+        multiplayerWins: 0,
+        multiplayerWinStreak: 0,
+        multiplayerRounds: 0,
+        multiplayerRoundWins: 0,
+        multiplayerNoEliminationWins: 0,
+        multiplayerLowLifeRoundWins: 0,
+        multiplayerCleanWins: 0,
+        quickMatches: 0,
+        friendMatches: 0,
         currentGameHadDeath: false,
         currentGameHadSkip: false,
         gameStartCounted: false,
@@ -3978,6 +4010,10 @@ function loadDailyQuestState() {
     if (!Array.isArray(dailyQuestState.rewardClaimed)) dailyQuestState.rewardClaimed = [];
     if (!dailyQuestState.progress) dailyQuestState.progress = createDailyQuestProgress();
     if (typeof dailyQuestState.rerolls !== "number") dailyQuestState.rerolls = DAILY_QUEST_REROLL_COUNT;
+    const defaults = createDailyQuestProgress();
+    Object.keys(defaults).forEach(key => {
+        if (dailyQuestState.progress[key] === undefined) dailyQuestState.progress[key] = defaults[key];
+    });
 }
 
 function refreshDailyQuestIfNeeded() {
@@ -4003,6 +4039,7 @@ function completeDailyQuest(id) {
     dailyQuestState.completed.push(id);
     saveDailyQuestState();
     setMessage(`퀘스트 완료! ${quest.name} · 보상을 받을 수 있습니다.`);
+    updateUI();
 }
 
 function isDailyQuestRewardClaimed(id) {
@@ -4070,6 +4107,7 @@ function resetQuestRunProgress() {
     p.oneLifeStreak = 0;
     p.noSkipStreak = 0;
     p.postSkipStreak = 0;
+    p.fullLifeStreak = 0;
     p.fastClears = 0;
     p.lowTimeClears = 0;
     p.noItemClears = 0;
@@ -4119,6 +4157,7 @@ function onDailyQuestDeath() {
     p.oneLifeStreak = 0;
     p.noSkipStreak = 0;
     p.postSkipStreak = 0;
+    p.fullLifeStreak = 0;
     saveDailyQuestState();
 }
 
@@ -4136,8 +4175,15 @@ function onDailyQuestClear() {
     if (lives === 1) p.oneLifeStreak++;
     else p.oneLifeStreak = 0;
 
-    if (remainingTime >= stageLimit * 0.5) p.fastClears++;
-    else p.fastClears = 0;
+    if (lives === MAX_LIVES) p.fullLifeStreak++;
+    else p.fullLifeStreak = 0;
+
+    if (remainingTime >= stageLimit * 0.5) {
+        p.fastClears++;
+        p.fastClearCount++;
+    } else {
+        p.fastClears = 0;
+    }
 
     if (remainingTime <= 10) p.lowTimeClears++;
 
@@ -4164,9 +4210,9 @@ function onDailyQuestClear() {
     if (p.noDeathStreak >= 5) completeDailyQuest(4);
     if (p.noDeathStreak >= 10) completeDailyQuest(5);
     if (p.lowTimeClears >= 3) completeDailyQuest(6);
-    if (remainingTime <= 3) completeDailyQuest(7);
+    if (Math.ceil(Math.max(0, remainingTime)) <= 3) completeDailyQuest(7);
     if (p.noDeathStreak >= 5) completeDailyQuest(8);
-    if (lives === MAX_LIVES && p.dailyClears >= 10) completeDailyQuest(9);
+    if (p.fullLifeStreak >= 10) completeDailyQuest(9);
     if (p.noDeathStreak >= 10) completeDailyQuest(10);
     if (p.dangerMapClears >= 5) completeDailyQuest(11);
     if (p.dangerMapClears >= 3) completeDailyQuest(12);
@@ -4183,7 +4229,7 @@ function onDailyQuestClear() {
     if (p.postSkipStreak >= 3) completeDailyQuest(32);
     if (p.lostLifeMapCleared && p.postLostLifeClears >= 2) completeDailyQuest(33);
     if (p.oneLifeStreak >= 3) completeDailyQuest(34);
-    if (p.fastClears >= 3) completeDailyQuest(35);
+    if (p.fastClearCount >= 3) completeDailyQuest(35);
     if (p.dailyClears >= 20) completeDailyQuest(36);
     if (p.qualifiedGames >= 3) completeDailyQuest(37);
     if (p.dailyClears >= 15) completeDailyQuest(38);
@@ -4191,7 +4237,67 @@ function onDailyQuestClear() {
     if (p.noDeathStreak >= 10) completeDailyQuest(40);
     if (p.postSkipStreak >= 5) completeDailyQuest(41);
     if (p.oneLifeStreak >= 5) completeDailyQuest(42);
-    if (p.fastClears >= 5) completeDailyQuest(43);
+    if (p.fastClearCount >= 5) completeDailyQuest(43);
+
+    saveDailyQuestState();
+}
+
+function onDailyQuestMultiplayerRoundFinished(winner) {
+    refreshDailyQuestIfNeeded();
+    const p = dailyQuestState.progress;
+
+    p.multiplayerRounds++;
+
+    if (winner === multiplayerRole) {
+        p.multiplayerRoundWins++;
+        multiplayerMatchHadRoundWin = true;
+
+        if (lives === 1) {
+            p.multiplayerLowLifeRoundWins++;
+            completeDailyQuest(26);
+        }
+
+        if (p.multiplayerRoundWins >= 5) completeDailyQuest(28);
+    }
+
+    if (p.multiplayerRounds >= 5) completeDailyQuest(24);
+    saveDailyQuestState();
+}
+
+function onDailyQuestMultiplayerMatchFinished(result) {
+    refreshDailyQuestIfNeeded();
+    const p = dailyQuestState.progress;
+
+    p.multiplayerMatches++;
+    if (multiplayerMatchType === "quick") p.quickMatches++;
+    if (multiplayerMatchType === "friend") p.friendMatches++;
+
+    const won = result === multiplayerRole;
+
+    if (won) {
+        p.multiplayerWins++;
+        p.multiplayerWinStreak++;
+        p.multiplayerNoEliminationWins++;
+        if (!multiplayerWasEliminated) {
+            p.multiplayerCleanWins++;
+        } else {
+            p.multiplayerNoEliminationWins--;
+        }
+
+        completeDailyQuest(21);
+        completeDailyQuest(22);
+        if (p.multiplayerWinStreak >= 3) completeDailyQuest(23);
+        if (!multiplayerWasEliminated) {
+            completeDailyQuest(25);
+            completeDailyQuest(27);
+        }
+    } else {
+        p.multiplayerWinStreak = 0;
+        completeDailyQuest(21);
+    }
+
+    if (p.quickMatches >= 1) completeDailyQuest(29);
+    if (p.friendMatches >= 1) completeDailyQuest(30);
 
     saveDailyQuestState();
 }
@@ -4257,9 +4363,9 @@ function getDailyQuestProgressInfo(quest) {
         case 4: current = p.noDeathStreak; target = 5; break;
         case 5: current = p.noDeathStreak; target = 10; break;
         case 6: current = p.lowTimeClears; target = 3; break;
-        case 7: current = p.lowTimeClears > 0 ? 1 : 0; target = 1; break;
+        case 7: current = isDailyQuestCompleted(7) ? 1 : 0; target = 1; break;
         case 8: current = p.noDeathStreak; target = 5; break;
-        case 9: current = lives === MAX_LIVES ? p.dailyClears : 0; target = 10; break;
+        case 9: current = p.fullLifeStreak; target = 10; break;
         case 10: current = p.noDeathStreak; target = 10; break;
         case 11: current = p.dangerMapClears; target = 5; break;
         case 12: current = p.dangerMapClears; target = 3; break;
@@ -4271,21 +4377,21 @@ function getDailyQuestProgressInfo(quest) {
         case 18: current = p.firstAidClears; target = 1; break;
         case 19: current = p.energyRecoveryUses; target = 1; break;
         case 20: current = p.noItemClears; target = 5; break;
-        case 21: current = 0; target = 1; break;
-        case 22: current = 0; target = 1; break;
-        case 23: current = 0; target = 3; break;
-        case 24: current = 0; target = 5; break;
-        case 25: current = 0; target = 1; break;
-        case 26: current = 0; target = 1; break;
-        case 27: current = 0; target = 1; break;
-        case 28: current = 0; target = 5; break;
-        case 29: current = 0; target = 1; break;
-        case 30: current = 0; target = 1; break;
+        case 21: current = p.multiplayerMatches; target = 1; break;
+        case 22: current = p.multiplayerWins; target = 1; break;
+        case 23: current = p.multiplayerWinStreak; target = 3; break;
+        case 24: current = p.multiplayerRounds; target = 5; break;
+        case 25: current = p.multiplayerNoEliminationWins; target = 1; break;
+        case 26: current = p.multiplayerLowLifeRoundWins; target = 1; break;
+        case 27: current = p.multiplayerCleanWins; target = 1; break;
+        case 28: current = p.multiplayerRoundWins; target = 5; break;
+        case 29: current = p.quickMatches; target = 1; break;
+        case 30: current = p.friendMatches; target = 1; break;
         case 31: current = p.noSkipStreak; target = 10; break;
         case 32: current = p.postSkipStreak; target = 3; break;
         case 33: current = p.lostLifeMapCleared ? 1 + p.postLostLifeClears : 0; target = 3; break;
         case 34: current = p.oneLifeStreak; target = 3; break;
-        case 35: current = p.fastClears; target = 3; break;
+        case 35: current = p.fastClearCount; target = 3; break;
         case 36: current = p.dailyClears; target = 20; break;
         case 37: current = p.qualifiedGames; target = 3; break;
         case 38: current = p.dailyClears; target = 15; break;
@@ -4293,7 +4399,7 @@ function getDailyQuestProgressInfo(quest) {
         case 40: current = p.noDeathStreak; target = 10; break;
         case 41: current = p.postSkipStreak; target = 5; break;
         case 42: current = p.oneLifeStreak; target = 5; break;
-        case 43: current = p.fastClears; target = 5; break;
+        case 43: current = p.fastClearCount; target = 5; break;
         default: current = 0; target = quest.target || 1;
     }
 
