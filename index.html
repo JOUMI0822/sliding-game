@@ -964,7 +964,21 @@ const AUDIO_FILES = {
 };
 const EFFECT_VOLUME_KEY = "slidingMazeEffectVolume_v1";
 let effectVolume = 0.70;
+
+/*
+   효과음은 하나의 Audio 객체를 계속 재사용하지 않습니다.
+   일부 모바일 브라우저/Safari에서는 같은 Audio 객체를
+   currentTime=0으로 되돌려 반복 재생할 때 두 번째 이후 재생이
+   실패하거나 무시되는 경우가 있습니다.
+
+   그래서 효과음마다 작은 재생 풀(pool)을 만들고,
+   호출할 때마다 사용 가능한 Audio 객체를 골라 재생합니다.
+*/
+const EFFECT_AUDIO_POOL_SIZE = 4;
 const effectAudioCache = new Map();
+const effectAudioPool = new Map();
+const effectAudioPoolIndex = new Map();
+
 let audioUnlocked = false;
 const oneShotEffectPlayed = new Set();
 
@@ -983,48 +997,177 @@ function saveEffectVolume() {
 
 function setEffectVolume(value) {
     effectVolume = Math.max(0, Math.min(1, Number(value) || 0));
-    for (const audio of effectAudioCache.values()) audio.volume = effectVolume;
+
+    for (const pool of effectAudioPool.values()) {
+        for (const audio of pool) {
+            audio.volume = effectVolume;
+        }
+    }
+
+    for (const audio of effectAudioCache.values()) {
+        audio.volume = effectVolume;
+    }
+
     saveEffectVolume();
     requestSettingsRender();
 }
 
-// 모바일/브라우저의 자동재생 제한을 풀기 위해 첫 사용자 입력에서 오디오를 활성화합니다.
-function unlockEffectAudio() {
-    if (audioUnlocked) return;
-    audioUnlocked = true;
+function createEffectAudio(type) {
+    const src = AUDIO_FILES[type];
+    if (!src) return null;
+
     try {
-        for (const type of Object.keys(AUDIO_FILES)) {
-            const audio = new Audio(AUDIO_FILES[type]);
-            audio.preload = "auto";
-            audioAudioCacheSet(type, audio);
-            try { audio.load(); } catch (error) {}
-        }
-    } catch (error) {}
+        const audio = new Audio(src);
+        audio.preload = "auto";
+        audio.volume = effectVolume;
+        audio.setAttribute("playsinline", "");
+        return audio;
+    } catch (error) {
+        return null;
+    }
 }
 
-function audioAudioCacheSet(type, audio) {
-    effectAudioCache.set(type, audio);
+function ensureEffectAudioPool(type) {
+    if (!AUDIO_FILES[type]) return [];
+
+    let pool = effectAudioPool.get(type);
+
+    if (!pool) {
+        pool = [];
+
+        for (let i = 0; i < EFFECT_AUDIO_POOL_SIZE; i++) {
+            const audio = createEffectAudio(type);
+            if (audio) pool.push(audio);
+        }
+
+        effectAudioPool.set(type, pool);
+        effectAudioPoolIndex.set(type, 0);
+    }
+
+    return pool;
+}
+
+// 첫 사용자 제스처에서 모든 효과음의 재생 준비를 끝냅니다.
+function unlockEffectAudio() {
+    if (audioUnlocked) return;
+
+    audioUnlocked = true;
+
+    try {
+        for (const type of Object.keys(AUDIO_FILES)) {
+            const pool = ensureEffectAudioPool(type);
+
+            for (const audio of pool) {
+                audio.volume = effectVolume;
+                try { audio.load(); } catch (error) {}
+            }
+        }
+    } catch (error) {}
 }
 
 function playEffectSound(type, oneShotKey = null) {
     const src = AUDIO_FILES[type];
-    if (!src || effectVolume <= 0) return;
-    if (oneShotKey && oneShotEffectPlayed.has(oneShotKey)) return;
-    if (oneShotKey) oneShotEffectPlayed.add(oneShotKey);
+
+    if (!src || effectVolume <= 0) return false;
+
+    /*
+       oneShotKey는 같은 이벤트에서 중복 호출되는 것을 막을 때만 사용합니다.
+       라운드가 시작될 때 resetOneShotEffects()로 초기화합니다.
+    */
+    if (
+        oneShotKey &&
+        oneShotEffectPlayed.has(oneShotKey)
+    ) {
+        return false;
+    }
+
+    if (oneShotKey) {
+        oneShotEffectPlayed.add(oneShotKey);
+    }
 
     try {
-        let audio = effectAudioCache.get(type);
-        if (!audio) {
-            audio = new Audio(src);
-            audio.preload = "auto";
-            effectAudioCache.set(type, audio);
+        let pool = ensureEffectAudioPool(type);
+
+        /*
+           혹시 브라우저가 Audio 객체 생성을 막았거나 풀이 비어 있으면
+           호출 순간 새 객체를 하나 만들어 재생합니다.
+        */
+        if (!pool.length) {
+            const fallback = createEffectAudio(type);
+
+            if (!fallback) return false;
+
+            pool = [fallback];
+            effectAudioPool.set(type, pool);
+            effectAudioPoolIndex.set(type, 0);
         }
+
+        let index = effectAudioPoolIndex.get(type) || 0;
+        let audio = null;
+
+        /*
+           아직 재생 중인 효과음을 끊지 않도록,
+           재생이 끝난 객체를 우선 선택합니다.
+        */
+        for (let i = 0; i < pool.length; i++) {
+            const candidate = pool[(index + i) % pool.length];
+
+            if (
+                candidate.paused ||
+                candidate.ended ||
+                candidate.readyState >= 2
+            ) {
+                audio = candidate;
+                index = (index + i + 1) % pool.length;
+                break;
+            }
+        }
+
+        /*
+           모든 객체가 재생 중이어도 가장 오래된 순환 위치를 사용합니다.
+           효과음 자체가 짧기 때문에 다음 호출에서는 자연스럽게 다시 사용됩니다.
+        */
+        if (!audio) {
+            audio = pool[index % pool.length];
+            index = (index + 1) % pool.length;
+        }
+
+        effectAudioPoolIndex.set(type, index);
+
         audio.volume = effectVolume;
-        audio.currentTime = 0;
+
+        try {
+            audio.pause();
+            audio.currentTime = 0;
+        } catch (error) {}
+
         const promise = audio.play();
-        if (promise && promise.catch) promise.catch(() => {});
-    } catch (error) {}
+
+        if (promise && promise.catch) {
+            promise.catch(() => {
+                /*
+                   play()가 실패하더라도 oneShot 상태를 영구적으로
+                   잠그지 않도록 실패 시 해당 키를 되돌립니다.
+                */
+                if (oneShotKey) {
+                    oneShotEffectPlayed.delete(oneShotKey);
+                }
+            });
+        }
+
+        return true;
+    } catch (error) {
+        if (oneShotKey) {
+            oneShotEffectPlayed.delete(oneShotKey);
+        }
+        return false;
+    }
 }
+
+// 첫 터치/클릭/키보드 입력을 실제 사용자 제스처로 받아 오디오를 준비합니다.
+document.addEventListener("pointerdown", unlockEffectAudio, { once: true, passive: true });
+document.addEventListener("touchstart", unlockEffectAudio, { once: true, passive: true });
+document.addEventListener("keydown", unlockEffectAudio, { once: true, passive: true });
 
 // 첫 터치/클릭/키보드 입력을 실제 사용자 제스처로 받아 오디오 재생 권한을 확보합니다.
 document.addEventListener("pointerdown", unlockEffectAudio, { once: true, passive: true });
@@ -4399,6 +4542,9 @@ function startNewGame() {
 ========================================================= */
 
 function startRound() {
+
+    // 맵마다 목표/결과 계열 일회성 효과음 상태를 새로 시작합니다.
+    resetOneShotEffects();
 
     clearTimeout(
         roundTimer
