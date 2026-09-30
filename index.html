@@ -982,27 +982,50 @@ function setEffectVolume(value) {
     saveEffectVolume();
     requestSettingsRender();
 }
-
 function getSoundVolume(type) {
-    // 새 UI 효과음은 체감 음량을 확실히 낮춥니다.
     if (type === "uiClick") return effectVolume * 0.10;
     if (type === "gameStart") return effectVolume * 0.12;
     return effectVolume;
 }
 
+// 모든 효과음은 호출할 때마다 새 Audio를 만들어 재생합니다.
+// 같은 객체의 currentTime을 반복 변경하지 않아 게임 중 연속 효과음도 안정적으로 재생됩니다.
 function playEffectSound(type, oneShotKey = null) {
     const src = AUDIO_FILES[type];
     if (!src || effectVolume <= 0) return null;
     if (oneShotKey && oneShotEffectPlayed.has(oneShotKey)) return null;
     if (oneShotKey) oneShotEffectPlayed.add(oneShotKey);
+
+    const volume = Math.max(0, Math.min(1, getSoundVolume(type)));
+
     try {
         const audio = new Audio(src);
         audio.preload = "auto";
-        audio.volume = Math.max(0, Math.min(1, getSoundVolume(type)));
+        audio.volume = volume;
         audio.setAttribute("playsinline", "");
+
+        audio.onended = () => {
+            audio.onended = null;
+            audio.onerror = null;
+        };
+        audio.onerror = () => {
+            if (oneShotKey) oneShotEffectPlayed.delete(oneShotKey);
+        };
+
         const promise = audio.play();
-        if (promise && promise.catch) {
-            promise.catch(() => { if (oneShotKey) oneShotEffectPlayed.delete(oneShotKey); });
+        if (promise && typeof promise.catch === "function") {
+            promise.catch(() => {
+                if (oneShotKey) oneShotEffectPlayed.delete(oneShotKey);
+                // 모바일 브라우저의 일시적인 첫 play() 거부에 한 번 재시도
+                try {
+                    const retry = new Audio(src);
+                    retry.preload = "auto";
+                    retry.volume = volume;
+                    retry.setAttribute("playsinline", "");
+                    const retryPromise = retry.play();
+                    if (retryPromise && typeof retryPromise.catch === "function") retryPromise.catch(() => {});
+                } catch (retryError) {}
+            });
         }
         return audio;
     } catch (error) {
@@ -1014,34 +1037,37 @@ function playEffectSound(type, oneShotKey = null) {
 function playUIClickSound() { return playEffectSound("uiClick"); }
 function playUIInvalidSound() { return playEffectSound("uiInvalid"); }
 
+// 시작 효과음이 끝난 다음 실제 게임 화면으로 전환합니다.
 function playGameStartSoundAndThenStart() {
     const src = AUDIO_FILES.gameStart;
-    if (!src || effectVolume <= 0) { startNewGame(); return; }
-
-    const audio = new Audio(src);
-    audio.preload = "auto";
-    audio.volume = Math.max(0, Math.min(1, getSoundVolume("gameStart")));
-    audio.setAttribute("playsinline", "");
-
-    let transitioned = false;
-    const transition = () => {
-        if (transitioned) return;
-        transitioned = true;
+    if (!src || effectVolume <= 0) {
         startNewGame();
-    };
+        return;
+    }
 
-    audio.onended = transition;
-    // 브라우저가 ended 이벤트를 누락하거나 음원이 너무 길어도 게임이 멈추지 않게 합니다.
-    const fallback = setTimeout(transition, 2500);
-    audio.addEventListener("ended", () => clearTimeout(fallback), { once: true });
+    try {
+        const audio = new Audio(src);
+        audio.preload = "auto";
+        audio.volume = getSoundVolume("gameStart");
+        audio.setAttribute("playsinline", "");
 
-    const promise = audio.play();
-    if (promise && promise.catch) promise.catch(transition);
+        let transitioned = false;
+        const transition = () => {
+            if (transitioned) return;
+            transitioned = true;
+            startNewGame();
+        };
+
+        audio.addEventListener("ended", transition, { once: true });
+        // 최대 2.5초 안전장치
+        setTimeout(transition, 2500);
+
+        const promise = audio.play();
+        if (promise && typeof promise.catch === "function") promise.catch(transition);
+    } catch (error) {
+        startNewGame();
+    }
 }
-
-document.addEventListener("pointerdown", () => {}, { once: true, passive: true });
-document.addEventListener("touchstart", () => {}, { once: true, passive: true });
-document.addEventListener("keydown", () => {}, { once: true, passive: true });
 
 /* =========================================================
    아이템 시스템
@@ -3939,15 +3965,9 @@ function isDailyQuestRewardClaimed(id) {
 }
 
 function claimDailyQuestReward(id) {
-    if (!isDailyQuestCompleted(id) || isDailyQuestRewardClaimed(id)) {
-        playUIInvalidSound();
-        return;
-    }
+    if (!isDailyQuestCompleted(id) || isDailyQuestRewardClaimed(id)) return;
     const quest = getQuestById(id);
-    if (!quest) {
-        playUIInvalidSound();
-        return;
-    }
+    if (!quest) return;
 
     dailyQuestState.rewardClaimed.push(id);
     coins += quest.reward;
@@ -3961,7 +3981,6 @@ function rerollDailyQuests() {
 
     if (dailyQuestState.rerolls <= 0) {
         setMessage("오늘의 퀘스트 뽑기를 모두 사용했습니다.");
-        playUIInvalidSound();
         return false;
     }
 
@@ -4371,6 +4390,7 @@ function drawQuestPanel() {
 
 function startNewGame() {
 
+    resetOneShotEffects();
     refreshDailyQuestIfNeeded();
     questOpen = false;
     settingsOpen = false;
@@ -4424,6 +4444,8 @@ function startRound() {
     clearTimeout(
         roundTimer
     );
+
+    resetOneShotEffects();
 
     gameState = "playing";
 
@@ -4484,7 +4506,6 @@ function skipMap() {
             setMessage(
                 "맵 넘기기 횟수를 모두 사용했습니다."
             );
-            playUIInvalidSound();
         }
 
         return;
