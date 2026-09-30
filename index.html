@@ -4019,6 +4019,8 @@ function claimDailyQuestReward(id) {
     saveCoins();
     saveDailyQuestState();
     setMessage(`퀘스트 보상 수령! ${quest.name} · 🪙 +${quest.reward}`);
+    updateUI();
+    return true;
 }
 
 function rerollDailyQuests() {
@@ -4405,18 +4407,31 @@ function drawQuestPanel() {
             ctx.font = "600 11px Pretendard, Noto Sans KR, sans-serif";
             ctx.fillText(`🪙 +${q.reward}코인`, 585, y + 14);
 
-            ctx.fillStyle = completed ? "rgba(99,184,255,0.72)" : "rgba(99,184,255,0.12)";
-            ctx.strokeStyle = completed ? "rgba(99,184,255,0.55)" : "rgba(99,184,255,0.18)";
-            ctx.lineWidth = 1;
+            // 달성한 퀘스트는 실제로 누를 수 있는 버튼처럼 명확하게 표시합니다.
+            if (completed) {
+                ctx.fillStyle = "rgba(99,184,255,0.18)";
+                ctx.strokeStyle = "rgba(99,184,255,0.95)";
+                ctx.lineWidth = 2;
+                ctx.shadowColor = "rgba(99,184,255,0.45)";
+                ctx.shadowBlur = 8;
+            } else {
+                ctx.fillStyle = "rgba(99,184,255,0.08)";
+                ctx.strokeStyle = "rgba(99,184,255,0.18)";
+                ctx.lineWidth = 1;
+                ctx.shadowColor = "transparent";
+                ctx.shadowBlur = 0;
+            }
             ctx.beginPath();
             ctx.roundRect(585, y + 25, 133, 25, 7);
             ctx.fill();
             ctx.stroke();
+            ctx.shadowColor = "transparent";
+            ctx.shadowBlur = 0;
 
             ctx.textAlign = "center";
             ctx.fillStyle = completed ? "#ffffff" : "rgba(255,255,255,0.28)";
             ctx.font = "bold 12px Pretendard, Noto Sans KR, sans-serif";
-            ctx.fillText("보상 받기", 651.5, y + 37.5);
+            ctx.fillText(completed ? "보상 받기  ›" : "보상 받기", 651.5, y + 37.5);
         }
     }
 
