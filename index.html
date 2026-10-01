@@ -1230,7 +1230,7 @@ const ITEM_DATA = {
     energyRecovery: {
         name: "에너지 복구 장치",
         icon: "🔋",
-        description: "맵 넘기기 0회일 때 더블 터치로 1개 소비 · 맵 넘기기 2회 회복"
+        description: "맵 넘기기 0회일 때 더블 터치 · 1개 소비 · 맵 넘기기 +2"
     }
 };
 
@@ -1270,6 +1270,7 @@ let pathGuideAutoFadeAt = 0;
 const PATH_GUIDE_FADE_DURATION = 0.18;
 let pathGuidePath = [];
 let pathGuideZeroWarningShown = false;
+let energyRecoveryUsed = false;
 let itemWarningText = "";
 let itemWarningUntil = 0;
 
@@ -1919,62 +1920,72 @@ function getSelectedItemLabel() {
     return `${data.icon} ${data.name}`;
 }
 
-function activateItemForRun() {
-    /*
-       아이템 소비 규칙
-       - 시간 조작 시계: 선택한 개수만큼 게임 시작 시 즉시 소비
-       - 에너지 보호막 / 경로 안내 장치 / 응급 처치 장치: 게임 시작 시 1개 소비
-       - 에너지 복구 장치: 게임 시작 시 소비하지 않음. 실제 복구 사용 시에만 소비
-    */
-    activeItem = selectedItem;
+function autoUnequipIfDepleted(type) {
+    if (itemInventory[type] <= 0 && selectedItem === type) {
+        selectedItem = null;
+        if (type === "timeClock") selectedTimeClocks = 1;
+    }
+}
 
+function activateItemForRun() {
+    // 게임 시작 시 장착 아이템을 1회 투입합니다.
+    // 시간 조작 시계만 선택한 개수만큼 소비하고, 나머지는 1개 소비합니다.
+    // 에너지 복구 장치는 실제 복구할 때만 소비합니다.
+    activeItem = selectedItem;
     activeTimeBonus = 0;
 
     if (activeItem === "timeClock") {
         const available = Math.max(0, Number(itemInventory.timeClock) || 0);
-        selectedTimeClocks = Math.max(0, Math.min(5, selectedTimeClocks, available));
+        selectedTimeClocks = Math.max(1, Math.min(5, selectedTimeClocks, available));
 
-        if (selectedTimeClocks <= 0) {
+        if (available <= 0) {
             activeItem = null;
+            selectedItem = null;
             selectedTimeClocks = 1;
         } else {
-            // 시계는 장착한 개수만큼 게임 시작 순간에 바로 소비합니다.
             itemInventory.timeClock -= selectedTimeClocks;
             activeTimeBonus = selectedTimeClocks;
+            autoUnequipIfDepleted("timeClock");
         }
     } else if (activeItem === "energyShield") {
         if (itemInventory.energyShield > 0) {
             itemInventory.energyShield--;
+            autoUnequipIfDepleted("energyShield");
         } else {
             activeItem = null;
+            selectedItem = null;
         }
     } else if (activeItem === "pathGuide") {
         if (itemInventory.pathGuide > 0) {
-            // 한 개를 게임에 투입하면 시작 자동 안내 + 같은 게임의 1회 재사용에 사용됩니다.
             itemInventory.pathGuide--;
+            // 보유량이 0이 되어도 이번 게임에 투입된 activeItem은 유지합니다.
+            autoUnequipIfDepleted("pathGuide");
         } else {
             activeItem = null;
+            selectedItem = null;
         }
     } else if (activeItem === "firstAid") {
         if (itemInventory.firstAid > 0) {
             itemInventory.firstAid--;
+            autoUnequipIfDepleted("firstAid");
         } else {
             activeItem = null;
+            selectedItem = null;
         }
     } else if (activeItem === "energyRecovery") {
-        // 에너지 복구 장치는 게임 시작 시 절대 소비하지 않습니다.
-        // 맵 넘기기 횟수가 0일 때 더블 터치로 실제 복구를 발동하면 1개 소비합니다.
+        // 시작 시에는 절대 차감하지 않습니다.
         if (itemInventory.energyRecovery <= 0) {
             activeItem = null;
+            selectedItem = null;
         }
     } else {
         activeItem = null;
     }
 
-    if (activeItem && activeItem !== "energyRecovery") {
+    if (activeItem) {
         playEffectSound("itemUse");
-        saveItemInventory();
     }
+    saveItemInventory();
 
     shieldCharges = 0;
     firstAidCharged = false;
@@ -1984,6 +1995,7 @@ function activateItemForRun() {
     pathGuideAutoFadeAt = 0;
     pathGuidePath = [];
     pathGuideZeroWarningShown = false;
+    energyRecoveryUsed = false;
     itemWarningText = "";
     itemWarningUntil = 0;
 }
@@ -1999,13 +2011,13 @@ function deactivateItemForRun() {
     pathGuideAutoFadeAt = 0;
     pathGuidePath = [];
     pathGuideZeroWarningShown = false;
+    energyRecoveryUsed = false;
     itemWarningText = "";
     itemWarningUntil = 0;
 }
 
 function useEnergyRecovery() {
-    // 에너지 복구 장치는 오직 맵 넘기기 횟수가 0일 때
-    // 더블 터치로 발동하며, 발동할 때마다 정확히 1개를 소비합니다.
+    // 맵 넘기기 횟수가 0일 때 더블 터치하면 1개만 소비하고 +2 합니다.
     if (
         activeItem !== "energyRecovery" ||
         mapSkips > 0 ||
@@ -2018,9 +2030,15 @@ function useEnergyRecovery() {
     mapSkips = Math.min(MAX_MAP_SKIPS, mapSkips + 2);
     onDailyQuestEnergyRecoveryUse();
 
+    // 마지막 1개까지 사용했다면 장착도 즉시 해제합니다.
+    autoUnequipIfDepleted("energyRecovery");
+    if (itemInventory.energyRecovery <= 0) {
+        activeItem = null;
+    }
+
     saveItemInventory();
     playEffectSound("itemUse");
-    showItemWarning(`에너지 복구 장치 1개 사용 · 맵 넘기기 +2`);
+    showItemWarning("에너지 복구 장치 1개 사용 · 맵 넘기기 +2");
     updateUI();
     return true;
 }
@@ -2097,6 +2115,7 @@ function adjustSelectedTimeClocks(direction) {
     selectedTimeClocks = Math.max(1, Math.min(5, selectedTimeClocks + direction));
     selectedItem = "timeClock";
 }
+
 
 function openInventoryDetail(type) {
     inventoryDetailType = type;
@@ -4800,13 +4819,13 @@ function skipMap() {
         mapSkips <= 0
     ) {
         if (useEnergyRecovery()) {
-            // 더블 터치로 에너지 복구 장치를 사용한 경우 여기서 종료합니다.
             return;
         }
 
         setMessage(
             "맵 넘기기 횟수를 모두 사용했습니다."
         );
+        updateUI();
         return;
     }
 
@@ -9338,20 +9357,6 @@ function drawInventoryDetailModal() {
         ctx.fillText("한 게임에서 최대 5개 사용", box.x + box.w / 2, 342);
     }
 
-    if (type === "energyRecovery") {
-        ctx.fillStyle = "#9eabb9";
-        ctx.font = "12px Pretendard, Noto Sans KR, sans-serif";
-        ctx.fillText(
-            "맵 넘기기 0회일 때 더블 터치 → 1개 소비 · 2회 회복",
-            box.x + box.w / 2,
-            330
-        );
-        ctx.fillText(
-            "사용 개수는 따로 설정하지 않습니다.",
-            box.x + box.w / 2,
-            350
-        );
-    }
 
     drawSettingsButton(410, 395, 100, 38, owned > 0 ? (equipped ? "해제" : "장착") : "보유하지 않음");
     drawSettingsButton(290, 395, 100, 38, "닫기");
