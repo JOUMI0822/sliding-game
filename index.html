@@ -4453,18 +4453,35 @@ function syncQuestRewardOverlay(force = false) {
         !!dailyQuestState
     );
 
-    // 매번 기존 버튼을 완전히 제거합니다.
-    // iPad Safari에서 이전 DOM 버튼이 남아 겹치는 문제를 방지합니다.
-    questRewardOverlay.innerHTML = "";
-    questRewardOverlaySignature = "";
-
     if (!shouldShow) {
+        if (questRewardOverlaySignature !== "hidden") {
+            questRewardOverlay.innerHTML = "";
+            questRewardOverlaySignature = "hidden";
+        }
         questRewardOverlay.style.display = "none";
         questRewardOverlay.setAttribute("aria-hidden", "true");
         return;
     }
 
     refreshDailyQuestIfNeeded();
+
+    // 게임 루프는 매 프레임 syncQuestRewardOverlay()를 호출합니다.
+    // 매 프레임 innerHTML을 비우고 버튼을 새로 만들면 모바일 Safari에서
+    // pointerdown과 click 사이에 기존 버튼이 사라져 click이 끊길 수 있습니다.
+    // 실제 퀘스트 상태가 바뀐 경우에만 DOM을 다시 만듭니다.
+    const signature = JSON.stringify({
+        gameState,
+        questOpen,
+        quests: dailyQuestState.quests,
+        completed: dailyQuestState.completed,
+        rewardClaimed: dailyQuestState.rewardClaimed
+    });
+
+    if (!force && questRewardOverlaySignature === signature) {
+        return;
+    }
+
+    questRewardOverlay.innerHTML = "";
 
     let buttonCount = 0;
 
@@ -4514,19 +4531,7 @@ function syncQuestRewardOverlay(force = false) {
             // 이미 다른 이벤트에서 수령된 경우 중복 지급을 막습니다.
             if (button.disabled) return;
 
-            const claimedNow = claimDailyQuestReward(id);
-            if (!claimedNow) {
-                syncQuestRewardOverlay(true);
-                return;
-            }
-
-            playUIClickSound();
-            button.disabled = true;
-            button.textContent = "수령 완료 ✓";
-
-            // 상태 저장/Canvas 갱신 후 HTML 버튼도 즉시 제거합니다.
-            updateUI();
-            syncQuestRewardOverlay(true);
+            claimQuestRewardFromOverlay(id, button);
         });
 
         questRewardOverlay.appendChild(button);
@@ -4538,6 +4543,7 @@ function syncQuestRewardOverlay(force = false) {
         "aria-hidden",
         buttonCount > 0 ? "false" : "true"
     );
+    questRewardOverlaySignature = signature;
 }
 function drawQuestPanel() {
     refreshDailyQuestIfNeeded();
