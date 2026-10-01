@@ -223,7 +223,7 @@ canvas {
 
 
 /* =========================================================
-   V29 로그인 / 회원가입 / 게스트 / 랭킹 UI
+   V28 로그인 / 회원가입 / 게스트 / 랭킹 UI
 ========================================================= */
 
 .entry-screen {
@@ -285,26 +285,6 @@ canvas {
 .entry-form input:focus {
     border-color: #63b8ff;
     box-shadow: 0 0 0 3px rgba(99,184,255,0.12);
-}
-
-
-.login-remember {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-height: 24px;
-    color: #aeb8c5;
-    font-size: 13px;
-    cursor: pointer;
-    user-select: none;
-}
-.login-remember input {
-    width: 17px !important;
-    height: 17px !important;
-    margin: 0;
-    padding: 0 !important;
-    accent-color: #63b8ff;
-    cursor: pointer;
 }
 
 .entry-form button,
@@ -403,38 +383,29 @@ canvas {
 
 .start-menu-actions {
     position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-    z-index: 151;
+    top: 52px;
+    right: 12px;
+    display: flex;
+    gap: 7px;
+    pointer-events: auto;
 }
 
 .start-menu-button {
-    position: absolute !important;
     min-width: 92px;
     height: 34px;
     padding: 0 10px;
     border: 1px solid rgba(255,255,255,0.18);
     border-radius: 8px;
-    background: rgba(15,19,25,0.88);
+    background: rgba(15,19,25,0.82);
     color: #f2f5f7;
     font: 700 12px Pretendard, "Noto Sans KR", Arial, sans-serif;
     cursor: pointer;
     touch-action: manipulation;
-    pointer-events: auto;
-    z-index: 152;
 }
-
-#startRankingButton { top: 12px !important; left: 12px !important; right: auto !important; bottom: auto !important; }
-#startLogoutButton { top: auto !important; left: auto !important; right: 12px !important; bottom: 12px !important; }
 
 .start-menu-button:active {
     transform: scale(0.98);
 }
-
-/* 랭킹창 hidden 상태가 display:flex에 덮이지 않도록 합니다. */
-.ranking-modal[hidden] { display: none !important; }
 
 .ranking-modal {
     position: fixed;
@@ -449,7 +420,6 @@ canvas {
 }
 
 .ranking-card {
-    position: relative; z-index: 1; pointer-events: auto;
     width: min(760px, 96vw);
     max-height: min(720px, 92vh);
     padding: 20px;
@@ -494,7 +464,6 @@ canvas {
 }
 
 .ranking-tab {
-    position: relative; z-index: 2; pointer-events: auto;
     flex: 1;
     height: 40px;
     border: 1px solid #46515f;
@@ -559,15 +528,21 @@ canvas {
     }
 
     .start-menu-account {
-        top: 8px;
+        top: 48px;
         right: 8px;
         max-width: 150px;
         font-size: 10px;
     }
 
-    .start-menu-actions { inset: 0; width: 100%; height: 100%; }
-    #startRankingButton { top: 8px !important; left: 8px !important; }
-    #startLogoutButton { right: 8px !important; bottom: 8px !important; }
+    .start-menu-actions {
+        top: 8px;
+        right: 8px;
+    }
+
+    .start-menu-logout {
+        right: 8px;
+        bottom: 8px;
+    }
 
     .start-menu-button {
         min-width: 78px;
@@ -583,13 +558,12 @@ canvas {
 
 <div id="entryGate" class="entry-screen">
     <div id="loginView" class="entry-card">
-        <div class="entry-title">🧩 미로 게임</div>
+        <div class="entry-title">슬라이딩</div>
         <div class="entry-subtitle">로그인해서 게임을 시작하세요</div>
 
         <form id="loginForm" class="entry-form" autocomplete="on">
             <input id="loginId" name="username" type="text" maxlength="30" placeholder="아이디" autocomplete="username" required>
             <input id="loginPassword" name="password" type="password" maxlength="100" placeholder="비밀번호" autocomplete="current-password" required>
-            <label class="login-remember"><input id="rememberLogin" type="checkbox"> 로그인 정보 저장하기</label>
             <button id="loginButton" class="entry-primary" type="submit">로그인</button>
         </form>
 
@@ -636,9 +610,11 @@ canvas {
         <div id="questRewardOverlay" aria-hidden="true"></div>
 
         <div id="startMenuOverlay" aria-hidden="true">
-            <div class="start-menu-account" id="startMenuAccount">게스트 모드</div>
             <div class="start-menu-actions">
                 <button id="startRankingButton" class="start-menu-button" type="button">🏆 랭킹</button>
+            </div>
+            <div class="start-menu-account" id="startMenuAccount">게스트 모드</div>
+            <div class="start-menu-logout">
                 <button id="startLogoutButton" class="start-menu-button" type="button">🚪 로그아웃</button>
             </div>
         </div>
@@ -737,7 +713,7 @@ const MAX_PREVIOUS_LAYOUTS = 180;
 let gameState = "start";
 
 /* =========================================================
-   V29 계정 / 게스트 / 랭킹 상태
+   V28 계정 / 게스트 / 랭킹 상태
 ========================================================= */
 let currentAccount = null;
 let guestMode = false;
@@ -858,55 +834,6 @@ async function apiJSON(path, options = {}) {
     return data;
 }
 
-const REMEMBER_LOGIN_KEY = "slidingMazeRememberLoginV29";
-
-function loadRememberedLogin() {
-    const checkbox = document.getElementById("rememberLogin");
-    const idInput = document.getElementById("loginId");
-    if (!checkbox || !idInput) return;
-    try {
-        const saved = JSON.parse(localStorage.getItem(REMEMBER_LOGIN_KEY) || "null");
-        if (saved && saved.id) {
-            idInput.value = String(saved.id);
-            checkbox.checked = true;
-        }
-    } catch (_) {}
-}
-
-function saveRememberPreference(id) {
-    const checkbox = document.getElementById("rememberLogin");
-    if (!checkbox) return;
-    try {
-        if (checkbox.checked) {
-            // 비밀번호는 저장하지 않습니다. 로그인 상태는 HttpOnly 세션 쿠키가 유지합니다.
-            localStorage.setItem(REMEMBER_LOGIN_KEY, JSON.stringify({ id: String(id) }));
-        } else {
-            localStorage.removeItem(REMEMBER_LOGIN_KEY);
-        }
-    } catch (_) {}
-}
-
-function clearRememberedLogin() {
-    try { localStorage.removeItem(REMEMBER_LOGIN_KEY); } catch (_) {}
-    const checkbox = document.getElementById("rememberLogin");
-    if (checkbox) checkbox.checked = false;
-}
-
-async function restoreRememberedSession() {
-    let shouldRestore = false;
-    try { shouldRestore = !!localStorage.getItem(REMEMBER_LOGIN_KEY); } catch (_) {}
-    if (!shouldRestore) return false;
-    try {
-        const data = await apiJSON("/api/me");
-        const account = data?.account || data?.user || data;
-        if (account && (account.id || account.nickname)) {
-            enterGameAsAccount(account);
-            return true;
-        }
-    } catch (_) {}
-    return false;
-}
-
 async function loginAccount() {
     const id = document.getElementById("loginId").value.trim();
     const password = document.getElementById("loginPassword").value;
@@ -926,7 +853,6 @@ async function loginAccount() {
             body: JSON.stringify({ id, password })
         });
         const account = data?.account || data?.user || data;
-        saveRememberPreference(id);
         document.getElementById("loginPassword").value = "";
         enterGameAsAccount(account);
     } catch (error) {
@@ -962,7 +888,7 @@ async function registerAccount() {
             body: JSON.stringify({ id, password, nickname })
         });
 
-        // 현재 V29 서버는 가입 직후 세션도 만들 수 있으므로,
+        // 현재 V28 서버는 가입 직후 세션도 만들 수 있으므로,
         // UX 요구사항에 맞춰 명시적으로 로그아웃한 뒤 로그인 화면으로 돌아갑니다.
         try { await apiJSON("/api/logout", { method: "POST", body: "{}" }); } catch (error) {}
 
@@ -987,7 +913,6 @@ async function logoutToEntry() {
     currentAccount = null;
     guestMode = false;
     gameAccessGranted = false;
-    clearRememberedLogin();
     document.getElementById("loginId").value = "";
     document.getElementById("loginPassword").value = "";
     document.getElementById("registerForm").reset();
@@ -996,7 +921,7 @@ async function logoutToEntry() {
     showLoginView("로그아웃되었습니다.", "success");
 }
 
-function calculateV29Score() {
+function calculateV28Score() {
     return Math.max(
         0,
         clearCount * 50 +
@@ -1006,10 +931,10 @@ function calculateV29Score() {
     );
 }
 
-async function submitV29Score() {
+async function submitV28Score() {
     if (!currentAccount || guestMode || !gameAccessGranted) return;
 
-    const score = calculateV29Score();
+    const score = calculateV28Score();
 
     try {
         await apiJSON("/api/ranking/score", {
@@ -1164,14 +1089,14 @@ function bindEntryAndRankingUI() {
 
     document.querySelectorAll("#startMenuOverlay button").forEach(button => {
         button.addEventListener("pointerdown", event => event.stopPropagation());
+        button.addEventListener("pointerup", event => event.stopPropagation());
         button.addEventListener("touchstart", event => event.stopPropagation(), { passive: true });
+        button.addEventListener("touchend", event => event.stopPropagation(), { passive: true });
     });
 }
 
 bindEntryAndRankingUI();
 showEntryGate();
-loadRememberedLogin();
-restoreRememberedSession();
 
 /* =========================================================
    2인용 경쟁 모드 준비 상태
@@ -6467,7 +6392,7 @@ function finishGameOver() {
         0.28;
 
     saveRecentRecord();
-    submitV29Score();
+    submitV28Score();
 
     setMessage(
         `게임 오버 — ${clearCount}회 클리어 / ${maxClearStreak}회 연속 클리어`
@@ -11782,7 +11707,7 @@ function gameLoop(
 
 
 /* =========================================================
-   V29 초기 계정 진입 화면
+   V28 초기 계정 진입 화면
 ========================================================= */
 
 function refreshRankingAccountLabel() {
