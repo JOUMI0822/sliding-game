@@ -404,31 +404,17 @@ canvas {
     touch-action: manipulation;
     pointer-events: auto;
     z-index: 152;
-    -webkit-tap-highlight-color: transparent;
 }
 
-#startRankingButton {
-    top: 12px !important;
-    left: 12px !important;
-    right: auto !important;
-    bottom: auto !important;
-}
-
-#startLogoutButton {
-    top: auto !important;
-    left: auto !important;
-    right: 12px !important;
-    bottom: 12px !important;
-}
+#startRankingButton { top: 12px !important; left: 12px !important; right: auto !important; bottom: auto !important; }
+#startLogoutButton { right: 12px !important; bottom: 12px !important; top: auto !important; left: auto !important; }
 
 .start-menu-button:active {
     transform: scale(0.98);
 }
 
-/* hidden 속성이 있을 때는 모달을 반드시 숨깁니다. */
-.ranking-modal[hidden] {
-    display: none !important;
-}
+/* hidden 상태의 랭킹창은 반드시 숨깁니다. */
+.ranking-modal[hidden] { display: none !important; }
 
 .ranking-modal {
     position: fixed;
@@ -443,9 +429,6 @@ canvas {
 }
 
 .ranking-card {
-    position: relative;
-    z-index: 1;
-    pointer-events: auto;
     width: min(760px, 96vw);
     max-height: min(720px, 92vh);
     padding: 20px;
@@ -491,9 +474,6 @@ canvas {
 
 .ranking-tab {
     flex: 1;
-    position: relative;
-    z-index: 2;
-    pointer-events: auto;
     height: 40px;
     border: 1px solid #46515f;
     border-radius: 9px;
@@ -569,20 +549,13 @@ canvas {
         height: 100%;
     }
 
+    #startRankingButton { top: 8px !important; left: 8px !important; }
+    #startLogoutButton { right: 8px !important; bottom: 8px !important; }
+
     .start-menu-button {
         min-width: 78px;
         height: 31px;
         font-size: 10px;
-    }
-
-    #startRankingButton {
-        top: 8px !important;
-        left: 8px !important;
-    }
-
-    #startLogoutButton {
-        right: 8px !important;
-        bottom: 8px !important;
     }
 }
 
@@ -757,7 +730,7 @@ let rankingLoading = false;
 let lifeLossCount = 0;
 let mapSkipCount = 0;
 
-const RANKING_API_BASE = "";
+const RANKING_API_BASE = "https://sliding-multiplayer-server-1.onrender.com";
 
 function setEntryStatus(elementId, message, type = "") {
     const element = document.getElementById(elementId);
