@@ -3936,7 +3936,7 @@ const DAILY_QUEST_POOL = [
     { id:4, name:"연속 질주", description:"5맵 연속 클리어", reward:5 },
     { id:5, name:"멈추지 않는 질주", description:"10맵 연속 클리어", reward:10 },
     { id:6, name:"시간과의 싸움", description:"제한시간 10초 이하 상태에서 3맵 클리어", reward:7 },
-    { id:7, name:"마지막 순간", description:"제한시간 3초 이하 상태에서 1맵 클리어", reward:5 },
+    { id:7, name:"마지막 순간", description:"맵 시작 후 5초 이내에 1맵 클리어", reward:8 },
     { id:8, name:"완벽한 출발", description:"목숨을 한 번도 잃지 않고 5맵 클리어", reward:6 },
     { id:9, name:"생존왕", description:"목숨 3개를 유지한 상태로 10맵 클리어", reward:10 },
     { id:10, name:"위험 회피자", description:"목숨을 잃지 않고 10맵 클리어", reward:10 },
@@ -3987,6 +3987,7 @@ function createDailyQuestProgress() {
         fastClears: 0,
         lowTimeClears: 0,
         lastMomentClears: 0,
+        quickMapClears: 0,
         noItemClears: 0,
         dangerMapClears: 0,
         timeClockClears: 0,
@@ -4066,6 +4067,11 @@ function loadDailyQuestState() {
     if (!Array.isArray(dailyQuestState.completed)) dailyQuestState.completed = [];
     if (!Array.isArray(dailyQuestState.rewardClaimed)) dailyQuestState.rewardClaimed = [];
     dailyQuestState.progress = mergeQuestProgressDefaults(dailyQuestState.progress);
+    // 새 「마지막 순간」 규칙은 별도 카운터를 사용하므로 기존 3초 규칙의
+    // lastMomentClears 기록이 새 퀘스트 진행도에 섞이지 않습니다.
+    if (typeof dailyQuestState.progress.quickMapClears !== "number") {
+        dailyQuestState.progress.quickMapClears = 0;
+    }
     if (typeof dailyQuestState.rerolls !== "number") dailyQuestState.rerolls = DAILY_QUEST_REROLL_COUNT;
     saveDailyQuestState();
 }
@@ -4175,6 +4181,7 @@ function onDailyQuestClear() {
     const p = dailyQuestState.progress;
     const stageLimit = getStageTimeLimit() + activeTimeBonus;
     const displayedTime = getDisplayedRemainingTime();
+    const elapsedTime = Math.max(0, stageLimit - remainingTime);
 
     p.dailyClears++;
     p.noDeathStreak++;
@@ -4187,7 +4194,9 @@ function onDailyQuestClear() {
 
     if (remainingTime >= stageLimit * 0.5) p.fastClears++;
     if (remainingTime <= 10) p.lowTimeClears++;
-    if (displayedTime <= 3.0) p.lastMomentClears++;
+    // 「마지막 순간」은 이제 남은 시간이 아니라 맵 시작 후 실제 경과 시간으로 판정합니다.
+    // 정확히 5.0초 이내에 골인하면 성공입니다.
+    if (elapsedTime <= 5.0) p.quickMapClears++;
     if (!activeItem) p.noItemClears++;
     if (dangers.size > 0) p.dangerMapClears++;
     if (activeItem === "timeClock") p.timeClockClears++;
@@ -4209,7 +4218,7 @@ function onDailyQuestClear() {
     if (p.noDeathStreak >= 5) completeDailyQuest(4);
     if (p.noDeathStreak >= 10) completeDailyQuest(5);
     if (p.lowTimeClears >= 3) completeDailyQuest(6);
-    if (p.lastMomentClears >= 1) completeDailyQuest(7);
+    if (p.quickMapClears >= 1) completeDailyQuest(7);
     if (p.noDeathStreak >= 5) completeDailyQuest(8);
     if (p.fullLifeClears >= 10) completeDailyQuest(9);
     if (p.noDeathStreak >= 10) completeDailyQuest(10);
@@ -4370,7 +4379,7 @@ function getDailyQuestProgressInfo(quest) {
         case 4: current = p.noDeathStreak; target = 5; break;
         case 5: current = p.noDeathStreak; target = 10; break;
         case 6: current = p.lowTimeClears; target = 3; break;
-        case 7: current = p.lastMomentClears; target = 1; break;
+        case 7: current = p.quickMapClears; target = 1; break;
         case 8: current = p.noDeathStreak; target = 5; break;
         case 9: current = p.fullLifeClears; target = 10; break;
         case 10: current = p.noDeathStreak; target = 10; break;
@@ -4481,10 +4490,10 @@ function syncQuestRewardOverlay(force = false) {
         );
 
         // Canvas와 동일한 위치에 딱 하나만 올립니다.
-        button.style.left = `${(555 / WIDTH) * 100}%`;
-        button.style.top = `${((rowY + 18) / HEIGHT) * 100}%`;
-        button.style.width = `${(163 / WIDTH) * 100}%`;
-        button.style.height = `${(34 / HEIGHT) * 100}%`;
+        button.style.left = `${(565 / WIDTH) * 100}%`;
+        button.style.top = `${((rowY + 22) / HEIGHT) * 100}%`;
+        button.style.width = `${(153 / WIDTH) * 100}%`;
+        button.style.height = `${(30 / HEIGHT) * 100}%`;
         button.textContent = "보상 받기  ›";
 
         // iPad Safari의 touch/pointer 이벤트가 Canvas로 내려가지 않도록
@@ -4603,12 +4612,12 @@ function drawQuestPanel() {
                 ? "#7dff9d"
                 : "#dce5ef";
         ctx.font = "600 11px Pretendard, Noto Sans KR, sans-serif";
-        ctx.fillText(`${info.current}/${info.target} · ${info.percent}%`, 565, y + 44);
+        ctx.fillText(`${info.current}/${info.target} · ${info.percent}%`, 535, y + 44);
 
         // 진행도 % 바
         const barX = 75;
         const barY = y + 51;
-        const barW = 480;
+        const barW = 455;
         const barH = 7;
         ctx.fillStyle = claimed ? "rgba(255,255,255,0.055)" : "rgba(255,255,255,0.10)";
         ctx.beginPath();
@@ -4624,10 +4633,10 @@ function drawQuestPanel() {
         ctx.fill();
 
         if (claimed) {
-            ctx.textAlign = "left";
+            ctx.textAlign = "center";
             ctx.fillStyle = "rgba(125,255,157,0.42)";
             ctx.font = "600 11px Pretendard, Noto Sans KR, sans-serif";
-            ctx.fillText(`🪙 +${q.reward}코인`, 585, y + 14);
+            ctx.fillText(`🪙 +${q.reward}코인`, 641.5, y + 12);
 
             // 수령 완료 상태는 Canvas가 표시합니다.
             // 실제 미수령 보상 버튼은 HTML <button> 하나만 표시합니다.
@@ -4635,19 +4644,19 @@ function drawQuestPanel() {
             ctx.strokeStyle = "rgba(110,232,139,0.34)";
             ctx.lineWidth = 1.5;
             ctx.beginPath();
-            ctx.roundRect(555, y + 18, 163, 34, 7);
+            ctx.roundRect(565, y + 22, 153, 30, 7);
             ctx.fill();
             ctx.stroke();
 
             ctx.textAlign = "center";
             ctx.fillStyle = "rgba(125,255,157,0.78)";
             ctx.font = "bold 12px Pretendard, Noto Sans KR, sans-serif";
-            ctx.fillText("보상 수령 완료 ✓", 636.5, y + 39);
+            ctx.fillText("보상 수령 완료 ✓", 641.5, y + 39);
         } else {
-            ctx.textAlign = "left";
+            ctx.textAlign = "center";
             ctx.fillStyle = completed ? "#ffd76a" : "rgba(255,215,106,0.38)";
             ctx.font = "600 11px Pretendard, Noto Sans KR, sans-serif";
-            ctx.fillText(`🪙 +${q.reward}코인`, 585, y + 14);
+            ctx.fillText(`🪙 +${q.reward}코인`, 641.5, y + 12);
 
             if (!completed) {
                 // 미달성 상태만 Canvas에 비활성 보상 표시.
@@ -4655,14 +4664,14 @@ function drawQuestPanel() {
                 ctx.strokeStyle = "rgba(99,184,255,0.18)";
                 ctx.lineWidth = 1;
                 ctx.beginPath();
-                ctx.roundRect(555, y + 18, 163, 34, 7);
+                ctx.roundRect(565, y + 22, 153, 30, 7);
                 ctx.fill();
                 ctx.stroke();
 
                 ctx.textAlign = "center";
                 ctx.fillStyle = "rgba(255,255,255,0.28)";
                 ctx.font = "bold 12px Pretendard, Noto Sans KR, sans-serif";
-                ctx.fillText("보상 받기", 636.5, y + 35);
+                ctx.fillText("보상 받기", 641.5, y + 39);
             }
             // completed + unclaimed 상태의 "보상 받기"는
             // 아래 syncQuestRewardOverlay()가 만드는 실제 HTML 버튼만 담당합니다.
