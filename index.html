@@ -4611,10 +4611,24 @@ function drawQuestPanel() {
         ctx.fill();
 
         if (claimed) {
-            ctx.textAlign = "right";
-            ctx.fillStyle = "rgba(125,255,157,0.38)";
+            // 보상을 수령한 뒤에는 Canvas에도 수령 완료 상태를 명확하게 표시합니다.
+            ctx.textAlign = "left";
+            ctx.fillStyle = "rgba(125,255,157,0.42)";
+            ctx.font = "600 11px Pretendard, Noto Sans KR, sans-serif";
+            ctx.fillText(`🪙 +${q.reward}코인`, 585, y + 14);
+
+            ctx.fillStyle = "rgba(110,232,139,0.10)";
+            ctx.strokeStyle = "rgba(110,232,139,0.34)";
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.roundRect(555, y + 18, 163, 34, 7);
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.textAlign = "center";
+            ctx.fillStyle = "rgba(125,255,157,0.78)";
             ctx.font = "bold 12px Pretendard, Noto Sans KR, sans-serif";
-            ctx.fillText("보상 수령 완료 ✓", 718, y + 18);
+            ctx.fillText("보상 수령 완료 ✓", 636.5, y + 39);
         } else {
             // 미완료 퀘스트도 보상 받기 버튼을 항상 표시하되,
             // 완료 전에는 가방의 미보유 아이템처럼 어둡고 희미하게 표시합니다.
