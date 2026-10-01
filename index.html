@@ -760,6 +760,8 @@ let guestMode = false;
 let gameAccessGranted = false;
 let rankingMode = "today";
 let rankingLoading = false;
+// 랭킹 저장 요청을 순서대로 처리해 저장 완료 후 랭킹을 조회하도록 합니다.
+let rankingSavePromise = Promise.resolve();
 
 let lifeLossCount = 0;
 let mapSkipCount = 0;
@@ -999,28 +1001,53 @@ function calculateV28Score() {
     );
 }
 
-async function submitV28Score() {
-    if (!currentAccount || guestMode || !gameAccessGranted) return;
-
-    const score = calculateV28Score();
-
-    try {
-        await apiJSON("/api/ranking/score", {
-            method: "POST",
-            body: JSON.stringify({
-                clears: clearCount,
-                maxStreak: maxClearStreak,
-                skips: mapSkipCount,
-                lifeLosses: lifeLossCount,
-                score
-            })
-        });
-    } catch (error) {
-        console.warn("랭킹 점수 저장 실패:", error);
+function submitV28Score() {
+    if (!currentAccount || guestMode || !gameAccessGranted) {
+        return Promise.resolve(false);
     }
+
+    // 현재 런의 값을 즉시 복사합니다. 저장 요청이 늦게 실행되어도
+    // 그 사이 clearCount 등이 바뀌어 다른 기록으로 저장되는 일을 막습니다.
+    const payload = {
+        clears: Number(clearCount) || 0,
+        maxStreak: Number(maxClearStreak) || 0,
+        skips: Number(mapSkipCount) || 0,
+        lifeLosses: Number(lifeLossCount) || 0
+    };
+    payload.score = Math.max(
+        0,
+        payload.clears * 50 +
+        payload.maxStreak * 100 -
+        payload.skips * 10 -
+        payload.lifeLosses * 10
+    );
+
+    // 이전 저장이 끝난 뒤 이번 기록을 저장합니다.
+    rankingSavePromise = rankingSavePromise
+        .catch(() => false)
+        .then(async () => {
+            try {
+                const result = await apiJSON(`/api/ranking/score?_=${Date.now()}`, {
+                    method: "POST",
+                    body: JSON.stringify(payload)
+                });
+
+                if (!result?.saved) {
+                    throw new Error("서버가 랭킹 저장을 확인하지 못했습니다.");
+                }
+
+                console.log("랭킹 저장 완료:", result.score);
+                return true;
+            } catch (error) {
+                console.warn("랭킹 점수 저장 실패:", error);
+                return false;
+            }
+        });
+
+    return rankingSavePromise;
 }
 
-function openRankingPanel(mode = "today") {
+async function openRankingPanel(mode = "today") {
     if (!currentAccount) {
         window.alert("게스트 모드에서는 랭킹을 볼 수 없습니다. 회원으로 로그인해 주세요.");
         return;
@@ -1032,7 +1059,10 @@ function openRankingPanel(mode = "today") {
     panel.classList.add("ranking-open");
     panel.setAttribute("aria-hidden", "false");
     updateRankingTabs();
-    loadRanking(rankingMode);
+
+    // 방금 저장한 최고 기록이 반드시 서버에 반영된 뒤 조회합니다.
+    await rankingSavePromise;
+    await loadRanking(rankingMode);
 }
 
 function closeRankingPanel() {
@@ -1050,6 +1080,10 @@ function updateRankingTabs() {
 
 async function loadRanking(mode = rankingMode) {
     if (!currentAccount) return;
+
+    // 저장 중인 기록이 있으면 저장 완료 후 조회합니다.
+    await rankingSavePromise;
+
     rankingLoading = true;
     rankingMode = mode === "weekly" ? "weekly" : "today";
     updateRankingTabs();
@@ -1059,7 +1093,9 @@ async function loadRanking(mode = rankingMode) {
     body.innerHTML = "";
 
     try {
-        const rankingPath = rankingMode === "weekly" ? "/api/ranking/weekly" : "/api/ranking/today";
+        const rankingPath = rankingMode === "weekly"
+            ? "/api/ranking/weekly"
+            : "/api/ranking/today";
         const data = await apiJSON(`${rankingPath}?_=${Date.now()}`);
         const rows = Array.isArray(data?.rows) ? data.rows : Array.isArray(data?.ranking) ? data.ranking : Array.isArray(data) ? data : [];
 
@@ -6179,9 +6215,9 @@ function clearGame() {
 
     } catch (error) {}
 
-    // 클리어가 확정된 순간 최신 점수를 랭킹에 반영합니다.
-    // 게임 오버까지 기다리지 않아도 현재 기록이 서버에 저장됩니다.
-    submitV28Score();
+    // 클리어가 확정된 순간 최신 점수를 랭킹 저장 큐에 넣습니다.
+    // 게임 루프는 계속 진행하지만 저장은 순서대로 완료됩니다.
+    void submitV28Score();
 
     applyImpactRecoil(
         150,
@@ -6474,7 +6510,8 @@ function finishGameOver() {
         0.28;
 
     saveRecentRecord();
-    submitV28Score();
+    // 게임 오버 시점의 최종 기록도 저장 큐에 넣습니다.
+    void submitV28Score();
 
     setMessage(
         `게임 오버 — ${clearCount}회 클리어 / ${maxClearStreak}회 연속 클리어`
