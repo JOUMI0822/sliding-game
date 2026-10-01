@@ -407,6 +407,11 @@ canvas {
     transform: scale(0.98);
 }
 
+/* hidden 속성이 있는 랭킹창은 CSS의 display:flex보다 우선해서 반드시 숨깁니다. */
+.ranking-modal[hidden] {
+    display: none !important;
+}
+
 .ranking-modal {
     position: fixed;
     inset: 0;
@@ -1055,30 +1060,55 @@ function bindEntryAndRankingUI() {
         logoutToEntry();
     });
 
-    document.getElementById("rankingClose")?.addEventListener("click", event => {
-        event.preventDefault();
-        event.stopPropagation();
-        playUIClickSound();
-        closeRankingPanel();
-    });
-
-    document.getElementById("rankingTodayTab")?.addEventListener("click", event => {
-        event.preventDefault();
-        event.stopPropagation();
-        playUIClickSound();
-        loadRanking("today");
-    });
-
-    document.getElementById("rankingWeeklyTab")?.addEventListener("click", event => {
-        event.preventDefault();
-        event.stopPropagation();
-        playUIClickSound();
-        loadRanking("weekly");
-    });
-
+    const rankingClose = document.getElementById("rankingClose");
+    const rankingTodayTab = document.getElementById("rankingTodayTab");
+    const rankingWeeklyTab = document.getElementById("rankingWeeklyTab");
     const rankingPanel = document.getElementById("rankingPanel");
+
+    // 모바일에서 상위 gameWrapper의 터치 처리와 충돌하지 않도록
+    // 랭킹 버튼은 pointerup을 기준으로 직접 처리합니다.
+    const bindRankingAction = (element, action) => {
+        if (!element) return;
+        let handledPointerId = null;
+
+        element.addEventListener("pointerup", event => {
+            event.preventDefault();
+            event.stopPropagation();
+
+            if (handledPointerId === event.pointerId) return;
+            handledPointerId = event.pointerId;
+
+            playUIClickSound();
+            action();
+
+            setTimeout(() => {
+                if (handledPointerId === event.pointerId) {
+                    handledPointerId = null;
+                }
+            }, 0);
+        }, { passive: false });
+
+        element.addEventListener("click", event => {
+            event.preventDefault();
+            event.stopPropagation();
+        });
+    };
+
+    bindRankingAction(rankingClose, () => closeRankingPanel());
+    bindRankingAction(rankingTodayTab, () => loadRanking("today"));
+    bindRankingAction(rankingWeeklyTab, () => loadRanking("weekly"));
+
     rankingPanel?.addEventListener("pointerdown", event => event.stopPropagation());
-    rankingPanel?.addEventListener("touchstart", event => event.stopPropagation(), { passive: true });
+    rankingPanel?.addEventListener("pointerup", event => event.stopPropagation());
+    rankingPanel?.addEventListener("touchstart", event => event.stopPropagation(), { passive: false });
+    rankingPanel?.addEventListener("touchend", event => event.stopPropagation(), { passive: false });
+
+    // 랭킹 바깥 배경을 눌러도 닫을 수 있게 합니다.
+    rankingPanel?.addEventListener("pointerup", event => {
+        if (event.target === rankingPanel) {
+            closeRankingPanel();
+        }
+    });
 
     document.querySelectorAll("#startMenuOverlay button").forEach(button => {
         button.addEventListener("pointerdown", event => event.stopPropagation());
@@ -1087,6 +1117,7 @@ function bindEntryAndRankingUI() {
 }
 
 bindEntryAndRankingUI();
+closeRankingPanel();
 showEntryGate();
 
 /* =========================================================
