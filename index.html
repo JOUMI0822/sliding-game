@@ -4471,7 +4471,7 @@ function drawQuestPanel() {
                 ctx.shadowBlur = 0;
             }
             ctx.beginPath();
-            ctx.roundRect(585, y + 25, 133, 25, 7);
+            ctx.roundRect(570, y + 20, 148, 30, 7);
             ctx.fill();
             ctx.stroke();
             ctx.shadowColor = "transparent";
@@ -4480,7 +4480,7 @@ function drawQuestPanel() {
             ctx.textAlign = "center";
             ctx.fillStyle = completed ? "#ffffff" : "rgba(255,255,255,0.28)";
             ctx.font = "bold 12px Pretendard, Noto Sans KR, sans-serif";
-            ctx.fillText(completed ? "보상 받기  ›" : "보상 받기", 651.5, y + 37.5);
+            ctx.fillText(completed ? "보상 받기  ›" : "보상 받기", 644, y + 35);
         }
     }
 
@@ -9844,9 +9844,16 @@ function handleSettingsTap(x, y) {
         for (let i = 0; i < DAILY_QUEST_COUNT; i++) {
             const id = dailyQuestState.quests[i];
             if (!id || !isDailyQuestCompleted(id) || isDailyQuestRewardClaimed(id)) continue;
-            const y = 122 + i * 77;
-            if (isInsideRect(x, y, { x: 585, y: y + 25, w: 133, h: 25 })) {
-                claimDailyQuestReward(id);
+            const rowY = 122 + i * 77;
+
+            // 보상 버튼은 시각적으로 보이는 버튼보다 넓은 영역을 실제 터치 영역으로 사용합니다.
+            // 모바일에서 버튼 가장자리를 눌러도 정상적으로 수령되도록 오른쪽 보상 영역 전체를 허용합니다.
+            const rewardHitArea = { x: 565, y: rowY + 8, w: 165, h: 48 };
+            if (isInsideRect(x, y, rewardHitArea)) {
+                const claimedNow = claimDailyQuestReward(id);
+                if (claimedNow) {
+                    playUIClickSound();
+                }
                 return true;
             }
         }
