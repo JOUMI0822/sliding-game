@@ -407,6 +407,10 @@ canvas {
     transform: scale(0.98);
 }
 
+.ranking-modal[hidden] {
+    display: none !important;
+}
+
 .ranking-modal {
     position: fixed;
     inset: 0;
@@ -417,6 +421,7 @@ canvas {
     padding: 20px;
     background: rgba(0,0,0,0.72);
     touch-action: auto;
+    pointer-events: auto;
 }
 
 .ranking-card {
