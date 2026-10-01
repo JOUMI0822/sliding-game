@@ -220,10 +220,149 @@ canvas {
 }
 
 
+
+/* =========================================================
+   V28 계정 / 일일·주간 랭킹 UI
+========================================================= */
+#accountPanel {
+    position: fixed;
+    top: 8px;
+    right: 8px;
+    z-index: 1000;
+    width: min(300px, calc(100vw - 16px));
+    padding: 10px;
+    border: 1px solid #3a4655;
+    border-radius: 12px;
+    background: rgba(15,19,25,.96);
+    box-shadow: 0 8px 28px rgba(0,0,0,.35);
+    pointer-events: auto;
+    touch-action: manipulation;
+}
+#accountPanel .account-row {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 6px;
+}
+#accountPanel input {
+    width: 100%;
+    min-width: 0;
+    padding: 7px 8px;
+    border: 1px solid #46515f;
+    border-radius: 7px;
+    background: #0b0e13;
+    color: #fff;
+    font-size: 12px;
+    touch-action: manipulation;
+}
+#accountPanel button {
+    flex: 1;
+    min-width: 0;
+    padding: 7px 6px;
+    border: 1px solid #4d5b6c;
+    border-radius: 7px;
+    background: #1b2330;
+    color: #f5f7fa;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+#accountPanel button:active { transform: scale(.98); }
+#accountStatus {
+    margin-bottom: 7px;
+    color: #9fdcff;
+    font-size: 11px;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+#accountError {
+    min-height: 14px;
+    margin-top: 4px;
+    color: #ff9d9d;
+    font-size: 10px;
+    text-align: center;
+}
+#rankingPanel {
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 1100;
+    width: min(620px, calc(100vw - 20px));
+    max-height: min(620px, calc(100vh - 30px));
+    overflow: auto;
+    padding: 14px;
+    border: 1px solid #46515f;
+    border-radius: 14px;
+    background: #111720;
+    box-shadow: 0 18px 60px rgba(0,0,0,.55);
+    pointer-events: auto;
+    touch-action: manipulation;
+}
+#rankingPanel[hidden], #accountPanel[hidden] { display:none; }
+#rankingPanel h2 {
+    margin: 0 0 10px;
+    font-size: 19px;
+    text-align: center;
+}
+#rankingTabs { display:flex; gap:6px; margin-bottom:10px; }
+#rankingTabs button {
+    flex:1; padding:8px; border:1px solid #46515f; border-radius:8px;
+    background:#1a222d; color:#fff; font-weight:700; touch-action:manipulation;
+}
+#rankingTabs button.active { background:#294b66; border-color:#63b8ff; }
+#rankingMeta { color:#9ba8b7; font-size:11px; text-align:center; margin-bottom:8px; }
+#rankingTable { width:100%; border-collapse:collapse; font-size:11px; }
+#rankingTable th, #rankingTable td { padding:6px 4px; border-bottom:1px solid #27303b; text-align:center; }
+#rankingTable th { color:#9ba8b7; font-weight:700; }
+#rankingTable tr.me { background:rgba(99,184,255,.12); }
+#rankingClose { width:100%; margin-top:10px; padding:8px; border:1px solid #46515f; border-radius:8px; background:#1b2330; color:#fff; font-weight:700; touch-action:manipulation; }
+#rankingOpen {
+    position: fixed; top: 8px; left: 8px; z-index: 1000;
+    padding:8px 10px; border:1px solid #46515f; border-radius:9px;
+    background:rgba(15,19,25,.96); color:#fff; font-weight:700; font-size:11px;
+    cursor:pointer; pointer-events:auto; touch-action:manipulation;
+}
+@media (max-width:820px) {
+    #accountPanel { top: 48px; right: 6px; width: min(280px, calc(100vw - 12px)); }
+    #rankingOpen { top: 6px; left: 6px; }
+}
+
 </style>
 </head>
 
 <body>
+<button id="rankingOpen" type="button">🏆 랭킹</button>
+
+<div id="accountPanel" hidden>
+    <div id="accountStatus">로그인하지 않음</div>
+    <div class="account-row"><input id="accountId" autocomplete="username" placeholder="아이디 (3~24자)"></div>
+    <div class="account-row"><input id="accountNickname" autocomplete="nickname" placeholder="닉네임 (회원가입 시)" hidden></div>
+    <div class="account-row"><input id="accountPassword" type="password" autocomplete="current-password" placeholder="비밀번호 (8자 이상)"></div>
+    <div class="account-row">
+        <button id="accountLogin" type="button">로그인</button>
+        <button id="accountRegister" type="button">회원가입</button>
+        <button id="accountLogout" type="button" hidden>로그아웃</button>
+    </div>
+    <div id="accountError"></div>
+</div>
+
+<div id="rankingPanel" hidden>
+    <h2>🏆 랭킹</h2>
+    <div id="rankingTabs">
+        <button id="dailyRankingTab" class="active" type="button">오늘</button>
+        <button id="weeklyRankingTab" type="button">이번 주</button>
+    </div>
+    <div id="rankingMeta">로그인 후 랭킹을 확인할 수 있습니다.</div>
+    <table id="rankingTable">
+        <thead><tr><th>순위</th><th>닉네임</th><th>점수</th><th>클리어</th><th>연속</th><th>넘기기</th><th>목숨 감소</th></tr></thead>
+        <tbody id="rankingBody"></tbody>
+    </table>
+    <button id="rankingClose" type="button">닫기</button>
+</div>
+
 
 <div id="gameWrapper">
 
@@ -1608,6 +1747,8 @@ let lives = MAX_LIVES;
 let clearCount = 0;
 let clearStreak = 0;
 let maxClearStreak = 0;
+let lifeLossCount = 0;
+let mapSkipCount = 0;
 let allTimeBestStreak = 0;
 
 let coins = 0;
@@ -4815,6 +4956,8 @@ function startNewGame() {
     clearStreak = 0;
 
     maxClearStreak = 0;
+    lifeLossCount = 0;
+    mapSkipCount = 0;
 
     mapSkips =
         MAX_MAP_SKIPS;
@@ -4922,6 +5065,7 @@ function skipMap() {
     );
 
     mapSkips--;
+    mapSkipCount++;
     onDailyQuestMapSkip();
 
     if (mapSkips === 0) {
@@ -5372,6 +5516,7 @@ function dieGame() {
     }
 
     lives--;
+    lifeLossCount++;
     onDailyQuestDeath();
 
     if (tryAutoFirstAid()) {
@@ -5475,6 +5620,7 @@ function timeoutGame() {
     remainingTime = 0;
 
     lives--;
+    lifeLossCount++;
 
     if (tryAutoFirstAid()) {
         gameState = "playing";
@@ -5560,6 +5706,239 @@ function timeoutGame() {
    게임 오버
 ========================================================= */
 
+/* =========================================================
+   V28 계정 / 랭킹
+========================================================= */
+
+let currentAccount = null;
+let rankingMode = "daily";
+
+const accountPanel = document.getElementById("accountPanel");
+const rankingPanel = document.getElementById("rankingPanel");
+const rankingBody = document.getElementById("rankingBody");
+const rankingMeta = document.getElementById("rankingMeta");
+const accountStatus = document.getElementById("accountStatus");
+const accountError = document.getElementById("accountError");
+const accountIdInput = document.getElementById("accountId");
+const accountNicknameInput = document.getElementById("accountNickname");
+const accountPasswordInput = document.getElementById("accountPassword");
+const accountLoginButton = document.getElementById("accountLogin");
+const accountRegisterButton = document.getElementById("accountRegister");
+const accountLogoutButton = document.getElementById("accountLogout");
+
+function setAccountError(message = "") {
+    accountError.textContent = message;
+}
+
+function updateAccountUI() {
+    if (currentAccount) {
+        accountStatus.textContent = `👤 ${currentAccount.nickname} (${currentAccount.id})`;
+        accountIdInput.hidden = true;
+        accountNicknameInput.hidden = true;
+        accountPasswordInput.hidden = true;
+        accountLoginButton.hidden = true;
+        accountRegisterButton.hidden = true;
+        accountLogoutButton.hidden = false;
+    } else {
+        accountStatus.textContent = "로그인하면 일일·주간 랭킹에 기록됩니다.";
+        accountIdInput.hidden = false;
+        accountNicknameInput.hidden = false;
+        accountPasswordInput.hidden = false;
+        accountLoginButton.hidden = false;
+        accountRegisterButton.hidden = false;
+        accountLogoutButton.hidden = true;
+    }
+}
+
+async function apiJSON(url, options = {}) {
+    const response = await fetch(url, {
+        credentials: "include",
+        ...options,
+        headers: {
+            "Content-Type": "application/json",
+            ...(options.headers || {})
+        }
+    });
+    let data = null;
+    try { data = await response.json(); } catch (error) {}
+    if (!response.ok) {
+        throw new Error(data && data.error ? data.error : "요청에 실패했습니다.");
+    }
+    return data;
+}
+
+async function loadCurrentAccount() {
+    try {
+        const data = await apiJSON("/api/me");
+        currentAccount = data;
+    } catch (error) {
+        currentAccount = null;
+    }
+    updateAccountUI();
+}
+
+async function loginAccount() {
+    setAccountError("");
+    try {
+        const data = await apiJSON("/api/login", {
+            method: "POST",
+            body: JSON.stringify({
+                id: accountIdInput.value.trim(),
+                password: accountPasswordInput.value
+            })
+        });
+        currentAccount = data.user;
+        accountPasswordInput.value = "";
+        updateAccountUI();
+        setAccountError("로그인 완료!");
+        if (!rankingPanel.hidden) loadRanking(rankingMode);
+    } catch (error) {
+        setAccountError(error.message);
+    }
+}
+
+async function registerAccount() {
+    setAccountError("");
+    try {
+        const data = await apiJSON("/api/register", {
+            method: "POST",
+            body: JSON.stringify({
+                id: accountIdInput.value.trim(),
+                nickname: accountNicknameInput.value.trim(),
+                password: accountPasswordInput.value
+            })
+        });
+        currentAccount = data.user;
+        accountPasswordInput.value = "";
+        updateAccountUI();
+        setAccountError("회원가입 및 로그인 완료!");
+    } catch (error) {
+        setAccountError(error.message);
+    }
+}
+
+async function logoutAccount() {
+    try { await apiJSON("/api/logout", { method: "POST", body: "{}" }); } catch (error) {}
+    currentAccount = null;
+    updateAccountUI();
+    setAccountError("로그아웃했습니다.");
+}
+
+function calculateV28Score() {
+    return Math.max(
+        0,
+        clearCount * 50 +
+        maxClearStreak * 100 -
+        mapSkipCount * 10 -
+        lifeLossCount * 10
+    );
+}
+
+async function submitV28Score() {
+    if (!currentAccount) return null;
+    try {
+        return await apiJSON("/api/ranking/score", {
+            method: "POST",
+            body: JSON.stringify({
+                clears: clearCount,
+                maxStreak: maxClearStreak,
+                skips: mapSkipCount,
+                lifeLosses: lifeLossCount
+            })
+        });
+    } catch (error) {
+        console.warn("V28 랭킹 기록 저장 실패:", error.message);
+        return null;
+    }
+}
+
+function renderRanking(rows, mine) {
+    rankingBody.innerHTML = "";
+    if (!rows.length) {
+        rankingBody.innerHTML = '<tr><td colspan="7">아직 기록이 없습니다.</td></tr>';
+        return;
+    }
+    rows.forEach(row => {
+        const tr = document.createElement("tr");
+        if (row.me) tr.className = "me";
+        tr.innerHTML = `
+            <td>${row.rank}</td>
+            <td>${escapeHTML(row.nickname)}</td>
+            <td>${row.score}</td>
+            <td>${row.clears}</td>
+            <td>${row.maxStreak}</td>
+            <td>${row.skips}</td>
+            <td>${row.lifeLosses}</td>
+        `;
+        rankingBody.appendChild(tr);
+    });
+    if (mine) {
+        rankingMeta.textContent = `내 순위 ${mine.rank}위 · ${mine.score}점`;
+    }
+}
+
+function escapeHTML(value) {
+    return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}
+
+async function loadRanking(mode = "daily") {
+    rankingMode = mode;
+    document.getElementById("dailyRankingTab").classList.toggle("active", mode === "daily");
+    document.getElementById("weeklyRankingTab").classList.toggle("active", mode === "weekly");
+
+    if (!currentAccount) {
+        rankingMeta.textContent = "로그인 후 랭킹을 확인할 수 있습니다.";
+        rankingBody.innerHTML = '<tr><td colspan="7">먼저 로그인해주세요.</td></tr>';
+        return;
+    }
+
+    rankingMeta.textContent = "랭킹 불러오는 중...";
+
+    try {
+        const endpoint = mode === "weekly" ? "/api/ranking/weekly" : "/api/ranking/today";
+        const data = await apiJSON(endpoint);
+        if (mode === "weekly") {
+            rankingMeta.textContent = `${data.week} 주간 랭킹 · ${data.weekEnds}까지`;
+        } else {
+            rankingMeta.textContent = `${data.date} 일일 랭킹`;
+        }
+        renderRanking(data.ranking || [], data.mine);
+        if (data.mine) {
+            rankingMeta.textContent += ` · 내 순위 ${data.mine.rank}위 / ${data.mine.score}점`;
+        }
+    } catch (error) {
+        rankingMeta.textContent = error.message;
+        rankingBody.innerHTML = '<tr><td colspan="7">랭킹을 불러오지 못했습니다.</td></tr>';
+    }
+}
+
+function openRanking() {
+    rankingPanel.hidden = false;
+    loadRanking(rankingMode);
+}
+
+function closeRanking() {
+    rankingPanel.hidden = true;
+}
+
+accountLoginButton.addEventListener("click", loginAccount);
+accountRegisterButton.addEventListener("click", registerAccount);
+accountLogoutButton.addEventListener("click", logoutAccount);
+document.getElementById("rankingOpen").addEventListener("click", openRanking);
+document.getElementById("rankingClose").addEventListener("click", closeRanking);
+document.getElementById("dailyRankingTab").addEventListener("click", () => loadRanking("daily"));
+document.getElementById("weeklyRankingTab").addEventListener("click", () => loadRanking("weekly"));
+
+/* 로그인 UI는 게임 화면을 가리지 않도록 기본적으로 접어둡니다. */
+accountPanel.hidden = false;
+updateAccountUI();
+loadCurrentAccount();
+
 function finishGameOver() {
 
     clearTimeout(
@@ -5595,6 +5974,7 @@ function finishGameOver() {
         0.28;
 
     saveRecentRecord();
+    submitV28Score();
 
     setMessage(
         `게임 오버 — ${clearCount}회 클리어 / ${maxClearStreak}회 연속 클리어`
