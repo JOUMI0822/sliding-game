@@ -287,6 +287,26 @@ canvas {
     box-shadow: 0 0 0 3px rgba(99,184,255,0.12);
 }
 
+
+.login-remember {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 24px;
+    color: #aeb8c5;
+    font-size: 13px;
+    cursor: pointer;
+    user-select: none;
+}
+.login-remember input {
+    width: 17px !important;
+    height: 17px !important;
+    margin: 0;
+    padding: 0 !important;
+    accent-color: #63b8ff;
+    cursor: pointer;
+}
+
 .entry-form button,
 .entry-card > button {
     width: 100%;
@@ -407,13 +427,13 @@ canvas {
 }
 
 #startRankingButton { top: 12px !important; left: 12px !important; right: auto !important; bottom: auto !important; }
-#startLogoutButton { right: 12px !important; bottom: 12px !important; top: auto !important; left: auto !important; }
+#startLogoutButton { top: auto !important; left: auto !important; right: 12px !important; bottom: 12px !important; }
 
 .start-menu-button:active {
     transform: scale(0.98);
 }
 
-/* hidden 상태의 랭킹창은 반드시 숨깁니다. */
+/* 랭킹창 hidden 상태가 display:flex에 덮이지 않도록 합니다. */
 .ranking-modal[hidden] { display: none !important; }
 
 .ranking-modal {
@@ -429,6 +449,7 @@ canvas {
 }
 
 .ranking-card {
+    position: relative; z-index: 1; pointer-events: auto;
     width: min(760px, 96vw);
     max-height: min(720px, 92vh);
     padding: 20px;
@@ -473,6 +494,7 @@ canvas {
 }
 
 .ranking-tab {
+    position: relative; z-index: 2; pointer-events: auto;
     flex: 1;
     height: 40px;
     border: 1px solid #46515f;
@@ -543,12 +565,7 @@ canvas {
         font-size: 10px;
     }
 
-    .start-menu-actions {
-        inset: 0;
-        width: 100%;
-        height: 100%;
-    }
-
+    .start-menu-actions { inset: 0; width: 100%; height: 100%; }
     #startRankingButton { top: 8px !important; left: 8px !important; }
     #startLogoutButton { right: 8px !important; bottom: 8px !important; }
 
@@ -572,6 +589,7 @@ canvas {
         <form id="loginForm" class="entry-form" autocomplete="on">
             <input id="loginId" name="username" type="text" maxlength="30" placeholder="아이디" autocomplete="username" required>
             <input id="loginPassword" name="password" type="password" maxlength="100" placeholder="비밀번호" autocomplete="current-password" required>
+            <label class="login-remember"><input id="rememberLogin" type="checkbox"> 로그인 정보 저장하기</label>
             <button id="loginButton" class="entry-primary" type="submit">로그인</button>
         </form>
 
@@ -840,6 +858,55 @@ async function apiJSON(path, options = {}) {
     return data;
 }
 
+const REMEMBER_LOGIN_KEY = "slidingMazeRememberLoginV29";
+
+function loadRememberedLogin() {
+    const checkbox = document.getElementById("rememberLogin");
+    const idInput = document.getElementById("loginId");
+    if (!checkbox || !idInput) return;
+    try {
+        const saved = JSON.parse(localStorage.getItem(REMEMBER_LOGIN_KEY) || "null");
+        if (saved && saved.id) {
+            idInput.value = String(saved.id);
+            checkbox.checked = true;
+        }
+    } catch (_) {}
+}
+
+function saveRememberPreference(id) {
+    const checkbox = document.getElementById("rememberLogin");
+    if (!checkbox) return;
+    try {
+        if (checkbox.checked) {
+            // 비밀번호는 저장하지 않습니다. 로그인 상태는 HttpOnly 세션 쿠키가 유지합니다.
+            localStorage.setItem(REMEMBER_LOGIN_KEY, JSON.stringify({ id: String(id) }));
+        } else {
+            localStorage.removeItem(REMEMBER_LOGIN_KEY);
+        }
+    } catch (_) {}
+}
+
+function clearRememberedLogin() {
+    try { localStorage.removeItem(REMEMBER_LOGIN_KEY); } catch (_) {}
+    const checkbox = document.getElementById("rememberLogin");
+    if (checkbox) checkbox.checked = false;
+}
+
+async function restoreRememberedSession() {
+    let shouldRestore = false;
+    try { shouldRestore = !!localStorage.getItem(REMEMBER_LOGIN_KEY); } catch (_) {}
+    if (!shouldRestore) return false;
+    try {
+        const data = await apiJSON("/api/me");
+        const account = data?.account || data?.user || data;
+        if (account && (account.id || account.nickname)) {
+            enterGameAsAccount(account);
+            return true;
+        }
+    } catch (_) {}
+    return false;
+}
+
 async function loginAccount() {
     const id = document.getElementById("loginId").value.trim();
     const password = document.getElementById("loginPassword").value;
@@ -859,6 +926,7 @@ async function loginAccount() {
             body: JSON.stringify({ id, password })
         });
         const account = data?.account || data?.user || data;
+        saveRememberPreference(id);
         document.getElementById("loginPassword").value = "";
         enterGameAsAccount(account);
     } catch (error) {
@@ -919,6 +987,7 @@ async function logoutToEntry() {
     currentAccount = null;
     guestMode = false;
     gameAccessGranted = false;
+    clearRememberedLogin();
     document.getElementById("loginId").value = "";
     document.getElementById("loginPassword").value = "";
     document.getElementById("registerForm").reset();
@@ -1101,6 +1170,8 @@ function bindEntryAndRankingUI() {
 
 bindEntryAndRankingUI();
 showEntryGate();
+loadRememberedLogin();
+restoreRememberedSession();
 
 /* =========================================================
    2인용 경쟁 모드 준비 상태
