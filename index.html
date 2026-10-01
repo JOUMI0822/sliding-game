@@ -4042,8 +4042,6 @@ const DAILY_QUEST_POOL = [
     { id:26, name:"역전극", description:"목숨 1개 상태에서 라운드 승리", reward:8 },
     { id:27, name:"무너지지 않는 자", description:"한 번도 탈락하지 않고 경기 승리", reward:7 },
     { id:28, name:"라운드 정복자", description:"2인 경쟁에서 5라운드 승리", reward:10 },
-    { id:29, name:"빠른 대전", description:"빠른 대전 경기 1회 완료", reward:4 },
-    { id:30, name:"라이벌과의 결투", description:"방 코드로 친구와 경기 1회 완료", reward:4 },
     { id:31, name:"끈기의 달인", description:"맵 넘기기를 사용하지 않고 10맵 클리어", reward:7 },
     { id:32, name:"다시 일어나기", description:"맵 넘기기를 3회 이상 사용한 뒤 3맵 연속 클리어", reward:6 },
     { id:33, name:"불굴의 의지", description:"목숨을 1개 잃은 맵을 클리어하고 이후 2맵 추가 클리어", reward:6 },
@@ -4150,7 +4148,25 @@ function loadDailyQuestState() {
     dailyQuestState = saved;
     if (!Array.isArray(dailyQuestState.completed)) dailyQuestState.completed = [];
     if (!Array.isArray(dailyQuestState.rewardClaimed)) dailyQuestState.rewardClaimed = [];
+
+    // 삭제된 멀티플레이 퀘스트 29, 30은 기존 저장 데이터에서도 제거합니다.
+    dailyQuestState.quests = Array.isArray(dailyQuestState.quests)
+        ? dailyQuestState.quests.filter(id => id !== 29 && id !== 30)
+        : [];
+    dailyQuestState.completed = dailyQuestState.completed.filter(id => id !== 29 && id !== 30);
+    dailyQuestState.rewardClaimed = dailyQuestState.rewardClaimed.filter(id => id !== 29 && id !== 30);
+
     dailyQuestState.progress = mergeQuestProgressDefaults(dailyQuestState.progress);
+
+    // 기존 목록에서 삭제된 퀘스트 때문에 슬롯이 부족하면 현재 퀘스트 풀에서 보충합니다.
+    if (dailyQuestState.quests.length < DAILY_QUEST_COUNT) {
+        const existing = new Set(dailyQuestState.quests);
+        const candidates = shuffleArray(DAILY_QUEST_POOL.map(q => q.id))
+            .filter(id => !existing.has(id));
+        while (dailyQuestState.quests.length < DAILY_QUEST_COUNT && candidates.length) {
+            dailyQuestState.quests.push(candidates.shift());
+        }
+    }
     // 새 「마지막 순간」 규칙은 별도 카운터를 사용하므로 기존 3초 규칙의
     // lastMomentClears 기록이 새 퀘스트 진행도에 섞이지 않습니다.
     if (typeof dailyQuestState.progress.quickMapClears !== "number") {
@@ -4392,8 +4408,6 @@ function onDailyQuestMultiplayerMatchEnd(result) {
     }
 
     if (p.multiplayerMatchesCompleted >= 1) completeDailyQuest(21);
-    if (p.multiplayerMatchType === "quick" && p.multiplayerMatchesCompleted > 0) completeDailyQuest(29);
-    if (p.multiplayerMatchType === "friend" && p.multiplayerMatchesCompleted > 0) completeDailyQuest(30);
 
     p.multiplayerMatchActive = false;
     p.multiplayerMatchType = null;
@@ -4485,8 +4499,6 @@ function getDailyQuestProgressInfo(quest) {
         case 26: current = isDailyQuestCompleted(26) ? 1 : 0; target = 1; break;
         case 27: current = isDailyQuestCompleted(27) ? 1 : 0; target = 1; break;
         case 28: current = p.multiplayerRoundsWon; target = 5; break;
-        case 29: current = isDailyQuestCompleted(29) ? 1 : 0; target = 1; break;
-        case 30: current = isDailyQuestCompleted(30) ? 1 : 0; target = 1; break;
         case 31: current = p.noSkipStreak; target = 10; break;
         case 32: current = p.postSkipStreak; target = 3; break;
         case 33: current = p.lostLifeMapCleared ? 1 + p.postLostLifeClears : 0; target = 3; break;
