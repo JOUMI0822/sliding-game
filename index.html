@@ -150,7 +150,7 @@ canvas {
     width: 100%;
     height: 100%;
     pointer-events: none;
-    z-index: 20;
+    z-index: 100;
     touch-action: none;
 }
 
@@ -4418,7 +4418,7 @@ function getDailyQuestProgressInfo(quest) {
 let questRewardOverlaySignature = "";
 
 function claimQuestRewardFromOverlay(id, button) {
-    if (!questOpen || !dailyQuestState) return;
+    if (!questOpen || !dailyQuestState || !button || button.disabled) return;
 
     refreshDailyQuestIfNeeded();
 
@@ -4431,6 +4431,7 @@ function claimQuestRewardFromOverlay(id, button) {
     playUIClickSound();
     button.disabled = true;
     button.textContent = "수령 완료 ✓";
+    updateUI();
     syncQuestRewardOverlay(true);
 }
 
@@ -4443,80 +4444,92 @@ function syncQuestRewardOverlay(force = false) {
         !!dailyQuestState
     );
 
+    // 매번 기존 버튼을 완전히 제거합니다.
+    // iPad Safari에서 이전 DOM 버튼이 남아 겹치는 문제를 방지합니다.
+    questRewardOverlay.innerHTML = "";
+    questRewardOverlaySignature = "";
+
     if (!shouldShow) {
-        if (questRewardOverlay.style.display !== "none" || force) {
-            questRewardOverlay.innerHTML = "";
-            questRewardOverlay.style.display = "none";
-            questRewardOverlay.setAttribute("aria-hidden", "true");
-            questRewardOverlaySignature = "";
-        }
+        questRewardOverlay.style.display = "none";
+        questRewardOverlay.setAttribute("aria-hidden", "true");
         return;
     }
 
     refreshDailyQuestIfNeeded();
 
-    const rows = [];
+    let buttonCount = 0;
+
     for (let i = 0; i < DAILY_QUEST_COUNT; i++) {
         const id = dailyQuestState.quests[i];
         const q = getQuestById(id);
         if (!q) continue;
 
-        if (
-            isDailyQuestCompleted(id) &&
-            !isDailyQuestRewardClaimed(id)
-        ) {
-            rows.push({ i, id, name: q.name, reward: q.reward });
+        if (!isDailyQuestCompleted(id) || isDailyQuestRewardClaimed(id)) {
+            continue;
         }
-    }
 
-    const signature = JSON.stringify(rows);
-    if (!force && signature === questRewardOverlaySignature) {
-        questRewardOverlay.style.display = rows.length ? "block" : "none";
-        questRewardOverlay.setAttribute("aria-hidden", rows.length ? "false" : "true");
-        return;
-    }
-
-    questRewardOverlaySignature = signature;
-    questRewardOverlay.innerHTML = "";
-
-    for (const row of rows) {
+        const rowY = 122 + i * 77;
         const button = document.createElement("button");
+
         button.type = "button";
         button.className = "quest-reward-button";
-        button.dataset.questId = String(row.id);
+        button.dataset.questId = String(id);
+        button.id = `quest-reward-button-${id}`;
         button.setAttribute(
             "aria-label",
-            `${row.name} 보상 받기 · ${row.reward}코인`
+            `${q.name} 보상 받기 · ${q.reward}코인`
         );
 
-        const rowY = 122 + row.i * 77;
-        button.style.left = `${(555 / 800) * 100}%`;
-        button.style.top = `${((rowY + 18) / 600) * 100}%`;
-        button.style.width = `${(163 / 800) * 100}%`;
-        button.style.height = `${(34 / 600) * 100}%`;
+        // Canvas와 동일한 위치에 딱 하나만 올립니다.
+        button.style.left = `${(555 / WIDTH) * 100}%`;
+        button.style.top = `${((rowY + 18) / HEIGHT) * 100}%`;
+        button.style.width = `${(163 / WIDTH) * 100}%`;
+        button.style.height = `${(34 / HEIGHT) * 100}%`;
         button.textContent = "보상 받기  ›";
 
-        // gameWrapper의 iPad touch 처리보다 버튼이 먼저 이벤트를 처리하도록 합니다.
-        ["touchstart", "touchmove", "touchend", "touchcancel",
-         "pointerdown", "pointermove", "pointerup", "pointercancel"].forEach(type => {
-            button.addEventListener(type, event => {
-                event.stopPropagation();
-            }, { passive: true });
-        });
+        // iPad Safari의 touch/pointer 이벤트가 Canvas로 내려가지 않도록
+        // 버튼에서만 이벤트를 소비합니다.
+        const stopEvent = event => {
+            event.stopPropagation();
+        };
+
+        button.addEventListener("pointerdown", stopEvent, { passive: true });
+        button.addEventListener("pointerup", stopEvent, { passive: true });
+        button.addEventListener("touchstart", stopEvent, { passive: true });
+        button.addEventListener("touchend", stopEvent, { passive: true });
 
         button.addEventListener("click", event => {
             event.preventDefault();
             event.stopPropagation();
-            claimQuestRewardFromOverlay(row.id, button);
+
+            // 이미 다른 이벤트에서 수령된 경우 중복 지급을 막습니다.
+            if (button.disabled) return;
+
+            const claimedNow = claimDailyQuestReward(id);
+            if (!claimedNow) {
+                syncQuestRewardOverlay(true);
+                return;
+            }
+
+            playUIClickSound();
+            button.disabled = true;
+            button.textContent = "수령 완료 ✓";
+
+            // 상태 저장/Canvas 갱신 후 HTML 버튼도 즉시 제거합니다.
+            updateUI();
+            syncQuestRewardOverlay(true);
         });
 
         questRewardOverlay.appendChild(button);
+        buttonCount++;
     }
 
-    questRewardOverlay.style.display = rows.length ? "block" : "none";
-    questRewardOverlay.setAttribute("aria-hidden", rows.length ? "false" : "true");
+    questRewardOverlay.style.display = buttonCount > 0 ? "block" : "none";
+    questRewardOverlay.setAttribute(
+        "aria-hidden",
+        buttonCount > 0 ? "false" : "true"
+    );
 }
-
 function drawQuestPanel() {
     refreshDailyQuestIfNeeded();
     syncQuestRewardOverlay();
@@ -4611,12 +4624,13 @@ function drawQuestPanel() {
         ctx.fill();
 
         if (claimed) {
-            // 보상을 수령한 뒤에는 Canvas에도 수령 완료 상태를 명확하게 표시합니다.
             ctx.textAlign = "left";
             ctx.fillStyle = "rgba(125,255,157,0.42)";
             ctx.font = "600 11px Pretendard, Noto Sans KR, sans-serif";
             ctx.fillText(`🪙 +${q.reward}코인`, 585, y + 14);
 
+            // 수령 완료 상태는 Canvas가 표시합니다.
+            // 실제 미수령 보상 버튼은 HTML <button> 하나만 표시합니다.
             ctx.fillStyle = "rgba(110,232,139,0.10)";
             ctx.strokeStyle = "rgba(110,232,139,0.34)";
             ctx.lineWidth = 1.5;
@@ -4630,38 +4644,28 @@ function drawQuestPanel() {
             ctx.font = "bold 12px Pretendard, Noto Sans KR, sans-serif";
             ctx.fillText("보상 수령 완료 ✓", 636.5, y + 39);
         } else {
-            // 미완료 퀘스트도 보상 받기 버튼을 항상 표시하되,
-            // 완료 전에는 가방의 미보유 아이템처럼 어둡고 희미하게 표시합니다.
             ctx.textAlign = "left";
             ctx.fillStyle = completed ? "#ffd76a" : "rgba(255,215,106,0.38)";
             ctx.font = "600 11px Pretendard, Noto Sans KR, sans-serif";
             ctx.fillText(`🪙 +${q.reward}코인`, 585, y + 14);
 
-            // 달성한 퀘스트는 실제로 누를 수 있는 버튼처럼 명확하게 표시합니다.
-            if (completed) {
-                ctx.fillStyle = "rgba(99,184,255,0.18)";
-                ctx.strokeStyle = "rgba(99,184,255,0.95)";
-                ctx.lineWidth = 2;
-                ctx.shadowColor = "rgba(99,184,255,0.45)";
-                ctx.shadowBlur = 8;
-            } else {
+            if (!completed) {
+                // 미달성 상태만 Canvas에 비활성 보상 표시.
                 ctx.fillStyle = "rgba(99,184,255,0.08)";
                 ctx.strokeStyle = "rgba(99,184,255,0.18)";
                 ctx.lineWidth = 1;
-                ctx.shadowColor = "transparent";
-                ctx.shadowBlur = 0;
-            }
-            ctx.beginPath();
-            ctx.roundRect(555, y + 18, 163, 34, 7);
-            ctx.fill();
-            ctx.stroke();
-            ctx.shadowColor = "transparent";
-            ctx.shadowBlur = 0;
+                ctx.beginPath();
+                ctx.roundRect(555, y + 18, 163, 34, 7);
+                ctx.fill();
+                ctx.stroke();
 
-            ctx.textAlign = "center";
-            ctx.fillStyle = completed ? "#ffffff" : "rgba(255,255,255,0.28)";
-            ctx.font = "bold 12px Pretendard, Noto Sans KR, sans-serif";
-            ctx.fillText(completed ? "보상 받기  ›" : "보상 받기", 636.5, y + 35);
+                ctx.textAlign = "center";
+                ctx.fillStyle = "rgba(255,255,255,0.28)";
+                ctx.font = "bold 12px Pretendard, Noto Sans KR, sans-serif";
+                ctx.fillText("보상 받기", 636.5, y + 35);
+            }
+            // completed + unclaimed 상태의 "보상 받기"는
+            // 아래 syncQuestRewardOverlay()가 만드는 실제 HTML 버튼만 담당합니다.
         }
     }
 
@@ -9969,23 +9973,8 @@ function drawEffectPreviewInBox(
 
 
 function handleQuestRewardTap(x, y) {
-    if (!questOpen || !dailyQuestState) return false;
-
-    refreshDailyQuestIfNeeded();
-
-    for (let i = 0; i < DAILY_QUEST_COUNT; i++) {
-        const id = dailyQuestState.quests[i];
-        if (!id || !isDailyQuestCompleted(id) || isDailyQuestRewardClaimed(id)) continue;
-
-        const rowY = 122 + i * 77;
-        const rewardHitArea = { x: 550, y: rowY + 4, w: 185, h: 58 };
-
-        if (isInsideRect(x, y, rewardHitArea)) {
-            const claimedNow = claimDailyQuestReward(id);
-            if (claimedNow) playUIClickSound();
-            return true;
-        }
-    }
+    // 완료된 퀘스트의 보상은 실제 HTML <button>만 처리합니다.
+    // Canvas 좌표 판정은 제거하여 iPad 터치와 중복 실행을 방지합니다.
     return false;
 }
 
