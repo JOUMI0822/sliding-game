@@ -760,6 +760,7 @@ let guestMode = false;
 let gameAccessGranted = false;
 let rankingMode = "today";
 let rankingLoading = false;
+let scoreSavePromise = null;
 
 let lifeLossCount = 0;
 let mapSkipCount = 0;
@@ -997,27 +998,42 @@ function calculateV28Score() {
 }
 
 async function submitV28Score() {
-    if (!currentAccount || guestMode || !gameAccessGranted) return;
+    if (!currentAccount || guestMode || !gameAccessGranted) return false;
 
     const score = calculateV28Score();
 
-    try {
-        await apiJSON("/api/ranking/score", {
-            method: "POST",
-            body: JSON.stringify({
-                clears: clearCount,
-                maxStreak: maxClearStreak,
-                skips: mapSkipCount,
-                lifeLosses: lifeLossCount,
-                score
-            })
-        });
-    } catch (error) {
-        console.warn("랭킹 점수 저장 실패:", error);
-    }
+    scoreSavePromise = (async () => {
+        try {
+            const data = await apiJSON("/api/ranking/score", {
+                method: "POST",
+                body: JSON.stringify({
+                    clears: clearCount,
+                    maxStreak: maxClearStreak,
+                    skips: mapSkipCount,
+                    lifeLosses: lifeLossCount,
+                    score
+                })
+            });
+
+            console.log("[RANKING] score saved", data?.score ?? score);
+            return true;
+        } catch (error) {
+            console.warn("[RANKING] score save failed:", error);
+            return false;
+        } finally {
+            // Keep the promise available until the ranking panel has had a chance
+            // to await it; clear it on the next tick.
+            const finishedPromise = scoreSavePromise;
+            setTimeout(() => {
+                if (scoreSavePromise === finishedPromise) scoreSavePromise = null;
+            }, 0);
+        }
+    })();
+
+    return scoreSavePromise;
 }
 
-function openRankingPanel(mode = "today") {
+async function openRankingPanel(mode = "today") {
     if (!currentAccount) {
         window.alert("게스트 모드에서는 랭킹을 볼 수 없습니다. 회원으로 로그인해 주세요.");
         return;
@@ -1029,7 +1045,14 @@ function openRankingPanel(mode = "today") {
     panel.classList.add("ranking-open");
     panel.setAttribute("aria-hidden", "false");
     updateRankingTabs();
-    loadRanking(rankingMode);
+
+    // 게임 오버 직후 랭킹 버튼을 눌러도 점수 저장 요청이 끝난 뒤
+    // 최신 랭킹을 읽도록 기다립니다. 이 부분이 기존 갱신 지연의 핵심 수정입니다.
+    if (scoreSavePromise) {
+        await scoreSavePromise;
+    }
+
+    await loadRanking(rankingMode);
 }
 
 function closeRankingPanel() {
@@ -1907,7 +1930,6 @@ const AUDIO_FILES = {
     damage: "damage.m4a",
     itemUse: "item_use.m4a",
     gameOver: "gameover.m4a",
-    timeout: "timeout.m4a",
     uiInvalid: "ui_invalid.m4a",
     uiClick: "ui_click.m4a",
     gameStart: "game_start.m4a"
@@ -6351,8 +6373,6 @@ function timeoutGame() {
 
     lives--;
     lifeLossCount++;
-
-    playEffectSound("timeout");
 
     if (tryAutoFirstAid()) {
         gameState = "playing";
@@ -11824,7 +11844,7 @@ openRankingPanel = function(mode = "today") {
         return;
     }
     refreshRankingAccountLabel();
-    originalOpenRankingPanel(mode);
+    return originalOpenRankingPanel(mode);
 };
 
 /* =========================================================
