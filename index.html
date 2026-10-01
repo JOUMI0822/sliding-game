@@ -15,7 +15,6 @@ body {
     margin: 0;
     padding: 0;
     width: 100%;
-    height: 100%;
     min-height: 100%;
     background: #0b0e13;
     color: #f2f5f7;
@@ -37,11 +36,9 @@ body {
 #gameWrapper {
     width: 800px;
     max-width: 100vw;
-    height: 100vh;
-    height: 100dvh;
-    min-height: 0;
-    padding-bottom: 0;
-    overflow: hidden;
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding-bottom: 15px;
     touch-action: none;
     overscroll-behavior: none;
 }
@@ -240,15 +237,12 @@ canvas {
     background:
         radial-gradient(circle at 50% 20%, rgba(75,163,255,0.12), transparent 35%),
         #0b0e13;
-    overflow: hidden;
-    touch-action: none;
+    overflow: auto;
+    touch-action: auto;
 }
 
 .entry-card {
     width: min(420px, 92vw);
-    max-height: calc(100dvh - 48px);
-    overflow-y: auto;
-    overscroll-behavior: contain;
     padding: 30px 28px 26px;
     border: 1px solid #394352;
     border-radius: 20px;
@@ -393,8 +387,8 @@ canvas {
 
 .start-menu-account {
     position: absolute;
-    top: 12px;
-    right: 12px;
+    top: 54px;
+    left: 12px;
     max-width: 240px;
     padding: 7px 10px;
     border: 1px solid rgba(255,255,255,0.14);
@@ -565,9 +559,10 @@ canvas {
         padding: 24px 20px 22px;
     }
 
-   .start-menu-account {
+  .start-menu-account {
         top: 48px;
-        right: 8px;
+        left: 8px;
+        right: auto;
         max-width: 150px;
         font-size: 10px;
     }
