@@ -407,6 +407,10 @@ canvas {
     transform: scale(0.98);
 }
 
+.ranking-modal[hidden] {
+    display: none !important;
+}
+
 .ranking-modal {
     position: fixed;
     inset: 0;
@@ -420,17 +424,18 @@ canvas {
 }
 
 .ranking-card {
-    width: min(760px, 92vw);
-    height: min(620px, 82vh);
+    width: min(760px, 94vw);
+    height: min(760px, 88vh);
+    min-height: 560px;
     padding: 20px;
     box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
     border: 1px solid #3c4858;
     border-radius: 18px;
     background: #151b24;
     box-shadow: 0 24px 80px rgba(0,0,0,0.55);
-    overflow: auto;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
 }
 
 .ranking-header {
@@ -498,7 +503,7 @@ canvas {
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
-    scrollbar-width: auto;
+    touch-action: pan-x pan-y;
 }
 
 .ranking-table {
@@ -538,7 +543,8 @@ canvas {
 @media (max-width: 520px) {
     .ranking-card {
         width: 94vw;
-        height: 78vh;
+        height: 84vh;
+        min-height: 500px;
         padding: 16px;
     }
 
@@ -1097,7 +1103,25 @@ function bindEntryAndRankingUI() {
 
     const rankingPanel = document.getElementById("rankingPanel");
     rankingPanel?.addEventListener("pointerdown", event => event.stopPropagation());
+    rankingPanel?.addEventListener("pointerup", event => event.stopPropagation());
     rankingPanel?.addEventListener("touchstart", event => event.stopPropagation(), { passive: true });
+    rankingPanel?.addEventListener("touchend", event => event.stopPropagation(), { passive: true });
+
+    // 랭킹 패널 내부의 버튼은 gameWrapper의 터치 처리와 완전히 분리합니다.
+    document.querySelectorAll("#rankingPanel button").forEach(button => {
+        button.addEventListener("pointerdown", event => event.stopPropagation());
+        button.addEventListener("pointerup", event => event.stopPropagation());
+        button.addEventListener("touchstart", event => event.stopPropagation(), { passive: true });
+        button.addEventListener("touchend", event => event.stopPropagation(), { passive: true });
+        button.addEventListener("click", event => event.stopPropagation());
+    });
+
+    rankingPanel?.addEventListener("click", event => {
+        if (event.target === rankingPanel) {
+            playUIClickSound();
+            closeRankingPanel();
+        }
+    });
 
     document.querySelectorAll("#startMenuOverlay button").forEach(button => {
         button.addEventListener("pointerdown", event => event.stopPropagation());
@@ -6747,6 +6771,7 @@ gameWrapper.addEventListener(
     "touchstart",
     event => {
 
+        if (document.getElementById("rankingPanel")?.hidden === false) return;
         event.preventDefault();
 
         if (
@@ -6778,7 +6803,7 @@ gameWrapper.addEventListener(
     "touchmove",
     event => {
 
-
+        if (document.getElementById("rankingPanel")?.hidden === false) return;
         event.preventDefault();
 
     },
