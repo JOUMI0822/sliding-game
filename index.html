@@ -407,11 +407,8 @@ canvas {
     transform: scale(0.98);
 }
 
-.ranking-modal[hidden] {
-    display: none !important;
-}
-
 .ranking-modal {
+    display: none !important;
     position: fixed;
     inset: 0;
     z-index: 11000;
@@ -421,7 +418,10 @@ canvas {
     padding: 20px;
     background: rgba(0,0,0,0.72);
     touch-action: auto;
-    pointer-events: auto;
+}
+
+.ranking-modal.ranking-open {
+    display: flex !important;
 }
 
 .ranking-card {
@@ -966,6 +966,7 @@ function openRankingPanel(mode = "today") {
     rankingMode = mode === "weekly" ? "weekly" : "today";
     const panel = document.getElementById("rankingPanel");
     panel.hidden = false;
+    panel.classList.add("ranking-open");
     panel.setAttribute("aria-hidden", "false");
     updateRankingTabs();
     loadRanking(rankingMode);
@@ -975,6 +976,7 @@ function closeRankingPanel() {
     const panel = document.getElementById("rankingPanel");
     if (!panel) return;
     panel.hidden = true;
+    panel.classList.remove("ranking-open");
     panel.setAttribute("aria-hidden", "true");
 }
 
@@ -1028,6 +1030,13 @@ async function loadRanking(mode = rankingMode) {
 }
 
 function bindEntryAndRankingUI() {
+    // 랭킹창은 페이지 로드/로그인/새로고침 시 절대로 자동으로 열리지 않습니다.
+    const initialRankingPanel = document.getElementById("rankingPanel");
+    if (initialRankingPanel) {
+        initialRankingPanel.hidden = true;
+        initialRankingPanel.classList.remove("ranking-open");
+        initialRankingPanel.setAttribute("aria-hidden", "true");
+    }
     document.getElementById("loginForm")?.addEventListener("submit", event => {
         event.preventDefault();
         loginAccount();
