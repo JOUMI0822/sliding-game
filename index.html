@@ -338,23 +338,6 @@ canvas {
     flex: none;
 }
 
-.login-remember {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    margin-top: 2px;
-    color: #aeb8c5;
-    font-size: 13px;
-    cursor: pointer;
-    user-select: none;
-}
-.login-remember input {
-    width: 17px !important;
-    height: 17px !important;
-    margin: 0;
-    accent-color: #63b8ff;
-}
 .entry-status {
     min-height: 20px;
     margin-top: 10px;
@@ -400,11 +383,35 @@ canvas {
 
 .start-menu-actions {
     position: absolute;
-    top: 52px;
-    right: 12px;
-    display: flex;
-    gap: 7px;
+    inset: 0;
+    pointer-events: none;
+}
+
+#startRankingButton,
+#startLogoutButton {
+    position: absolute;
+    min-width: 92px;
+    height: 34px;
+    padding: 0 10px;
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 8px;
+    background: rgba(15,19,25,0.82);
+    color: #f2f5f7;
+    font: 700 12px Pretendard, "Noto Sans KR", Arial, sans-serif;
+    cursor: pointer;
     pointer-events: auto;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+}
+
+#startRankingButton {
+    top: 12px;
+    left: 12px;
+}
+
+#startLogoutButton {
+    right: 12px;
+    bottom: 12px;
 }
 
 .start-menu-button {
@@ -423,8 +430,6 @@ canvas {
 .start-menu-button:active {
     transform: scale(0.98);
 }
-
-.ranking-modal[hidden] { display: none !important; }
 
 .ranking-modal {
     position: fixed;
@@ -579,10 +584,6 @@ canvas {
             <input id="loginId" name="username" type="text" maxlength="30" placeholder="아이디" autocomplete="username" required>
             <input id="loginPassword" name="password" type="password" maxlength="100" placeholder="비밀번호" autocomplete="current-password" required>
             <button id="loginButton" class="entry-primary" type="submit">로그인</button>
-            <label class="login-remember">
-                <input id="loginRemember" type="checkbox">
-                <span>로그인 정보 저장하기</span>
-            </label>
         </form>
 
         <div id="loginStatus" class="entry-status" aria-live="polite"></div>
@@ -740,52 +741,7 @@ let rankingLoading = false;
 let lifeLossCount = 0;
 let mapSkipCount = 0;
 
-const RANKING_API_BASE = "https://sliding-multiplayer-server-1.onrender.com";
-
-const REMEMBER_LOGIN_KEY = "slidingMazeRememberLogin_v1";
-const SAVED_LOGIN_ID_KEY = "slidingMazeSavedLoginId_v1";
-
-function loadRememberedLoginPreference() {
-    try {
-        const remember = localStorage.getItem(REMEMBER_LOGIN_KEY) === "true";
-        const savedId = localStorage.getItem(SAVED_LOGIN_ID_KEY) || "";
-        const checkbox = document.getElementById("loginRemember");
-        const idInput = document.getElementById("loginId");
-        if (checkbox) checkbox.checked = remember;
-        if (idInput && savedId) idInput.value = savedId;
-        return { remember, savedId };
-    } catch (error) {
-        return { remember: false, savedId: "" };
-    }
-}
-
-function saveLoginPreference(id, remember) {
-    try {
-        if (remember) {
-            localStorage.setItem(REMEMBER_LOGIN_KEY, "true");
-            localStorage.setItem(SAVED_LOGIN_ID_KEY, id);
-        } else {
-            localStorage.removeItem(REMEMBER_LOGIN_KEY);
-            localStorage.removeItem(SAVED_LOGIN_ID_KEY);
-        }
-    } catch (error) {}
-}
-
-async function restoreSavedLogin() {
-    const pref = loadRememberedLoginPreference();
-    if (!pref.remember) return false;
-
-    try {
-        const data = await apiJSON("/api/me");
-        const account = data?.account || data?.user || data;
-        if (!account?.id) return false;
-        enterGameAsAccount(account);
-        return true;
-    } catch (error) {
-        // 서버 세션이 만료되었으면 저장된 아이디만 유지하고 로그인 화면을 보여줍니다.
-        return false;
-    }
-}
+const RANKING_API_BASE = "";
 
 function setEntryStatus(elementId, message, type = "") {
     const element = document.getElementById(elementId);
@@ -808,19 +764,6 @@ function showRegisterView() {
     if (input) setTimeout(() => input.focus(), 0);
 }
 
-function resetPageViewport() {
-    const reset = () => {
-        try { window.scrollTo(0, 0); } catch (error) {}
-        try {
-            document.documentElement.scrollTop = 0;
-            document.body.scrollTop = 0;
-        } catch (error) {}
-    };
-    reset();
-    requestAnimationFrame(reset);
-    setTimeout(reset, 60);
-}
-
 function showEntryGate() {
     gameAccessGranted = false;
     const gate = document.getElementById("entryGate");
@@ -831,7 +774,6 @@ function showEntryGate() {
 }
 
 function enterGameAsAccount(account) {
-    try { if (document.activeElement?.blur) document.activeElement.blur(); } catch (error) {}
     currentAccount = account && typeof account === "object" ? account : null;
     guestMode = false;
     gameAccessGranted = true;
@@ -845,7 +787,6 @@ function enterGameAsAccount(account) {
     multiplayerOpen = false;
     updateStartMenuOverlay();
     updateUI();
-    resetPageViewport();
 }
 
 function enterGameAsGuest() {
@@ -913,7 +854,6 @@ async function apiJSON(path, options = {}) {
 async function loginAccount() {
     const id = document.getElementById("loginId").value.trim();
     const password = document.getElementById("loginPassword").value;
-    const remember = document.getElementById("loginRemember")?.checked === true;
 
     if (!id || !password) {
         setEntryStatus("loginStatus", "아이디와 비밀번호를 입력하세요.", "error");
@@ -927,12 +867,9 @@ async function loginAccount() {
     try {
         const data = await apiJSON("/api/login", {
             method: "POST",
-            body: JSON.stringify({ id, password, remember })
+            body: JSON.stringify({ id, password })
         });
         const account = data?.account || data?.user || data;
-
-        saveLoginPreference(id, remember);
-
         document.getElementById("loginPassword").value = "";
         enterGameAsAccount(account);
     } catch (error) {
@@ -974,8 +911,6 @@ async function registerAccount() {
 
         document.getElementById("loginId").value = id;
         document.getElementById("loginPassword").value = "";
-        const rememberCheckbox = document.getElementById("loginRemember");
-        if (rememberCheckbox) rememberCheckbox.checked = false;
         document.getElementById("registerForm").reset();
         showLoginView("회원가입이 완료되었습니다. 로그인해 주세요.", "success");
     } catch (error) {
@@ -995,9 +930,6 @@ async function logoutToEntry() {
     currentAccount = null;
     guestMode = false;
     gameAccessGranted = false;
-    saveLoginPreference("", false);
-    const rememberCheckbox = document.getElementById("loginRemember");
-    if (rememberCheckbox) rememberCheckbox.checked = false;
     document.getElementById("loginId").value = "";
     document.getElementById("loginPassword").value = "";
     document.getElementById("registerForm").reset();
@@ -11816,18 +11748,11 @@ openRankingPanel = function(mode = "today") {
 ========================================================= */
 
 showEntryGate();
-loadRememberedLoginPreference();
 updateUI();
 
 requestAnimationFrame(
     gameLoop
 );
-
-// "로그인 정보 저장하기"가 켜져 있고 서버 세션이 살아 있으면
-// 새로고침 직후 로그인 화면을 거치지 않고 게임으로 복구합니다.
-restoreSavedLogin().catch(() => {});
-
-
 
 </script>
 
