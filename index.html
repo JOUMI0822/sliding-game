@@ -114,6 +114,11 @@ body {
     color: #7ddcff;
 }
 
+#score {
+    color: #ffd76a;
+    font-weight: 800;
+}
+
 #mapSkips {
     color: #d9c7ff;
     letter-spacing: 1px;
@@ -632,6 +637,7 @@ canvas {
         <div id="time">시간 20.0초</div>
         <div id="lives">목숨 ♥ ♥ ♥</div>
         <div id="clears">클리어 0회</div>
+        <div id="score">점수 0</div>
         <div id="equippedItemBox">
             <div id="itemInfo">아이템 미사용</div>
             <div id="itemWarning"></div>
@@ -6169,6 +6175,10 @@ function clearGame() {
 
     } catch (error) {}
 
+    // 클리어가 확정된 순간 최신 점수를 랭킹에 반영합니다.
+    // 게임 오버까지 기다리지 않아도 현재 기록이 서버에 저장됩니다.
+    submitV28Score();
+
     applyImpactRecoil(
         150,
         12,
@@ -6587,6 +6597,12 @@ function updateUI() {
         "clears"
     ).textContent =
         `클리어 ${clearCount}회`;
+
+    const scoreElement = document.getElementById("score");
+    if (scoreElement) {
+        scoreElement.textContent =
+            `점수 ${calculateV28Score().toLocaleString("ko-KR")}`;
+    }
 
     let skipIcons = "";
 
@@ -11552,6 +11568,18 @@ function drawGameOverScreen() {
         285
     );
 
+    ctx.fillStyle =
+        "#ffd76a";
+
+    ctx.font =
+        "bold 28px Pretendard, Noto Sans KR, sans-serif";
+
+    ctx.fillText(
+        `최종 점수 : ${calculateV28Score().toLocaleString("ko-KR")}점`,
+        WIDTH / 2,
+        335
+    );
+
 
     ctx.fillStyle =
         "#7ddcff";
@@ -11559,7 +11587,7 @@ function drawGameOverScreen() {
     ctx.fillText(
         `전체 최고 연속 클리어 : ${allTimeBestStreak}회`,
         WIDTH / 2,
-        330
+        375
     );
 
 
