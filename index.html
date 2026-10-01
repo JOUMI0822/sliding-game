@@ -246,6 +246,11 @@ canvas {
     touch-action: auto;
 }
 
+.entry-screen.session-checking {
+    visibility: hidden;
+    pointer-events: none;
+}
+
 .entry-card {
     width: min(420px, 92vw);
     padding: 30px 28px 26px;
@@ -760,8 +765,6 @@ let guestMode = false;
 let gameAccessGranted = false;
 let rankingMode = "today";
 let rankingLoading = false;
-// 랭킹 저장 요청을 순서대로 처리해 저장 완료 후 랭킹을 조회하도록 합니다.
-let rankingSavePromise = Promise.resolve();
 
 let lifeLossCount = 0;
 let mapSkipCount = 0;
@@ -793,7 +796,10 @@ function showEntryGate() {
     gameAccessGranted = false;
     const gate = document.getElementById("entryGate");
     const wrapper = document.getElementById("gameWrapper");
-    if (gate) gate.style.display = "flex";
+    if (gate) {
+        gate.classList.remove("session-checking");
+        gate.style.display = "flex";
+    }
     if (wrapper) wrapper.hidden = true;
     showLoginView();
 }
@@ -802,7 +808,11 @@ function enterGameAsAccount(account) {
     currentAccount = account && typeof account === "object" ? account : null;
     guestMode = false;
     gameAccessGranted = true;
-    document.getElementById("entryGate").style.display = "none";
+    const gate = document.getElementById("entryGate");
+    if (gate) {
+        gate.classList.remove("session-checking");
+        gate.style.display = "none";
+    }
     document.getElementById("gameWrapper").hidden = false;
     gameState = "start";
     questOpen = false;
@@ -818,7 +828,11 @@ function enterGameAsGuest() {
     currentAccount = null;
     guestMode = true;
     gameAccessGranted = true;
-    document.getElementById("entryGate").style.display = "none";
+    const gate = document.getElementById("entryGate");
+    if (gate) {
+        gate.classList.remove("session-checking");
+        gate.style.display = "none";
+    }
     document.getElementById("gameWrapper").hidden = false;
     gameState = "start";
     questOpen = false;
@@ -858,12 +872,9 @@ function escapeHTML(value) {
 async function apiJSON(path, options = {}) {
     const response = await fetch(`${RANKING_API_BASE}${path}`, {
         credentials: "include",
-        cache: "no-store",
         ...options,
         headers: {
             "Content-Type": "application/json",
-            "Cache-Control": "no-cache, no-store, max-age=0",
-            "Pragma": "no-cache",
             ...(options.headers || {})
         }
     });
@@ -1001,53 +1012,28 @@ function calculateV28Score() {
     );
 }
 
-function submitV28Score() {
-    if (!currentAccount || guestMode || !gameAccessGranted) {
-        return Promise.resolve(false);
-    }
+async function submitV28Score() {
+    if (!currentAccount || guestMode || !gameAccessGranted) return;
 
-    // 현재 런의 값을 즉시 복사합니다. 저장 요청이 늦게 실행되어도
-    // 그 사이 clearCount 등이 바뀌어 다른 기록으로 저장되는 일을 막습니다.
-    const payload = {
-        clears: Number(clearCount) || 0,
-        maxStreak: Number(maxClearStreak) || 0,
-        skips: Number(mapSkipCount) || 0,
-        lifeLosses: Number(lifeLossCount) || 0
-    };
-    payload.score = Math.max(
-        0,
-        payload.clears * 50 +
-        payload.maxStreak * 100 -
-        payload.skips * 10 -
-        payload.lifeLosses * 10
-    );
+    const score = calculateV28Score();
 
-    // 이전 저장이 끝난 뒤 이번 기록을 저장합니다.
-    rankingSavePromise = rankingSavePromise
-        .catch(() => false)
-        .then(async () => {
-            try {
-                const result = await apiJSON(`/api/ranking/score?_=${Date.now()}`, {
-                    method: "POST",
-                    body: JSON.stringify(payload)
-                });
-
-                if (!result?.saved) {
-                    throw new Error("서버가 랭킹 저장을 확인하지 못했습니다.");
-                }
-
-                console.log("랭킹 저장 완료:", result.score);
-                return true;
-            } catch (error) {
-                console.warn("랭킹 점수 저장 실패:", error);
-                return false;
-            }
+    try {
+        await apiJSON("/api/ranking/score", {
+            method: "POST",
+            body: JSON.stringify({
+                clears: clearCount,
+                maxStreak: maxClearStreak,
+                skips: mapSkipCount,
+                lifeLosses: lifeLossCount,
+                score
+            })
         });
-
-    return rankingSavePromise;
+    } catch (error) {
+        console.warn("랭킹 점수 저장 실패:", error);
+    }
 }
 
-async function openRankingPanel(mode = "today") {
+function openRankingPanel(mode = "today") {
     if (!currentAccount) {
         window.alert("게스트 모드에서는 랭킹을 볼 수 없습니다. 회원으로 로그인해 주세요.");
         return;
@@ -1059,10 +1045,7 @@ async function openRankingPanel(mode = "today") {
     panel.classList.add("ranking-open");
     panel.setAttribute("aria-hidden", "false");
     updateRankingTabs();
-
-    // 방금 저장한 최고 기록이 반드시 서버에 반영된 뒤 조회합니다.
-    await rankingSavePromise;
-    await loadRanking(rankingMode);
+    loadRanking(rankingMode);
 }
 
 function closeRankingPanel() {
@@ -1080,10 +1063,6 @@ function updateRankingTabs() {
 
 async function loadRanking(mode = rankingMode) {
     if (!currentAccount) return;
-
-    // 저장 중인 기록이 있으면 저장 완료 후 조회합니다.
-    await rankingSavePromise;
-
     rankingLoading = true;
     rankingMode = mode === "weekly" ? "weekly" : "today";
     updateRankingTabs();
@@ -1093,10 +1072,7 @@ async function loadRanking(mode = rankingMode) {
     body.innerHTML = "";
 
     try {
-        const rankingPath = rankingMode === "weekly"
-            ? "/api/ranking/weekly"
-            : "/api/ranking/today";
-        const data = await apiJSON(`${rankingPath}?_=${Date.now()}`);
+        const data = await apiJSON(rankingMode === "weekly" ? "/api/ranking/weekly" : "/api/ranking/today");
         const rows = Array.isArray(data?.rows) ? data.rows : Array.isArray(data?.ranking) ? data.ranking : Array.isArray(data) ? data : [];
 
         if (rows.length === 0) {
@@ -2008,6 +1984,42 @@ function unlockEffectAudio() {
             effectAudioCache.set(type, audio);
 
             try { audio.load(); } catch (error) {}
+        }
+    } catch (error) {}
+}
+
+function primeEffectSound(type) {
+    const src = AUDIO_FILES[type];
+    if (!src || effectVolume <= 0) return;
+
+    try {
+        let audio = effectAudioCache.get(type);
+        if (!audio) {
+            audio = new Audio(src);
+            audio.preload = "auto";
+            audio.__soundType = type;
+            audio.setAttribute("playsinline", "");
+            effectAudioCache.set(type, audio);
+        }
+
+        audio.volume = getSoundVolume(type);
+        audio.muted = true;
+        audio.currentTime = 0;
+
+        const promise = audio.play();
+        if (promise && typeof promise.then === "function") {
+            promise.then(() => {
+                audio.pause();
+                audio.currentTime = 0;
+                audio.muted = false;
+                audio.volume = getSoundVolume(type);
+            }).catch(() => {
+                audio.muted = false;
+            });
+        } else {
+            audio.pause();
+            audio.currentTime = 0;
+            audio.muted = false;
         }
     } catch (error) {}
 }
@@ -5702,6 +5714,12 @@ function drawQuestPanel() {
 
 function startNewGame() {
 
+    // iPad/iOS에서는 게임 중 타이머가 끝난 뒤 발생하는 play()가
+    // 사용자 제스처로 인정되지 않을 수 있으므로, 게임 시작 터치/키 입력 때
+    // gameover.m4a를 미리 무음 재생하여 해당 오디오 요소를 활성화합니다.
+    unlockEffectAudio();
+    primeEffectSound("gameOver");
+
     resetOneShotEffects();
     refreshDailyQuestIfNeeded();
     questOpen = false;
@@ -6215,9 +6233,9 @@ function clearGame() {
 
     } catch (error) {}
 
-    // 클리어가 확정된 순간 최신 점수를 랭킹 저장 큐에 넣습니다.
-    // 게임 루프는 계속 진행하지만 저장은 순서대로 완료됩니다.
-    void submitV28Score();
+    // 클리어가 확정된 순간 최신 점수를 랭킹에 반영합니다.
+    // 게임 오버까지 기다리지 않아도 현재 기록이 서버에 저장됩니다.
+    submitV28Score();
 
     applyImpactRecoil(
         150,
@@ -6510,8 +6528,7 @@ function finishGameOver() {
         0.28;
 
     saveRecentRecord();
-    // 게임 오버 시점의 최종 기록도 저장 큐에 넣습니다.
-    void submitV28Score();
+    submitV28Score();
 
     setMessage(
         `게임 오버 — ${clearCount}회 클리어 / ${maxClearStreak}회 연속 클리어`
@@ -11871,6 +11888,16 @@ openRankingPanel = function(mode = "today") {
 
 async function restoreSavedSession() {
     loadSavedLoginId();
+
+    // 저장된 세션 확인 중에는 로그인 화면을 숨겨 두어
+    // iPad에서 로그인 화면이 잠깐 보이거나 그 순간의 터치가
+    // 게임 시작 입력으로 이어지는 문제를 막습니다.
+    const gate = document.getElementById("entryGate");
+    if (gate) {
+        gate.classList.add("session-checking");
+        gate.style.display = "flex";
+    }
+
     try {
         const data = await apiJSON("/api/me");
         const account = data?.user || data?.account || data;
@@ -11879,6 +11906,7 @@ async function restoreSavedSession() {
             return;
         }
     } catch (error) {}
+
     showEntryGate();
     updateUI();
 }
