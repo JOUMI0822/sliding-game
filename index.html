@@ -407,10 +407,6 @@ canvas {
     transform: scale(0.98);
 }
 
-.ranking-modal[hidden] {
-    display: none !important;
-}
-
 .ranking-modal {
     position: fixed;
     inset: 0;
@@ -424,18 +420,14 @@ canvas {
 }
 
 .ranking-card {
-    width: min(760px, 94vw);
-    height: min(760px, 88vh);
-    min-height: 560px;
+    width: min(760px, 96vw);
+    max-height: min(720px, 92vh);
     padding: 20px;
-    box-sizing: border-box;
     border: 1px solid #3c4858;
     border-radius: 18px;
     background: #151b24;
     box-shadow: 0 24px 80px rgba(0,0,0,0.55);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
+    overflow: auto;
 }
 
 .ranking-header {
@@ -497,13 +489,7 @@ canvas {
 }
 
 .ranking-table-wrap {
-    flex: 1 1 auto;
-    min-height: 0;
     overflow-x: auto;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior: contain;
-    touch-action: pan-x pan-y;
 }
 
 .ranking-table {
@@ -523,10 +509,6 @@ canvas {
 .ranking-table th {
     color: #8f9aa8;
     font-size: 11px;
-    position: sticky;
-    top: 0;
-    z-index: 2;
-    background: #151b24;
 }
 
 .ranking-table td {
@@ -541,13 +523,6 @@ canvas {
 }
 
 @media (max-width: 520px) {
-    .ranking-card {
-        width: 94vw;
-        height: 84vh;
-        min-height: 500px;
-        padding: 16px;
-    }
-
     .entry-card {
         padding: 24px 20px 22px;
     }
@@ -742,7 +717,7 @@ let rankingLoading = false;
 let lifeLossCount = 0;
 let mapSkipCount = 0;
 
-const RANKING_API_BASE = "";
+const RANKING_API_BASE = "https://YOUR-RENDER-SERVICE.onrender.com";
 
 function setEntryStatus(elementId, message, type = "") {
     const element = document.getElementById(elementId);
@@ -1103,25 +1078,7 @@ function bindEntryAndRankingUI() {
 
     const rankingPanel = document.getElementById("rankingPanel");
     rankingPanel?.addEventListener("pointerdown", event => event.stopPropagation());
-    rankingPanel?.addEventListener("pointerup", event => event.stopPropagation());
     rankingPanel?.addEventListener("touchstart", event => event.stopPropagation(), { passive: true });
-    rankingPanel?.addEventListener("touchend", event => event.stopPropagation(), { passive: true });
-
-    // 랭킹 패널 내부의 버튼은 gameWrapper의 터치 처리와 완전히 분리합니다.
-    document.querySelectorAll("#rankingPanel button").forEach(button => {
-        button.addEventListener("pointerdown", event => event.stopPropagation());
-        button.addEventListener("pointerup", event => event.stopPropagation());
-        button.addEventListener("touchstart", event => event.stopPropagation(), { passive: true });
-        button.addEventListener("touchend", event => event.stopPropagation(), { passive: true });
-        button.addEventListener("click", event => event.stopPropagation());
-    });
-
-    rankingPanel?.addEventListener("click", event => {
-        if (event.target === rankingPanel) {
-            playUIClickSound();
-            closeRankingPanel();
-        }
-    });
 
     document.querySelectorAll("#startMenuOverlay button").forEach(button => {
         button.addEventListener("pointerdown", event => event.stopPropagation());
@@ -6771,7 +6728,6 @@ gameWrapper.addEventListener(
     "touchstart",
     event => {
 
-        if (document.getElementById("rankingPanel")?.hidden === false) return;
         event.preventDefault();
 
         if (
@@ -6803,7 +6759,7 @@ gameWrapper.addEventListener(
     "touchmove",
     event => {
 
-        if (document.getElementById("rankingPanel")?.hidden === false) return;
+
         event.preventDefault();
 
     },
