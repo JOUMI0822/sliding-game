@@ -1907,6 +1907,7 @@ const AUDIO_FILES = {
     damage: "damage.m4a",
     itemUse: "item_use.m4a",
     gameOver: "gameover.m4a",
+    timeout: "timeout.m4a",
     uiInvalid: "ui_invalid.m4a",
     uiClick: "ui_click.m4a",
     gameStart: "game_start.m4a"
@@ -6350,6 +6351,8 @@ function timeoutGame() {
 
     lives--;
     lifeLossCount++;
+
+    playEffectSound("timeout");
 
     if (tryAutoFirstAid()) {
         gameState = "playing";
