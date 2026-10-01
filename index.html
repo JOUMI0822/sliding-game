@@ -385,28 +385,29 @@ canvas {
     display: block;
 }
 
-.start-menu-account {
-    position: absolute;
-    top: 54px;
-    left: 12px;
-    max-width: 240px;
-    padding: 7px 10px;
-    border: 1px solid rgba(255,255,255,0.14);
-    border-radius: 9px;
-    background: rgba(9,12,17,0.68);
-    color: #cbd4dc;
-    font-size: 12px;
-    pointer-events: none;
-}
-
 .start-menu-actions {
     position: absolute;
     top: 12px;
     left: 12px;
     right: auto;
     display: flex;
-    gap: 7px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
     pointer-events: auto;
+}
+
+.start-menu-account {
+    position: static;
+    max-width: 240px;
+    padding: 5px 9px;
+    border: 1px solid rgba(255,255,255,0.14);
+    border-radius: 9px;
+    background: rgba(9,12,17,0.68);
+    color: #cbd4dc;
+    font-size: 12px;
+    line-height: 1.25;
+    pointer-events: none;
 }
 
 .start-menu-logout {
@@ -560,10 +561,8 @@ canvas {
     }
 
   .start-menu-account {
-        top: 48px;
-        left: 8px;
-        right: auto;
         max-width: 150px;
+        padding: 4px 7px;
         font-size: 10px;
     }
 
@@ -647,8 +646,8 @@ canvas {
         <div id="startMenuOverlay" aria-hidden="true">
             <div class="start-menu-actions">
                 <button id="startRankingButton" class="start-menu-button" type="button">🏆 랭킹</button>
+                <div class="start-menu-account" id="startMenuAccount">게스트 모드</div>
             </div>
-            <div class="start-menu-account" id="startMenuAccount">게스트 모드</div>
             <div class="start-menu-logout">
                 <button id="startLogoutButton" class="start-menu-button" type="button">🚪 로그아웃</button>
             </div>
