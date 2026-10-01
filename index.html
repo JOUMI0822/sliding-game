@@ -1732,6 +1732,39 @@ function joinMultiplayerRoom() {
     connectMultiplayerSocket(() => multiplayerSend({ type: "join", room: multiplayerRoomCode }));
 }
 
+async function copyMultiplayerRoomCode() {
+    const code = String(multiplayerRoomCode || "").trim().toUpperCase();
+    if (!code) {
+        setMessage("복사할 방 코드가 없습니다.");
+        updateUI();
+        return;
+    }
+
+    try {
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+            await navigator.clipboard.writeText(code);
+        } else {
+            const textarea = document.createElement("textarea");
+            textarea.value = code;
+            textarea.setAttribute("readonly", "");
+            textarea.style.position = "fixed";
+            textarea.style.left = "-9999px";
+            textarea.style.top = "0";
+            document.body.appendChild(textarea);
+            textarea.focus();
+            textarea.select();
+            const copied = document.execCommand("copy");
+            textarea.remove();
+            if (!copied) throw new Error("copy failed");
+        }
+        setMessage(`방 코드 ${code}가 복사되었습니다.`);
+        updateUI();
+    } catch (error) {
+        // iPad Safari에서 클립보드가 제한될 경우 직접 복사할 수 있는 창을 표시합니다.
+        window.prompt("방 코드를 복사하세요.", code);
+    }
+}
+
 function drawMultiplayerMenu() {
     ctx.save();
 
@@ -1784,17 +1817,20 @@ function drawMultiplayerMenu() {
         ctx.fillStyle = "#9ba7b5";
         ctx.font = "14px Pretendard, Noto Sans KR, sans-serif";
         ctx.fillText("친구에게 이 방 코드를 알려주세요.", WIDTH / 2, 275);
+
+        drawSettingsButton(305, 292, 190, 38, "📋 코드 복사");
+
         ctx.fillStyle = multiplayerPeerJoined ? "#63ff91" : "#ffbd66";
         ctx.font = "600 14px Pretendard, Noto Sans KR, sans-serif";
-        ctx.fillText(multiplayerPeerJoined ? "상대 플레이어 참가 완료" : multiplayerStatus, WIDTH / 2, 305);
+        ctx.fillText(multiplayerPeerJoined ? "상대 플레이어 참가 완료" : multiplayerStatus, WIDTH / 2, 345);
 
-        drawSettingsButton(205, 345, 180, 48, multiplayerPeerJoined ? "경기 시작" : "대기 중...");
-        drawSettingsButton(415, 345, 180, 48, "새 방 코드");
-        drawSettingsButton(205, 410, 390, 42, "돌아가기");
+        drawSettingsButton(205, 365, 180, 48, multiplayerPeerJoined ? "경기 시작" : "대기 중...");
+        drawSettingsButton(415, 365, 180, 48, "새 방 코드");
+        drawSettingsButton(205, 430, 390, 42, "돌아가기");
 
         ctx.fillStyle = "#687585";
         ctx.font = "13px Pretendard, Noto Sans KR, sans-serif";
-        ctx.fillText(`경기 시드: ${multiplayerSeed}`, WIDTH / 2, 475);
+        ctx.fillText(`경기 시드: ${multiplayerSeed}`, WIDTH / 2, 495);
     } else {
         ctx.fillStyle = "#b8f0ff";
         ctx.font = "600 18px Pretendard, Noto Sans KR, sans-serif";
@@ -11082,18 +11118,22 @@ function handleSettingsTap(x, y) {
                 return true;
             }
         } else if (multiplayerRole === "host") {
-            if (isInsideRect(x, y, { x: 205, y: 345, w: 180, h: 48 })) {
+            if (isInsideRect(x, y, { x: 305, y: 292, w: 190, h: 38 })) {
+                copyMultiplayerRoomCode();
+                return true;
+            }
+            if (isInsideRect(x, y, { x: 205, y: 365, w: 180, h: 48 })) {
                 if (multiplayerPeerJoined) startMultiplayerMatch();
                 return true;
             }
-            if (isInsideRect(x, y, { x: 415, y: 345, w: 180, h: 48 })) {
+            if (isInsideRect(x, y, { x: 415, y: 365, w: 180, h: 48 })) {
                 multiplayerRoomCode = generateRoomCode();
                 multiplayerSeed = generateMatchSeed();
                 multiplayerPeerJoined = false;
                 connectMultiplayerSocket(() => multiplayerSend({ type: "create", room: multiplayerRoomCode }));
                 return true;
             }
-            if (isInsideRect(x, y, { x: 205, y: 410, w: 390, h: 42 })) {
+            if (isInsideRect(x, y, { x: 205, y: 430, w: 390, h: 42 })) {
                 closeMultiplayerMenu();
                 return true;
             }
@@ -11423,28 +11463,8 @@ function drawStartScreen() {
     ctx.font =
         "15px Pretendard, Noto Sans KR, sans-serif";
 
-    ctx.fillStyle =
-        "#7ddcff";
-
-    ctx.font =
-        "600 18px Pretendard, Noto Sans KR, sans-serif";
-
-    ctx.fillText(
-        `최대 연속 클리어 기록 : ${allTimeBestStreak}회`,
-        WIDTH / 2,
-        350
-    );
-
-
-    ctx.fillStyle =
-        "#b8f0ff";
-
-    ctx.fillText(
-        `최대 클리어 기록 : ${maxClearCount}회`,
-        WIDTH / 2,
-        380
-    );
-
+    // 홈 화면에서는 개인 최고 기록 2줄만 숨깁니다.
+    // allTimeBestStreak / maxClearCount 값과 저장 기능은 그대로 유지합니다.
 
     ctx.fillStyle =
         "#dfe5ea";
