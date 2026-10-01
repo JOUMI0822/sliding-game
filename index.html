@@ -760,7 +760,7 @@ let guestMode = false;
 let gameAccessGranted = false;
 let rankingMode = "today";
 let rankingLoading = false;
-let scoreSavePromise = null;
+let rankingScoreSavePromise = null;
 
 let lifeLossCount = 0;
 let mapSkipCount = 0;
@@ -1000,37 +1000,29 @@ function calculateV28Score() {
 async function submitV28Score() {
     if (!currentAccount || guestMode || !gameAccessGranted) return false;
 
-    const score = calculateV28Score();
+    const payload = {
+        clears: clearCount,
+        maxStreak: maxClearStreak,
+        skips: mapSkipCount,
+        lifeLosses: lifeLossCount,
+        score: calculateV28Score()
+    };
 
-    scoreSavePromise = (async () => {
+    rankingScoreSavePromise = (async () => {
         try {
-            const data = await apiJSON("/api/ranking/score", {
+            const saved = await apiJSON("/api/ranking/score", {
                 method: "POST",
-                body: JSON.stringify({
-                    clears: clearCount,
-                    maxStreak: maxClearStreak,
-                    skips: mapSkipCount,
-                    lifeLosses: lifeLossCount,
-                    score
-                })
+                body: JSON.stringify(payload)
             });
-
-            console.log("[RANKING] score saved", data?.score ?? score);
+            console.log("[RANKING] saved", saved?.score ?? payload.score, payload);
             return true;
         } catch (error) {
-            console.warn("[RANKING] score save failed:", error);
+            console.warn("[RANKING] save failed", error);
             return false;
-        } finally {
-            // Keep the promise available until the ranking panel has had a chance
-            // to await it; clear it on the next tick.
-            const finishedPromise = scoreSavePromise;
-            setTimeout(() => {
-                if (scoreSavePromise === finishedPromise) scoreSavePromise = null;
-            }, 0);
         }
     })();
 
-    return scoreSavePromise;
+    return rankingScoreSavePromise;
 }
 
 async function openRankingPanel(mode = "today") {
@@ -1046,12 +1038,9 @@ async function openRankingPanel(mode = "today") {
     panel.setAttribute("aria-hidden", "false");
     updateRankingTabs();
 
-    // 게임 오버 직후 랭킹 버튼을 눌러도 점수 저장 요청이 끝난 뒤
-    // 최신 랭킹을 읽도록 기다립니다. 이 부분이 기존 갱신 지연의 핵심 수정입니다.
-    if (scoreSavePromise) {
-        await scoreSavePromise;
-    }
-
+    // 게임 중에도 현재 최고 기록을 서버에 한 번 확정한 뒤 랭킹을 읽습니다.
+    // 따라서 저장 요청과 랭킹 조회가 서로 경쟁하지 않습니다.
+    await submitV28Score();
     await loadRanking(rankingMode);
 }
 
@@ -1930,6 +1919,7 @@ const AUDIO_FILES = {
     damage: "damage.m4a",
     itemUse: "item_use.m4a",
     gameOver: "gameover.m4a",
+    timeout: "timeout.m4a",
     uiInvalid: "ui_invalid.m4a",
     uiClick: "ui_click.m4a",
     gameStart: "game_start.m4a"
@@ -4390,7 +4380,7 @@ function createMap() {
 
         const difficulty =
             Math.min(
-                10,
+                7,
                 Math.floor(
                     clearCount / 3
                 )
@@ -4738,52 +4728,49 @@ function createFallbackMap(
         return true;
     }
 
-    walls =
-        createBoundaryWalls();
+    // 최후의 안전장치: 경계만 있는 빈 맵은 절대 반환하지 않습니다.
+    // 검증된 고정 레이아웃을 만들고, 그 안에서 실제 도달 가능한 목표를 찾습니다.
+    const emergencyWalls = createBoundaryWalls();
+    const addEmergencyWall = (c, r) => {
+        if (!isBoundary(c, r) && !(c === stageStart.c && r === stageStart.r)) {
+            emergencyWalls.add(keyOf(c, r));
+        }
+    };
 
-    beginMapTransition(
-        oldWallSnapshot,
-        walls
-    );
+    for (let r = 2; r <= 6; r++) addEmergencyWall(5, r);
+    for (let r = 8; r <= 12; r++) addEmergencyWall(10, r);
+    for (let r = 2; r <= 6; r++) addEmergencyWall(14, r);
+    for (let c = 7; c <= 10; c++) addEmergencyWall(c, 5);
+    for (let c = 12; c <= 16; c++) addEmergencyWall(c, 9);
 
-    const simpleGraph =
-        buildSlideGraph(
-            walls
-        );
+    const emergencyGraph = buildSlideGraph(emergencyWalls);
+    const emergencyReachable = getReachableStates(emergencyGraph, startKey);
+    const emergencyCandidates = getGoalCandidates(emergencyGraph, emergencyReachable, startKey);
 
-    const simpleReachable =
-        getReachableStates(
-            simpleGraph,
-            startKey
-        );
-
-    const simpleCandidates =
-        getGoalCandidates(
-            simpleGraph,
-            simpleReachable,
-            startKey
-        );
-
-    if (
-        simpleCandidates.length > 0
-    ) {
-
-        goal =
-            parseKey(
-                simpleCandidates[0].key
-            );
-
-    } else {
-
-        goal = {
-            c: COLS - 2,
-            r: ROWS - 2
-        };
+    let emergencyGoal = null;
+    for (const candidate of emergencyCandidates) {
+        const path = getPathTo(emergencyGraph, startKey, candidate.key);
+        if (!path || path.length - 1 < MIN_PATH_LENGTH) continue;
+        const emergencyDangers = createDanger(emergencyGraph, candidate.key, path);
+        if (!verifySafeGoalPath(emergencyGraph, candidate.key, emergencyDangers)) continue;
+        emergencyGoal = { key: candidate.key, dangers: emergencyDangers };
+        break;
     }
 
-    dangers =
-        new Set();
+    if (emergencyGoal) {
+        walls = emergencyWalls;
+        goal = parseKey(emergencyGoal.key);
+        dangers = emergencyGoal.dangers;
+        beginMapTransition(oldWallSnapshot, walls);
+        return true;
+    }
 
+    // 이 지점은 정상적으로 도달하면 안 되지만, 그래도 목표를 빈 화면에 두지 않습니다.
+    // 가장 가까운 안전 셀을 목표로 사용합니다.
+    walls = emergencyWalls;
+    goal = { c: COLS - 2, r: ROWS - 2 };
+    dangers = new Set();
+    beginMapTransition(oldWallSnapshot, walls);
     return true;
 }
 
@@ -6198,10 +6185,6 @@ function clearGame() {
 
     } catch (error) {}
 
-    // 클리어가 확정된 순간 최신 점수를 랭킹에 반영합니다.
-    // 게임 오버까지 기다리지 않아도 현재 기록이 서버에 저장됩니다.
-    submitV28Score();
-
     applyImpactRecoil(
         150,
         12,
@@ -6373,6 +6356,8 @@ function timeoutGame() {
 
     lives--;
     lifeLossCount++;
+
+    playEffectSound("timeout");
 
     if (tryAutoFirstAid()) {
         gameState = "playing";
@@ -11844,7 +11829,7 @@ openRankingPanel = function(mode = "today") {
         return;
     }
     refreshRankingAccountLabel();
-    return originalOpenRankingPanel(mode);
+    originalOpenRankingPanel(mode);
 };
 
 /* =========================================================
