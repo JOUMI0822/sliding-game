@@ -223,7 +223,7 @@ canvas {
 
 
 /* =========================================================
-   V28 로그인 / 회원가입 / 게스트 / 랭킹 UI
+   V29 로그인 / 회원가입 / 게스트 / 랭킹 UI
 ========================================================= */
 
 .entry-screen {
@@ -384,51 +384,50 @@ canvas {
 .start-menu-actions {
     position: absolute;
     inset: 0;
+    width: 100%;
+    height: 100%;
     pointer-events: none;
+    z-index: 151;
 }
 
-#startRankingButton,
-#startLogoutButton {
-    position: absolute;
+.start-menu-button {
+    position: absolute !important;
     min-width: 92px;
     height: 34px;
     padding: 0 10px;
     border: 1px solid rgba(255,255,255,0.18);
     border-radius: 8px;
-    background: rgba(15,19,25,0.82);
+    background: rgba(15,19,25,0.88);
     color: #f2f5f7;
     font: 700 12px Pretendard, "Noto Sans KR", Arial, sans-serif;
     cursor: pointer;
-    pointer-events: auto;
     touch-action: manipulation;
+    pointer-events: auto;
+    z-index: 152;
     -webkit-tap-highlight-color: transparent;
 }
 
 #startRankingButton {
-    top: 12px;
-    left: 12px;
+    top: 12px !important;
+    left: 12px !important;
+    right: auto !important;
+    bottom: auto !important;
 }
 
 #startLogoutButton {
-    right: 12px;
-    bottom: 12px;
-}
-
-.start-menu-button {
-    min-width: 92px;
-    height: 34px;
-    padding: 0 10px;
-    border: 1px solid rgba(255,255,255,0.18);
-    border-radius: 8px;
-    background: rgba(15,19,25,0.82);
-    color: #f2f5f7;
-    font: 700 12px Pretendard, "Noto Sans KR", Arial, sans-serif;
-    cursor: pointer;
-    touch-action: manipulation;
+    top: auto !important;
+    left: auto !important;
+    right: 12px !important;
+    bottom: 12px !important;
 }
 
 .start-menu-button:active {
     transform: scale(0.98);
+}
+
+/* hidden 속성이 있을 때는 모달을 반드시 숨깁니다. */
+.ranking-modal[hidden] {
+    display: none !important;
 }
 
 .ranking-modal {
@@ -444,6 +443,9 @@ canvas {
 }
 
 .ranking-card {
+    position: relative;
+    z-index: 1;
+    pointer-events: auto;
     width: min(760px, 96vw);
     max-height: min(720px, 92vh);
     padding: 20px;
@@ -489,6 +491,9 @@ canvas {
 
 .ranking-tab {
     flex: 1;
+    position: relative;
+    z-index: 2;
+    pointer-events: auto;
     height: 40px;
     border: 1px solid #46515f;
     border-radius: 9px;
@@ -559,14 +564,25 @@ canvas {
     }
 
     .start-menu-actions {
-        top: 48px;
-        right: 8px;
+        inset: 0;
+        width: 100%;
+        height: 100%;
     }
 
     .start-menu-button {
         min-width: 78px;
         height: 31px;
         font-size: 10px;
+    }
+
+    #startRankingButton {
+        top: 8px !important;
+        left: 8px !important;
+    }
+
+    #startLogoutButton {
+        right: 8px !important;
+        bottom: 8px !important;
     }
 }
 
@@ -730,7 +746,7 @@ const MAX_PREVIOUS_LAYOUTS = 180;
 let gameState = "start";
 
 /* =========================================================
-   V28 계정 / 게스트 / 랭킹 상태
+   V29 계정 / 게스트 / 랭킹 상태
 ========================================================= */
 let currentAccount = null;
 let guestMode = false;
@@ -905,7 +921,7 @@ async function registerAccount() {
             body: JSON.stringify({ id, password, nickname })
         });
 
-        // 현재 V28 서버는 가입 직후 세션도 만들 수 있으므로,
+        // 현재 V29 서버는 가입 직후 세션도 만들 수 있으므로,
         // UX 요구사항에 맞춰 명시적으로 로그아웃한 뒤 로그인 화면으로 돌아갑니다.
         try { await apiJSON("/api/logout", { method: "POST", body: "{}" }); } catch (error) {}
 
@@ -938,7 +954,7 @@ async function logoutToEntry() {
     showLoginView("로그아웃되었습니다.", "success");
 }
 
-function calculateV28Score() {
+function calculateV29Score() {
     return Math.max(
         0,
         clearCount * 50 +
@@ -948,10 +964,10 @@ function calculateV28Score() {
     );
 }
 
-async function submitV28Score() {
+async function submitV29Score() {
     if (!currentAccount || guestMode || !gameAccessGranted) return;
 
-    const score = calculateV28Score();
+    const score = calculateV29Score();
 
     try {
         await apiJSON("/api/ranking/score", {
@@ -6407,7 +6423,7 @@ function finishGameOver() {
         0.28;
 
     saveRecentRecord();
-    submitV28Score();
+    submitV29Score();
 
     setMessage(
         `게임 오버 — ${clearCount}회 클리어 / ${maxClearStreak}회 연속 클리어`
@@ -11722,7 +11738,7 @@ function gameLoop(
 
 
 /* =========================================================
-   V28 초기 계정 진입 화면
+   V29 초기 계정 진입 화면
 ========================================================= */
 
 function refreshRankingAccountLabel() {
