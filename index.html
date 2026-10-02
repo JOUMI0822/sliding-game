@@ -448,14 +448,14 @@ canvas {
 
 .start-menu-competitive {
     position: absolute;
-    top: 58px;
+    top: 100px;
     right: 12px;
     pointer-events: auto;
 }
 
 .start-menu-ranking {
     position: absolute;
-    top: 100px;
+    top: 58px;
     right: 12px;
     pointer-events: auto;
 }
@@ -713,9 +713,6 @@ canvas {
             </div>
             <div class="start-menu-ranking">
                 <button id="startRankingButton" class="start-menu-button" type="button">🏆 랭킹</button>
-            </div>
-            <div class="start-menu-logout">
-                <button id="startLogoutButton" class="start-menu-button" type="button">🚪 로그아웃</button>
             </div>
         </div>
     </div>
@@ -1274,13 +1271,6 @@ function bindEntryAndRankingUI() {
         event.stopPropagation();
         playUIClickSound();
         openMultiplayerMenu();
-    });
-
-    document.getElementById("startLogoutButton")?.addEventListener("click", event => {
-        event.preventDefault();
-        event.stopPropagation();
-        playUIClickSound();
-        logoutToEntry();
     });
 
     document.getElementById("rankingClose")?.addEventListener("click", event => {
@@ -2579,7 +2569,7 @@ let volumeTouchPointerId = null;
 
 function positionVolumeTouchArea() {
     if (!volumeTouchArea || !canvas) return;
-    if (!settingsOpen) {
+    if (!settingsOpen || skinOpen) {
         volumeTouchArea.style.display = "none";
         return;
     }
@@ -5530,26 +5520,8 @@ function onDailyQuestShieldBlock() {
     saveDailyQuestState();
 }
 
-function getSkinButton() {
-    return { x: 168, y: 74, w: 42, h: 42 };
-}
-
-function drawSkinButton() {
-    const b = getSkinButton();
-    ctx.save();
-    ctx.fillStyle = "rgba(9,12,17,0.68)";
-    ctx.strokeStyle = "rgba(255,255,255,0.14)";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.roundRect(b.x, b.y, b.w, b.h, 12);
-    ctx.fill();
-    ctx.stroke();
-    drawClearEmoji("👔", b.x + b.w / 2, b.y + b.h / 2 + 1, 25);
-    ctx.restore();
-}
-
 function getQuestButton() {
-    return { x: 220, y: 74, w: 42, h: 42 };
+    return { x: 168, y: 74, w: 42, h: 42 };
 }
 
 function drawQuestButton() {
@@ -10485,6 +10457,8 @@ function drawInventoryPanel() {
     ctx.font = "bold 28px Pretendard, Noto Sans KR, sans-serif";
     ctx.fillText("🎒 인벤토리", WIDTH / 2, 98);
 
+    drawSettingsButton(panel.x + panel.w - 150, 78, 125, 34, "👔 스킨");
+
     const types = Object.keys(ITEM_DATA);
     const cols = 5;
     const size = 82;
@@ -11079,38 +11053,6 @@ function drawSkinPanel() {
             }
         }
     );
-    ctx.fillStyle =
-        "#8f9aa8";
-
-    ctx.font =
-        "13px Pretendard, Noto Sans KR, sans-serif";
-
-    ctx.fillStyle = "#aeb8c5";
-    ctx.font = "600 13px Pretendard, Noto Sans KR, sans-serif";
-    ctx.fillText(`효과음 크기  ${Math.round(effectVolume * 100)}%`, WIDTH / 2, 500);
-
-    const volumeBar = { x: WIDTH / 2 - 130, y: 516, w: 260, h: 8 };
-    ctx.fillStyle = "rgba(255,255,255,0.10)";
-    ctx.beginPath();
-    ctx.roundRect(volumeBar.x, volumeBar.y, volumeBar.w, volumeBar.h, 5);
-    ctx.fill();
-    ctx.fillStyle = "#7ddcff";
-    ctx.beginPath();
-    ctx.roundRect(volumeBar.x, volumeBar.y, volumeBar.w * effectVolume, volumeBar.h, 5);
-    ctx.fill();
-    ctx.fillStyle = "#dfe5ea";
-    ctx.beginPath();
-    ctx.arc(volumeBar.x + volumeBar.w * effectVolume, volumeBar.y + volumeBar.h / 2, 8, 0, Math.PI * 2);
-    ctx.fill();
-    drawSettingsButton(
-        WIDTH / 2 - 80,
-        550,
-        160,
-        26,
-        "닫기"
-    );
-
-
     ctx.restore();
 }
 
@@ -11290,7 +11232,6 @@ function handleSkinSettingTap(x, y) {
 function handleSettingsTap(x, y) {
     refreshDailyQuestIfNeeded();
     const questButton = getQuestButton();
-    const skinButton = getSkinButton();
     const shopButton = getShopButton();
     const inventoryButton = getInventoryButton();
     const gear = getStartSettingsButton();
@@ -11353,12 +11294,6 @@ function handleSettingsTap(x, y) {
         return true;
     }
 
-    if (!shopOpen && !inventoryOpen && !settingsOpen && !multiplayerOpen && !questOpen && !skinOpen && isInsideRect(x, y, skinButton)) {
-        skinOpen = true;
-        requestSettingsRender();
-        return true;
-    }
-
     if (!shopOpen && !inventoryOpen && !settingsOpen && !multiplayerOpen && !questOpen && isInsideRect(x, y, questButton)) {
         questOpen = true;
         syncQuestRewardOverlay(true);
@@ -11402,6 +11337,14 @@ function handleSettingsTap(x, y) {
 
     if (inventoryOpen) {
         const panel = { x: 55, y: 55, w: 690, h: 490 };
+
+        if (isInsideRect(x, y, { x: panel.x + panel.w - 150, y: 78, w: 125, h: 34 })) {
+            inventoryOpen = false;
+            skinOpen = true;
+            closeInventoryDetail();
+            requestSettingsRender();
+            return true;
+        }
 
         if (inventoryDetailType) {
             const box = { x: 145, y: 145, w: 510, h: 320 };
@@ -11715,11 +11658,10 @@ function drawStartScreen() {
     );
 
 
-    drawSettingsGear();
-    drawInventoryButton();
-    drawShopButton();
-    drawSkinButton();
     drawQuestButton();
+    drawShopButton();
+    drawInventoryButton();
+    drawSettingsGear();
 
 
     if (questOpen) {
