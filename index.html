@@ -5539,21 +5539,7 @@ function getQuestButton() {
 }
 
 function drawQuestButton() {
-    const b = getQuestButton();
-    ctx.save();
-    ctx.fillStyle = "rgba(15,19,25,0.82)";
-    ctx.strokeStyle = "rgba(255,255,255,0.18)";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.roundRect(b.x, b.y, b.w, b.h, 8);
-    ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = "#f2f5f7";
-    ctx.font = "bold 22px Arial, sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText("📜", b.x + b.w / 2, b.y + b.h / 2 + 1);
-    ctx.restore();
+    drawIconMenuButton(getQuestButton(), "📜");
 }
 
 let questOpen = false;
@@ -10275,8 +10261,7 @@ function drawVectorQuestIcon(cx, cy) {
     ctx.restore();
 }
 
-function drawShopButton() {
-    const button = getShopButton();
+function drawIconMenuButton(button, emoji) {
     ctx.save();
     ctx.fillStyle = "rgba(15,19,25,0.82)";
     ctx.strokeStyle = "rgba(255,255,255,0.18)";
@@ -10285,12 +10270,17 @@ function drawShopButton() {
     ctx.roundRect(button.x, button.y, button.w, button.h, 8);
     ctx.fill();
     ctx.stroke();
+
     ctx.fillStyle = "#f2f5f7";
-    ctx.font = "bold 22px Arial, sans-serif";
+    ctx.font = '20px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText("🛒", button.x + button.w / 2, button.y + button.h / 2 + 1);
+    ctx.fillText(emoji, button.x + button.w / 2, button.y + button.h / 2 + 0.5);
     ctx.restore();
+}
+
+function drawShopButton() {
+    drawIconMenuButton(getShopButton(), "🛒");
 }
 
 function getStartSettingsButton() {
@@ -10320,20 +10310,39 @@ function isInsideRect(
 
 
 function drawSettingsGear() {
-    const button = getStartSettingsButton();
+
+    const button =
+        getStartSettingsButton();
+
     ctx.save();
-    ctx.fillStyle = "rgba(15,19,25,0.82)";
-    ctx.strokeStyle = "rgba(255,255,255,0.18)";
+
+    ctx.fillStyle =
+        "rgba(15,19,25,0.82)";
+
+    ctx.strokeStyle =
+        "rgba(255,255,255,0.18)";
+
     ctx.lineWidth = 1;
+
     ctx.beginPath();
-    ctx.roundRect(button.x, button.y, button.w, button.h, 8);
+
+    ctx.roundRect(
+        button.x,
+        button.y,
+        button.w,
+        button.h,
+        12
+    );
+
     ctx.fill();
     ctx.stroke();
+
     ctx.fillStyle = "#f2f5f7";
-    ctx.font = "bold 25px Arial, sans-serif";
+    ctx.font = '20px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText("⚙", button.x + button.w / 2, button.y + button.h / 2 + 1);
+    ctx.fillText("⚙", button.x + button.w / 2, button.y + button.h / 2 + 0.5);
+
     ctx.restore();
 }
 
@@ -10540,21 +10549,7 @@ function getInventoryButton() {
 }
 
 function drawInventoryButton() {
-    const button = getInventoryButton();
-    ctx.save();
-    ctx.fillStyle = "rgba(15,19,25,0.82)";
-    ctx.strokeStyle = "rgba(255,255,255,0.18)";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.roundRect(button.x, button.y, button.w, button.h, 8);
-    ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = "#f2f5f7";
-    ctx.font = "bold 22px Arial, sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText("🎒", button.x + button.w / 2, button.y + button.h / 2 + 1);
-    ctx.restore();
+    drawIconMenuButton(getInventoryButton(), "🎒");
 }
 
 function drawInventoryPanel() {
