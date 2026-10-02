@@ -625,8 +625,8 @@ canvas {
         left: 8px;
         right: auto;
     }
-    .start-menu-ranking { top: 34px; right: 8px; }
-    .start-menu-competitive { top: 69px; right: 8px; }
+    .start-menu-ranking { top: 14px; right: 8px; }
+    .start-menu-competitive { top: 49px; right: 8px; }
 
     .start-menu-logout {
         right: 8px;
@@ -10476,8 +10476,6 @@ function drawInventoryPanel() {
     ctx.font = "bold 28px Pretendard, Noto Sans KR, sans-serif";
     ctx.fillText("🎒 인벤토리", WIDTH / 2, 98);
 
-    drawSettingsButton(panel.x + panel.w - 150, 78, 125, 34, "👔 스킨");
-
     const types = Object.keys(ITEM_DATA);
     const cols = 5;
     const size = 82;
@@ -11383,14 +11381,6 @@ function handleSettingsTap(x, y) {
 
     if (inventoryOpen) {
         const panel = { x: 55, y: 55, w: 690, h: 490 };
-
-        if (isInsideRect(x, y, { x: panel.x + panel.w - 150, y: 78, w: 125, h: 34 })) {
-            inventoryOpen = false;
-            skinOpen = true;
-            closeInventoryDetail();
-            requestSettingsRender();
-            return true;
-        }
 
         if (inventoryDetailType) {
             const box = { x: 145, y: 145, w: 510, h: 320 };
