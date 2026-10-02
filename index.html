@@ -761,6 +761,18 @@ const canvasStage = document.getElementById("canvasStage");
 const questRewardOverlay = document.getElementById("questRewardOverlay");
 const ctx = canvas.getContext("2d");
 
+// 컬러 이모지는 일반 텍스트와 분리해서 그려 기기별로 더 선명하게 표시합니다.
+const EMOJI_FONT = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
+function drawClearEmoji(emoji, x, y, size = 24) {
+  ctx.save();
+  ctx.font = `normal ${size}px ${EMOJI_FONT}`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(emoji, x, y);
+  ctx.restore();
+}
+
+
 const CELL = 40;
 const COLS = 20;
 const ROWS = 15;
@@ -1898,20 +1910,20 @@ function drawMultiplayerMenu() {
     ctx.textBaseline = "middle";
 
     ctx.fillStyle = "#f3f5f7";
-    ctx.font = "bold 30px Pretendard, Noto Sans KR, sans-serif";
+    ctx.font = "bold 30px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
     ctx.fillText("2인용 경쟁", WIDTH / 2, 125);
 
     if (multiplayerMatchmaking) {
         ctx.fillStyle = "#aeb8c4";
-        ctx.font = "15px Pretendard, Noto Sans KR, sans-serif";
+        ctx.font = "15px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
         ctx.fillText("빠른 대전에서 상대 플레이어를 찾고 있습니다.", WIDTH / 2, 180);
         ctx.fillStyle = "#63ff91";
-        ctx.font = "bold 24px Pretendard, Noto Sans KR, sans-serif";
+        ctx.font = "bold 24px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
         ctx.fillText("상대를 찾는 중...", WIDTH / 2, 255);
         drawSettingsButton(205, 345, 390, 48, "매칭 취소");
     } else if (!multiplayerRole) {
         ctx.fillStyle = "#aeb8c4";
-        ctx.font = "15px Pretendard, Noto Sans KR, sans-serif";
+        ctx.font = "15px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
         ctx.fillText("빠른 대전 또는 방 코드로 상대를 찾을 수 있습니다.", WIDTH / 2, 165);
 
         drawSettingsButton(205, 205, 390, 52, "⚡ 빠른 대전");
@@ -1920,21 +1932,21 @@ function drawMultiplayerMenu() {
         drawSettingsButton(305, 415, 190, 42, "돌아가기");
     } else if (multiplayerRole === "host") {
         ctx.fillStyle = "#7ddcff";
-        ctx.font = "600 18px Pretendard, Noto Sans KR, sans-serif";
+        ctx.font = "600 18px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
         ctx.fillText("HOST · 방장", WIDTH / 2, 170);
 
         ctx.fillStyle = "#ffffff";
-        ctx.font = "bold 48px Pretendard, Noto Sans KR, sans-serif";
+        ctx.font = "bold 48px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
         ctx.fillText(multiplayerRoomCode, WIDTH / 2, 235);
 
         ctx.fillStyle = "#9ba7b5";
-        ctx.font = "14px Pretendard, Noto Sans KR, sans-serif";
+        ctx.font = "14px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
         ctx.fillText("친구에게 이 방 코드를 알려주세요.", WIDTH / 2, 270);
 
         drawSettingsButton(305, 292, 190, 38, "📋 코드 복사");
 
         ctx.fillStyle = multiplayerPeerJoined ? "#63ff91" : "#ffbd66";
-        ctx.font = "600 14px Pretendard, Noto Sans KR, sans-serif";
+        ctx.font = "600 14px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
         ctx.fillText(multiplayerPeerJoined ? "상대 플레이어 참가 완료" : multiplayerStatus, WIDTH / 2, 345);
 
         drawSettingsButton(205, 365, 180, 48, multiplayerPeerJoined ? "경기 시작" : "대기 중...");
@@ -1942,22 +1954,22 @@ function drawMultiplayerMenu() {
         drawSettingsButton(205, 430, 390, 42, "돌아가기");
 
         ctx.fillStyle = "#687585";
-        ctx.font = "13px Pretendard, Noto Sans KR, sans-serif";
+        ctx.font = "13px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
         ctx.fillText(`경기 시드: ${multiplayerSeed}`, WIDTH / 2, 495);
     } else {
         ctx.fillStyle = "#b8f0ff";
-        ctx.font = "600 18px Pretendard, Noto Sans KR, sans-serif";
+        ctx.font = "600 18px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
         ctx.fillText("PLAYER 2 · 참가자", WIDTH / 2, 170);
 
         ctx.fillStyle = "#ffffff";
-        ctx.font = "bold 42px Pretendard, Noto Sans KR, sans-serif";
+        ctx.font = "bold 42px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
         ctx.fillText(multiplayerRoomCode, WIDTH / 2, 235);
 
         ctx.fillStyle = "#9ba7b5";
-        ctx.font = "14px Pretendard, Noto Sans KR, sans-serif";
+        ctx.font = "14px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
         ctx.fillText("입력한 방 코드가 준비되었습니다.", WIDTH / 2, 275);
         ctx.fillStyle = "#63ff91";
-        ctx.font = "600 14px Pretendard, Noto Sans KR, sans-serif";
+        ctx.font = "600 14px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
         ctx.fillText(multiplayerStatus, WIDTH / 2, 305);
 
         drawSettingsButton(205, 345, 180, 48, "다른 방 참가");
@@ -5527,7 +5539,7 @@ function drawQuestButton() {
     ctx.font = "bold 22px Arial, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText("📜", b.x + b.w / 2, b.y + b.h / 2 + 1);
+    drawClearEmoji("📜", b.x + b.w / 2, b.y + b.h / 2 + 1, 25);
     ctx.restore();
 }
 
@@ -5728,11 +5740,11 @@ function drawQuestPanel() {
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillStyle = "#f3f5f7";
-    ctx.font = "bold 28px Pretendard, Noto Sans KR, sans-serif";
+    ctx.font = "bold 28px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
     ctx.fillText("📜 일일 퀘스트", WIDTH / 2, 65);
 
     ctx.fillStyle = "#ffd76a";
-    ctx.font = "600 14px Pretendard, Noto Sans KR, sans-serif";
+    ctx.font = "600 14px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
     ctx.fillText(`🪙 ${coins}코인`, WIDTH / 2, 97);
 
     for (let i = 0; i < DAILY_QUEST_COUNT; i++) {
@@ -5767,11 +5779,11 @@ function drawQuestPanel() {
             : completed
                 ? "#7dff9d"
                 : "#f3f5f7";
-        ctx.font = "bold 15px Pretendard, Noto Sans KR, sans-serif";
+        ctx.font = "bold 15px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
         ctx.fillText(`${i + 1}. ${q.name}`, 75, y + 15);
 
         ctx.fillStyle = claimed ? "rgba(159,170,183,0.38)" : "#9faab7";
-        ctx.font = "11px Pretendard, Noto Sans KR, sans-serif";
+        ctx.font = "11px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
         ctx.fillText(q.description, 75, y + 31);
 
         // 현재 달성치 / 목표치를 % 막대 위에 표시
@@ -5781,7 +5793,7 @@ function drawQuestPanel() {
             : completed
                 ? "#7dff9d"
                 : "#dce5ef";
-        ctx.font = "600 11px Pretendard, Noto Sans KR, sans-serif";
+        ctx.font = "600 11px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
         ctx.fillText(`${info.current}/${info.target} · ${info.percent}%`, 535, y + 44);
 
         // 진행도 % 바
@@ -5805,7 +5817,7 @@ function drawQuestPanel() {
         if (claimed) {
             ctx.textAlign = "center";
             ctx.fillStyle = "rgba(125,255,157,0.42)";
-            ctx.font = "600 11px Pretendard, Noto Sans KR, sans-serif";
+            ctx.font = "600 11px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
             ctx.fillText(`🪙 +${q.reward}코인`, 641.5, y + 12);
 
             // 수령 완료 상태는 Canvas가 표시합니다.
@@ -5820,12 +5832,12 @@ function drawQuestPanel() {
 
             ctx.textAlign = "center";
             ctx.fillStyle = "rgba(125,255,157,0.78)";
-            ctx.font = "bold 12px Pretendard, Noto Sans KR, sans-serif";
+            ctx.font = "bold 12px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
             ctx.fillText("보상 수령 완료 ✓", 641.5, y + 39);
         } else {
             ctx.textAlign = "center";
             ctx.fillStyle = completed ? "#ffd76a" : "rgba(255,215,106,0.38)";
-            ctx.font = "600 11px Pretendard, Noto Sans KR, sans-serif";
+            ctx.font = "600 11px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
             ctx.fillText(`🪙 +${q.reward}코인`, 641.5, y + 12);
 
             if (!completed) {
@@ -5840,7 +5852,7 @@ function drawQuestPanel() {
 
                 ctx.textAlign = "center";
                 ctx.fillStyle = "rgba(255,255,255,0.28)";
-                ctx.font = "bold 12px Pretendard, Noto Sans KR, sans-serif";
+                ctx.font = "bold 12px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
                 ctx.fillText("보상 받기", 641.5, y + 39);
             }
             // completed + unclaimed 상태의 "보상 받기"는
@@ -6884,7 +6896,7 @@ function updateExpAnimation(now) {
     expResultData.displayLevel=lv; expResultData.displayExp=Math.max(0,xp); if(t>=1){expResultData.displayLevel=target;expResultData.displayExp=expResultData.targetExp;expAnimation.done=true;setPlayerProgress(target,expResultData.targetExp);}
 }
 function drawExpProgressBar(x,y,w,h,level,exp){const ratio=Math.max(0,Math.min(1,exp/getLevelRequiredExp(level)));ctx.fillStyle="rgba(255,255,255,.09)";ctx.beginPath();ctx.roundRect(x,y,w,h,h/2);ctx.fill();ctx.fillStyle="#63b8ff";ctx.beginPath();ctx.roundRect(x,y,w*ratio,h,h/2);ctx.fill();}
-function drawExperienceResultScreen(now=performance.now()) { updateExpAnimation(now); ctx.fillStyle="#090b10";ctx.fillRect(0,0,WIDTH,HEIGHT);ctx.save();ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillStyle=expResultData?.targetLevel>expResultData?.beforeLevel?"#ffd76a":"#f3f5f7";ctx.font="bold 46px Pretendard,Noto Sans KR,sans-serif";ctx.fillText(expResultData?.targetLevel>expResultData?.beforeLevel?"LEVEL UP!":"EXP 획득",WIDTH/2,140);ctx.fillStyle="#7ddcff";ctx.font="bold 30px Pretendard,Noto Sans KR,sans-serif";ctx.fillText(`+${formatExp(expResultData?.amount||0)} EXP`,WIDTH/2,215);const lv=expResultData?.displayLevel||playerLevel,xp=expResultData?.displayExp||0;ctx.fillStyle="#fff";ctx.font="bold 30px Pretendard,Noto Sans KR,sans-serif";ctx.fillText(`Lv. ${lv}`,WIDTH/2,285);drawExpProgressBar(170,330,460,22,lv,xp);ctx.fillStyle="#aeb8c4";ctx.font="600 15px Pretendard,Noto Sans KR,sans-serif";ctx.fillText(`EXP ${formatExp(xp)} / ${formatExp(getLevelRequiredExp(lv))}`,WIDTH/2,375);ctx.fillStyle="#8d98a6";ctx.font="14px Pretendard,Noto Sans KR,sans-serif";ctx.fillText(expAnimation?.done?"R / SPACE 또는 화면 터치 : 홈으로":"EXP가 올라가는 중...",WIDTH/2,490);ctx.restore(); }
+function drawExperienceResultScreen(now=performance.now()) { updateExpAnimation(now); ctx.fillStyle="#090b10";ctx.fillRect(0,0,WIDTH,HEIGHT);ctx.save();ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillStyle=expResultData?.targetLevel>expResultData?.beforeLevel?"#ffd76a":"#f3f5f7";ctx.font="bold 46px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";ctx.fillText(expResultData?.targetLevel>expResultData?.beforeLevel?"LEVEL UP!":"EXP 획득",WIDTH/2,140);ctx.fillStyle="#7ddcff";ctx.font="bold 30px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";ctx.fillText(`+${formatExp(expResultData?.amount||0)} EXP`,WIDTH/2,215);const lv=expResultData?.displayLevel||playerLevel,xp=expResultData?.displayExp||0;ctx.fillStyle="#fff";ctx.font="bold 30px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";ctx.fillText(`Lv. ${lv}`,WIDTH/2,285);drawExpProgressBar(170,330,460,22,lv,xp);ctx.fillStyle="#aeb8c4";ctx.font="600 15px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";ctx.fillText(`EXP ${formatExp(xp)} / ${formatExp(getLevelRequiredExp(lv))}`,WIDTH/2,375);ctx.fillStyle="#8d98a6";ctx.font="14px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";ctx.fillText(expAnimation?.done?"R / SPACE 또는 화면 터치 : 홈으로":"EXP가 올라가는 중...",WIDTH/2,490);ctx.restore(); }
 
 /* =========================================================
    PC 키보드
@@ -10009,7 +10021,7 @@ function drawGame() {
         ctx.fillStyle = "rgba(255,255,255,0.32)";
         ctx.fillRect(opx + 4, opy + 4, CELL - 22, 4);
         ctx.fillStyle = "#ffd29a";
-        ctx.font = "bold 10px Pretendard, Noto Sans KR, sans-serif";
+        ctx.font = "bold 10px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
         ctx.textAlign = "center";
         ctx.textBaseline = "bottom";
         ctx.fillText("상대", opponent.x + CELL / 2, opponent.y - 3);
@@ -10074,7 +10086,7 @@ function drawGame() {
             "#f3f5f7";
 
         ctx.font =
-            "600 17px Pretendard, Noto Sans KR, sans-serif";
+            "600 17px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
 
         ctx.textAlign =
             "center";
@@ -10148,7 +10160,7 @@ function drawShopButton() {
     ctx.font = "bold 22px Arial, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText("🛒", button.x + button.w / 2, button.y + button.h / 2 + 1);
+    drawClearEmoji("🛒", button.x + button.w / 2, button.y + button.h / 2 + 1, 25);
     ctx.restore();
 }
 
@@ -10263,7 +10275,7 @@ function drawSettingsButton(
         "#f0f3f6";
 
     ctx.font =
-        "600 15px Pretendard, Noto Sans KR, sans-serif";
+        "600 15px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
 
     ctx.textAlign =
         "center";
@@ -10340,11 +10352,11 @@ function drawShopPanel() {
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillStyle = "#fff";
-    ctx.font = "bold 28px Pretendard, Noto Sans KR, sans-serif";
+    ctx.font = "bold 28px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
     ctx.fillText("🛒 아이템 상점", WIDTH / 2, 62);
 
     ctx.fillStyle = "#ffd76a";
-    ctx.font = "700 18px Pretendard, Noto Sans KR, sans-serif";
+    ctx.font = "700 18px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
     ctx.fillText(`🪙 코인 ${coins}`, WIDTH / 2, 95);
 
     const types = ["timeClock", "energyShield", "pathGuide", "firstAid", "energyRecovery"];
@@ -10359,7 +10371,7 @@ function drawShopPanel() {
     drawSettingsButton(panel.x + panel.w - 56, arrowY, 48, 48, "▶");
 
     ctx.fillStyle = "#aeb8c5";
-    ctx.font = "600 13px Pretendard, Noto Sans KR, sans-serif";
+    ctx.font = "600 13px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
     const rowStart = 190;
     pageTypes.forEach((type, index) => {
         const y = rowStart + index * 108;
@@ -10380,11 +10392,11 @@ function drawShopPanel() {
 
         ctx.textAlign = "left";
         ctx.fillStyle = "#f1f4f7";
-        ctx.font = "700 16px Pretendard, Noto Sans KR, sans-serif";
+        ctx.font = "700 16px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
         ctx.fillText(`${data.icon} ${data.name}`, panel.x + 88, y - 18);
 
         ctx.fillStyle = "#9eabb9";
-        ctx.font = "12px Pretendard, Noto Sans KR, sans-serif";
+        ctx.font = "12px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
         if (type === "energyRecovery") {
             ctx.fillText("맵 넘기기 모두 소모 시 한 번만 작동 ·", panel.x + 88, y - 2);
             ctx.fillText("(1개 3회복 / 2개 5회복)", panel.x + 88, y + 14);
@@ -10393,7 +10405,7 @@ function drawShopPanel() {
         }
 
         ctx.fillStyle = "#cbd4dc";
-        ctx.font = "12px Pretendard, Noto Sans KR, sans-serif";
+        ctx.font = "12px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
         ctx.fillText(`보유 ${inventory}개 · 개당 ${price} 코인`, panel.x + 88, y + 27);
 
         // 구매 수량 조절
@@ -10404,7 +10416,7 @@ function drawShopPanel() {
 
         ctx.textAlign = "center";
         ctx.fillStyle = maxQty > 0 ? "#91e7b2" : "#7f8b99";
-        ctx.font = "11px Pretendard, Noto Sans KR, sans-serif";
+        ctx.font = "11px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
         ctx.fillText(
             maxQty > 0
                 ? `총 ${qty * price} 코인 · 구매 후 ${remaining} 코인 남음`
@@ -10445,7 +10457,7 @@ function drawInventoryButton() {
     ctx.font = "bold 22px Arial, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText("🎒", button.x + button.w / 2, button.y + button.h / 2 + 1);
+    drawClearEmoji("🎒", button.x + button.w / 2, button.y + button.h / 2 + 1, 25);
     ctx.restore();
 }
 
@@ -10466,7 +10478,7 @@ function drawInventoryPanel() {
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillStyle = "#fff";
-    ctx.font = "bold 28px Pretendard, Noto Sans KR, sans-serif";
+    ctx.font = "bold 28px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
     ctx.fillText("🎒 인벤토리", WIDTH / 2, 98);
 
     drawSettingsButton(panel.x + panel.w - 150, 78, 125, 34, "👔 스킨");
@@ -10523,12 +10535,12 @@ function drawInventoryPanel() {
         ctx.restore();
 
         ctx.fillStyle = "#cbd4dc";
-        ctx.font = "12px Pretendard, Noto Sans KR, sans-serif";
+        ctx.font = "12px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
         ctx.fillText(`${owned ? itemInventory[type] : 0}`, x + size / 2, y + size + 18);
     });
 
     ctx.fillStyle = "#aeb8c5";
-    ctx.font = "13px Pretendard, Noto Sans KR, sans-serif";
+    ctx.font = "13px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
     ctx.fillText("아이콘을 눌러 아이템 설명과 장착 상태를 확인하세요.", WIDTH / 2, 345);
 
     if (selectedItem) {
@@ -10589,11 +10601,11 @@ function drawInventoryDetailModal() {
 
     ctx.fillText(data.icon, detailIconX, 178);
 
-    ctx.font = "bold 25px Pretendard, Noto Sans KR, sans-serif";
+    ctx.font = "bold 25px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
     ctx.fillText(data.name, box.x + box.w / 2, 208);
 
     ctx.fillStyle = "#c5ced8";
-    ctx.font = "15px Pretendard, Noto Sans KR, sans-serif";
+    ctx.font = "15px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
     ctx.fillText(data.description, box.x + box.w / 2, 245);
     ctx.fillText(`보유 ${owned}개`, box.x + box.w / 2, 278);
 
@@ -10602,7 +10614,7 @@ function drawInventoryDetailModal() {
         drawSettingsButton(361, 292, 78, 38, `${selectedTimeClocks}개`);
         drawSettingsButton(446, 292, 42, 38, "+");
         ctx.fillStyle = "#9eabb9";
-        ctx.font = "12px Pretendard, Noto Sans KR, sans-serif";
+        ctx.font = "12px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
         ctx.fillText("한 게임에서 최대 5개 사용", box.x + box.w / 2, 342);
     }
 
@@ -10614,7 +10626,7 @@ function drawInventoryDetailModal() {
         drawSettingsButton(361, 292, 78, 38, `${selectedEnergyRecovery}개`);
         drawSettingsButton(446, 292, 42, 38, "+");
         ctx.fillStyle = "#9eabb9";
-        ctx.font = "12px Pretendard, Noto Sans KR, sans-serif";
+        ctx.font = "12px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
         ctx.fillText(
             `다음 사용: ${selectedEnergyRecovery}개 → 맵 넘기기 +${selectedEnergyRecovery === 1 ? 3 : 5}`,
             box.x + box.w / 2,
@@ -10652,10 +10664,10 @@ function drawSettingsPanel() {
     ctx.fill(); ctx.stroke();
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 28px Pretendard, Noto Sans KR, sans-serif";
+    ctx.font = "bold 28px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
     ctx.fillText("⚙ 설정", WIDTH / 2, 108);
     ctx.fillStyle = "#aeb8c5";
-    ctx.font = "600 15px Pretendard, Noto Sans KR, sans-serif";
+    ctx.font = "600 15px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
     ctx.fillText(`효과음 크기  ${Math.round(effectVolume * 100)}%`, WIDTH / 2, 175);
     const volumeBar = { x: WIDTH / 2 - 130, y: 195, w: 260, h: 8 };
     ctx.fillStyle = "rgba(255,255,255,0.10)";
@@ -10722,7 +10734,7 @@ function drawSkinPanel() {
         "#ffffff";
 
     ctx.font =
-        "bold 28px Pretendard, Noto Sans KR, sans-serif";
+        "bold 28px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
 
     ctx.fillText(
         "👔 스킨",
@@ -10803,7 +10815,7 @@ function drawSkinPanel() {
                     "#aeb8c5";
 
                 ctx.font =
-                    "600 15px Pretendard, Noto Sans KR, sans-serif";
+                    "600 15px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
 
                 ctx.textAlign =
                     "center";
@@ -10863,7 +10875,7 @@ function drawSkinPanel() {
                     "#f0f3f6";
 
                 ctx.font =
-                    "600 15px Pretendard, Noto Sans KR, sans-serif";
+                    "600 15px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
 
                 ctx.textAlign =
                     "center";
@@ -10906,7 +10918,7 @@ function drawSkinPanel() {
                 "#aeb8c5";
 
             ctx.font =
-                "600 15px Pretendard, Noto Sans KR, sans-serif";
+                "600 15px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
 
             ctx.textAlign =
                 "center";
@@ -11010,7 +11022,7 @@ function drawSkinPanel() {
                         : "#ffffff";
 
                 ctx.font =
-                    "600 16px Pretendard, Noto Sans KR, sans-serif";
+                    "600 16px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
 
                 ctx.textAlign =
                     "center";
@@ -11026,7 +11038,7 @@ function drawSkinPanel() {
 
                 if (selected.custom) {
                     ctx.font =
-                        "11px Pretendard, Noto Sans KR, sans-serif";
+                        "11px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
                     ctx.fillStyle =
                         luminance > 145
                             ? "rgba(16,19,24,0.72)"
@@ -11069,10 +11081,10 @@ function drawSkinPanel() {
         "#8f9aa8";
 
     ctx.font =
-        "13px Pretendard, Noto Sans KR, sans-serif";
+        "13px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
 
     ctx.fillStyle = "#aeb8c5";
-    ctx.font = "600 13px Pretendard, Noto Sans KR, sans-serif";
+    ctx.font = "600 13px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
     ctx.fillText(`효과음 크기  ${Math.round(effectVolume * 100)}%`, WIDTH / 2, 500);
 
     const volumeBar = { x: WIDTH / 2 - 130, y: 516, w: 260, h: 8 };
@@ -11222,7 +11234,7 @@ function drawEffectPreviewInBox(
         "rgba(255,255,255,0.94)";
 
     ctx.font =
-        "600 15px Pretendard, Noto Sans KR, sans-serif";
+        "600 15px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
 
     ctx.fillText(
         effect === "none"
@@ -11567,7 +11579,7 @@ function drawStartScreen() {
         "#f3f5f7";
 
     ctx.font =
-        "bold 48px Pretendard, Noto Sans KR, sans-serif";
+        "bold 48px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
 
     ctx.fillText(
         "슬라이딩",
@@ -11580,7 +11592,7 @@ function drawStartScreen() {
         "#8f9aa8";
 
     ctx.font =
-        "600 20px Pretendard, Noto Sans KR, sans-serif";
+        "600 20px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
 
     ctx.fillText(
         "끝 없는 미로 탈출",
@@ -11593,7 +11605,7 @@ function drawStartScreen() {
         "#dfe5ea";
 
     ctx.font =
-        "600 18px Pretendard, Noto Sans KR, sans-serif";
+        "600 18px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
 
     ctx.fillText(
         "키보드 조작 : W A S D 를 눌러 이동",
@@ -11617,7 +11629,7 @@ function drawStartScreen() {
         "#8995a3";
 
     ctx.font =
-        "15px Pretendard, Noto Sans KR, sans-serif";
+        "15px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
 
     // 홈 화면에서는 개인 최고 기록 2줄만 숨깁니다.
     // 기록 변수와 저장 기능은 게임 오버/점수 시스템에서 그대로 유지합니다.
@@ -11626,7 +11638,7 @@ function drawStartScreen() {
         "#dfe5ea";
 
     ctx.font =
-        "600 17px Pretendard, Noto Sans KR, sans-serif";
+        "600 17px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
 
     ctx.fillText(
         "최근 기록",
@@ -11636,7 +11648,7 @@ function drawStartScreen() {
 
 
     ctx.font =
-        "14px Pretendard, Noto Sans KR, sans-serif";
+        "14px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
 
 
     if (
@@ -11693,7 +11705,7 @@ function drawStartScreen() {
         "#ffffff";
 
     ctx.font =
-        "bold 20px Pretendard, Noto Sans KR, sans-serif";
+        "bold 20px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
 
     ctx.fillText(
         "키 사용 또는 더블 터치로 시작",
@@ -11774,7 +11786,7 @@ function drawGameOverScreen() {
         "#ff4d5d";
 
     ctx.font =
-        "bold 56px Pretendard, Noto Sans KR, sans-serif";
+        "bold 56px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
 
     ctx.fillText(
         "GAME OVER",
@@ -11787,7 +11799,7 @@ function drawGameOverScreen() {
         "#f1f4f7";
 
     ctx.font =
-        "600 22px Pretendard, Noto Sans KR, sans-serif";
+        "600 22px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
 
     ctx.fillText(
         `클리어 기록 : ${clearCount}회`,
@@ -11805,7 +11817,7 @@ function drawGameOverScreen() {
         "#ffd76a";
 
     ctx.font =
-        "bold 28px Pretendard, Noto Sans KR, sans-serif";
+        "bold 28px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
 
     ctx.fillText(
         `최종 점수 : ${calculateV28Score().toLocaleString("ko-KR")}점`,
@@ -11828,7 +11840,7 @@ function drawGameOverScreen() {
         "#8d98a6";
 
     ctx.font =
-        "16px Pretendard, Noto Sans KR, sans-serif";
+        "16px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
 
     ctx.fillText(
         "R 또는 SPACE : 시작 화면",
@@ -11878,16 +11890,16 @@ function drawMultiplayerResultScreen() {
     const title = gameState === "multiplayerWaitingResult" ? "경기 결과 대기 중" :
         multiplayerResult === multiplayerRole ? "승리!" : multiplayerResult === "draw" ? "무승부" : "패배";
     ctx.fillStyle = "#f3f5f7";
-    ctx.font = "bold 46px Pretendard, Noto Sans KR, sans-serif";
+    ctx.font = "bold 46px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
     ctx.fillText(title, WIDTH / 2, 205);
     ctx.fillStyle = "#aeb8c4";
-    ctx.font = "600 18px Pretendard, Noto Sans KR, sans-serif";
+    ctx.font = "600 18px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
     ctx.fillText(gameState === "multiplayerWaitingResult" ? "상대 플레이어의 결과를 기다리고 있습니다." : "2인용 경쟁 경기가 종료되었습니다.", WIDTH / 2, 270);
     ctx.fillStyle = "#7ddcff";
-    ctx.font = "600 16px Pretendard, Noto Sans KR, sans-serif";
+    ctx.font = "600 16px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
     ctx.fillText(`방 코드 ${multiplayerRoomCode}`, WIDTH / 2, 325);
     ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 18px Pretendard, Noto Sans KR, sans-serif";
+    ctx.font = "bold 18px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
     ctx.fillText("Space 또는 화면 터치로 시작 화면으로", WIDTH / 2, 470);
     ctx.restore();
 }
@@ -11912,11 +11924,11 @@ function drawEnergyRecoveryChoice() {
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillStyle = "#f3f5f7";
-    ctx.font = "bold 23px Pretendard, Noto Sans KR, sans-serif";
+    ctx.font = "bold 23px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
     ctx.fillText("🌀 에너지 복구 장치", WIDTH / 2, 240);
 
     ctx.fillStyle = "#aeb8c4";
-    ctx.font = "14px Pretendard, Noto Sans KR, sans-serif";
+    ctx.font = "14px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
     ctx.fillText("맵 넘기기를 모두 소모했습니다. 몇 개 사용할까요?", WIDTH / 2, 275);
 
     const canUse2 = itemInventory.energyRecovery >= 2;
@@ -11928,7 +11940,7 @@ function drawEnergyRecoveryChoice() {
     }
 
     ctx.fillStyle = "#7f8b99";
-    ctx.font = "12px Pretendard, Noto Sans KR, sans-serif";
+    ctx.font = "12px Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,Pretendard,Noto Sans KR,sans-serif";
     ctx.fillText(`현재 보유량: ${itemInventory.energyRecovery}개 · 이 게임에서는 1회만 사용 가능`, WIDTH / 2, 370);
     ctx.restore();
 }
