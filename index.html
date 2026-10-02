@@ -599,7 +599,7 @@ canvas {
     color: #e7edf2;
 }
 
-.ranking-table td:nth-child(2) {
+.ranking-table td:nth-child(3) {
     text-align: left;
     max-width: 220px;
     overflow: hidden;
@@ -734,8 +734,8 @@ canvas {
                 <thead>
                     <tr>
                         <th>순위</th>
-                        <th>닉네임</th>
                         <th>Lv.</th>
+                        <th>닉네임</th>
                         <th>점수</th>
                         <th>클리어</th>
                         <th>연속</th>
@@ -1200,15 +1200,15 @@ async function loadRanking(mode = rankingMode) {
         } else {
             body.innerHTML = rows.map((row, index) => {
                 const rank = Number(row.rank) || index + 1;
-                const nickname = row.nickname || row.name || "-";
                 const level = Math.max(1, Number(row.level) || 1);
+                const nickname = row.nickname || row.name || "-";
                 const score = Number(row.score) || 0;
                 const clears = Number(row.clears) || 0;
                 const streak = Number(row.maxStreak) || Number(row.max_streak) || 0;
                 return `<tr>
                     <td>${rank}</td>
-                    <td>${escapeHTML(nickname)}</td>
                     <td>Lv. ${level}</td>
+                    <td>${escapeHTML(nickname)}</td>
                     <td>${score.toLocaleString("ko-KR")}</td>
                     <td>${clears}</td>
                     <td>${streak}</td>
@@ -1221,7 +1221,7 @@ async function loadRanking(mode = rankingMode) {
             : "오늘의 랭킹입니다.";
     } catch (error) {
         status.textContent = error.message || "랭킹을 불러오지 못했습니다.";
-        body.innerHTML = `<tr><td colspan="6">랭킹 정보를 불러오지 못했습니다.</td></tr>`;
+        body.innerHTML = `<tr><td colspan="5">랭킹 정보를 불러오지 못했습니다.</td></tr>`;
     } finally {
         rankingLoading = false;
     }
@@ -2111,14 +2111,22 @@ function resetOneShotEffects() {
 try {
     const saved = Number(localStorage.getItem(EFFECT_VOLUME_KEY));
     if (Number.isFinite(saved)) effectVolume = Math.max(0, Math.min(1, saved));
-} catch (error) {}
-try {
-    const savedMusicVolume = Number(localStorage.getItem(MUSIC_VOLUME_KEY));
-    if (Number.isFinite(savedMusicVolume)) musicVolume = Math.max(0, Math.min(1, savedMusicVolume));
+    const savedMusic = Number(localStorage.getItem(MUSIC_VOLUME_KEY));
+    if (Number.isFinite(savedMusic)) musicVolume = Math.max(0, Math.min(1, savedMusic));
 } catch (error) {}
 
 function saveEffectVolume() {
     try { localStorage.setItem(EFFECT_VOLUME_KEY, String(effectVolume)); } catch (error) {}
+}
+
+function saveMusicVolume() {
+    try { localStorage.setItem(MUSIC_VOLUME_KEY, String(musicVolume)); } catch (error) {}
+}
+
+function setMusicVolume(value) {
+    musicVolume = Math.max(0, Math.min(1, Number(value) || 0));
+    saveMusicVolume();
+    requestSettingsRender();
 }
 
 function setEffectVolume(value) {
@@ -2129,9 +2137,6 @@ function setEffectVolume(value) {
     saveEffectVolume();
     requestSettingsRender();
 }
-
-function saveMusicVolume() { try { localStorage.setItem(MUSIC_VOLUME_KEY, String(musicVolume)); } catch (error) {} }
-function setMusicVolume(value) { musicVolume = Math.max(0, Math.min(1, Number(value) || 0)); saveMusicVolume(); requestSettingsRender(); }
 
 function getSoundVolume(type) {
     if (type === "uiClick") return effectVolume * 0.10;
@@ -2582,19 +2587,13 @@ Object.assign(volumeTouchArea.style, {
     WebkitUserSelect: "none"
 });
 document.body.appendChild(volumeTouchArea);
-const musicVolumeTouchArea = document.createElement("div");
-musicVolumeTouchArea.id = "musicVolumeTouchArea";
-Object.assign(musicVolumeTouchArea.style, volumeTouchArea.style);
-document.body.appendChild(musicVolumeTouchArea);
 
 let volumeTouchPointerId = null;
-let musicVolumeTouchPointerId = null;
 
 function positionVolumeTouchArea() {
     if (!volumeTouchArea || !canvas) return;
     if (!settingsOpen || skinOpen) {
         volumeTouchArea.style.display = "none";
-        musicVolumeTouchArea.style.display = "none";
         return;
     }
 
@@ -2609,12 +2608,6 @@ function positionVolumeTouchArea() {
     volumeTouchArea.style.top = `${rect.top + (bar.y - 22) * scaleY}px`;
     volumeTouchArea.style.width = `${(bar.w + 32) * scaleX}px`;
     volumeTouchArea.style.height = `${52 * scaleY}px`;
-    const musicBar = { x: WIDTH / 2 - 130, y: 295, w: 260, h: 8 };
-    musicVolumeTouchArea.style.display = "block";
-    musicVolumeTouchArea.style.left = `${rect.left + (musicBar.x - 16) * scaleX}px`;
-    musicVolumeTouchArea.style.top = `${rect.top + (musicBar.y - 22) * scaleY}px`;
-    musicVolumeTouchArea.style.width = `${(musicBar.w + 32) * scaleX}px`;
-    musicVolumeTouchArea.style.height = `${52 * scaleY}px`;
 }
 
 function setVolumeFromClientX(clientX) {
@@ -2624,34 +2617,6 @@ function setVolumeFromClientX(clientX) {
     setEffectVolume((x - bar.x) / bar.w);
     requestSettingsRender();
 }
-function setMusicVolumeFromClientX(clientX) {
-    const rect = canvas.getBoundingClientRect();
-    const bar = { x: WIDTH / 2 - 130, w: 260 };
-    const x = (clientX - rect.left) * (WIDTH / rect.width);
-    setMusicVolume((x - bar.x) / bar.w);
-}
-
-musicVolumeTouchArea.addEventListener("pointerdown", event => {
-    if (!settingsOpen || skinOpen) return;
-    musicVolumeTouchPointerId = event.pointerId;
-    try { musicVolumeTouchArea.setPointerCapture(event.pointerId); } catch (error) {}
-    setMusicVolumeFromClientX(event.clientX);
-    event.preventDefault(); event.stopPropagation();
-}, { passive: false });
-musicVolumeTouchArea.addEventListener("pointermove", event => {
-    if (musicVolumeTouchPointerId !== event.pointerId) return;
-    setMusicVolumeFromClientX(event.clientX);
-    event.preventDefault(); event.stopPropagation();
-}, { passive: false });
-function endMusicVolumePointer(event) {
-    if (musicVolumeTouchPointerId !== event.pointerId) return;
-    setMusicVolumeFromClientX(event.clientX);
-    try { musicVolumeTouchArea.releasePointerCapture(event.pointerId); } catch (error) {}
-    musicVolumeTouchPointerId = null;
-    event.preventDefault(); event.stopPropagation();
-}
-musicVolumeTouchArea.addEventListener("pointerup", endMusicVolumePointer, { passive: false });
-musicVolumeTouchArea.addEventListener("pointercancel", endMusicVolumePointer, { passive: false });
 
 volumeTouchArea.addEventListener("pointerdown", event => {
     if (!settingsOpen) return;
@@ -10711,31 +10676,35 @@ function drawSettingsPanel() {
     ctx.fillStyle = "#ffffff";
     ctx.font = "bold 28px Pretendard, Noto Sans KR, sans-serif";
     ctx.fillText("⚙ 설정", WIDTH / 2, 108);
+
     ctx.fillStyle = "#aeb8c5";
     ctx.font = "600 15px Pretendard, Noto Sans KR, sans-serif";
     ctx.fillText(`효과음 크기  ${Math.round(effectVolume * 100)}%`, WIDTH / 2, 175);
-    const volumeBar = { x: WIDTH / 2 - 130, y: 195, w: 260, h: 8 };
+    const effectBar = { x: WIDTH / 2 - 130, y: 195, w: 260, h: 8 };
     ctx.fillStyle = "rgba(255,255,255,0.10)";
-    ctx.beginPath(); ctx.roundRect(volumeBar.x, volumeBar.y, volumeBar.w, volumeBar.h, 5); ctx.fill();
+    ctx.beginPath(); ctx.roundRect(effectBar.x, effectBar.y, effectBar.w, effectBar.h, 5); ctx.fill();
     ctx.fillStyle = "#7ddcff";
-    ctx.beginPath(); ctx.roundRect(volumeBar.x, volumeBar.y, volumeBar.w * effectVolume, volumeBar.h, 5); ctx.fill();
+    ctx.beginPath(); ctx.roundRect(effectBar.x, effectBar.y, effectBar.w * effectVolume, effectBar.h, 5); ctx.fill();
     ctx.fillStyle = "#dfe5ea";
-    ctx.beginPath(); ctx.arc(volumeBar.x + volumeBar.w * effectVolume, volumeBar.y + volumeBar.h / 2, 8, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(effectBar.x + effectBar.w * effectVolume, effectBar.y + effectBar.h / 2, 8, 0, Math.PI * 2); ctx.fill();
+
     ctx.fillStyle = "#aeb8c5";
-    ctx.font = "600 15px Pretendard, Noto Sans KR, sans-serif";
-    ctx.fillText(`🎵 음악 크기  ${Math.round(musicVolume * 100)}%`, WIDTH / 2, 275);
-    const musicBar = { x: WIDTH / 2 - 130, y: 295, w: 260, h: 8 };
+    ctx.fillText(`배경음악 크기  ${Math.round(musicVolume * 100)}%`, WIDTH / 2, 245);
+    const musicBar = { x: WIDTH / 2 - 130, y: 265, w: 260, h: 8 };
     ctx.fillStyle = "rgba(255,255,255,0.10)";
     ctx.beginPath(); ctx.roundRect(musicBar.x, musicBar.y, musicBar.w, musicBar.h, 5); ctx.fill();
-    ctx.fillStyle = "#7ddcff";
+    ctx.fillStyle = "#b995ff";
     ctx.beginPath(); ctx.roundRect(musicBar.x, musicBar.y, musicBar.w * musicVolume, musicBar.h, 5); ctx.fill();
     ctx.fillStyle = "#dfe5ea";
     ctx.beginPath(); ctx.arc(musicBar.x + musicBar.w * musicVolume, musicBar.y + musicBar.h / 2, 8, 0, Math.PI * 2); ctx.fill();
-    drawSettingsButton(WIDTH / 2 - 130, 360, 260, 48, "🚪 로그아웃");
+
+    drawSettingsButton(WIDTH / 2 - 130, 340, 260, 48, "🚪 로그아웃");
     drawSettingsButton(WIDTH / 2 - 80, 450, 160, 32, "닫기");
+    ctx.fillStyle = "#687484";
+    ctx.font = "11px Pretendard, Noto Sans KR, sans-serif";
+    ctx.fillText("배경음악은 추후 음악 추가 시 이 설정을 사용합니다.", WIDTH / 2, 305);
     ctx.restore();
 }
-
 function drawSkinPanel() {
 
     ctx.save();
@@ -11583,10 +11552,11 @@ function handleSettingsTap(x, y) {
         positionVolumeTouchArea();
         return true;
     }
-    if (isInsideRect(x, y, { x: WIDTH / 2 - 130, y: 265, w: 260, h: 70 })) {
+    if (isInsideRect(x, y, { x: WIDTH / 2 - 130, y: 245, w: 260, h: 42 })) {
+        setMusicVolume((x - (WIDTH / 2 - 130)) / 260);
         return true;
     }
-    if (isInsideRect(x, y, { x: WIDTH / 2 - 130, y: 360, w: 260, h: 48 })) {
+    if (isInsideRect(x, y, { x: WIDTH / 2 - 130, y: 340, w: 260, h: 48 })) {
         logoutToEntry();
         return true;
     }
