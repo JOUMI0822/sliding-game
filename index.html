@@ -448,14 +448,14 @@ canvas {
 
 .start-menu-competitive {
     position: absolute;
-    top: 100px;
+    top: 58px;
     right: 12px;
     pointer-events: auto;
 }
 
 .start-menu-ranking {
     position: absolute;
-    top: 58px;
+    top: 100px;
     right: 12px;
     pointer-events: auto;
 }
@@ -625,8 +625,8 @@ canvas {
         left: 8px;
         right: auto;
     }
-    .start-menu-ranking { top: 54px; right: 8px; }
-    .start-menu-competitive { top: 91px; right: 8px; }
+    .start-menu-ranking { top: 34px; right: 8px; }
+    .start-menu-competitive { top: 69px; right: 8px; }
 
     .start-menu-logout {
         right: 8px;
@@ -708,9 +708,7 @@ canvas {
                     <div class="start-account-exp-text">EXP · 랭킹/레벨 저장 제외</div>
                 </div>
             </div>
-            <div class="start-menu-competitive">
-                <button id="startMultiplayerButton" class="start-menu-button" type="button">⚔ 2인 대전</button>
-            </div>
+            <div class="start-menu-competitive"><button id="startMultiplayerButton" class="start-menu-button" type="button">⚔ 2인 대전</button></div>
             <div class="start-menu-ranking">
                 <button id="startRankingButton" class="start-menu-button" type="button">🏆 랭킹</button>
             </div>
@@ -1295,7 +1293,15 @@ function bindEntryAndRankingUI() {
     });
 
     const rankingPanel = document.getElementById("rankingPanel");
-    rankingPanel?.addEventListener("pointerdown", event => event.stopPropagation());
+    rankingPanel?.addEventListener("pointerdown", event => {
+        if (event.target === rankingPanel) {
+            event.preventDefault();
+            event.stopPropagation();
+            closeRankingPanel();
+            return;
+        }
+        event.stopPropagation();
+    });
     rankingPanel?.addEventListener("touchstart", event => event.stopPropagation(), { passive: true });
 
     document.querySelectorAll("#startMenuOverlay button").forEach(button => {
@@ -1910,7 +1916,7 @@ function drawMultiplayerMenu() {
 
     ctx.fillStyle = "#f3f5f7";
     ctx.font = "bold 30px Pretendard, Noto Sans KR, sans-serif";
-    ctx.fillText("2인용 경쟁", WIDTH / 2, 125);
+    ctx.fillText("2인 대전", WIDTH / 2, 125);
 
     if (multiplayerMatchmaking) {
         ctx.fillStyle = "#aeb8c4";
@@ -5520,8 +5526,21 @@ function onDailyQuestShieldBlock() {
     saveDailyQuestState();
 }
 
+function getSkinButton() { return { x: 168, y: 74, w: 42, h: 42 }; }
+
+function drawSkinButton() {
+    const b = getSkinButton();
+    ctx.save();
+    ctx.fillStyle = "rgba(9,12,17,0.68)";
+    ctx.strokeStyle = "rgba(255,255,255,0.14)";
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.roundRect(b.x,b.y,b.w,b.h,12); ctx.fill(); ctx.stroke();
+    drawClearEmoji("👔", b.x+b.w/2, b.y+b.h/2+1, 25);
+    ctx.restore();
+}
+
 function getQuestButton() {
-    return { x: 168, y: 74, w: 42, h: 42 };
+    return { x: 220, y: 74, w: 42, h: 42 };
 }
 
 function drawQuestButton() {
@@ -11053,6 +11072,21 @@ function drawSkinPanel() {
             }
         }
     );
+    ctx.fillStyle =
+        "#8f9aa8";
+
+    ctx.font =
+        "13px Pretendard, Noto Sans KR, sans-serif";
+
+    drawSettingsButton(
+        WIDTH / 2 - 80,
+        550,
+        160,
+        26,
+        "닫기"
+    );
+
+
     ctx.restore();
 }
 
@@ -11232,12 +11266,18 @@ function handleSkinSettingTap(x, y) {
 function handleSettingsTap(x, y) {
     refreshDailyQuestIfNeeded();
     const questButton = getQuestButton();
+    const skinButton = getSkinButton();
     const shopButton = getShopButton();
     const inventoryButton = getInventoryButton();
     const gear = getStartSettingsButton();
 
     // 2인용 메뉴가 열려 있으면 다른 시작 화면 기능보다 먼저 처리
     if (multiplayerOpen) {
+        const multiplayerPanel = { x: 135, y: 80, w: 530, h: 440 };
+        if (x < multiplayerPanel.x || x > multiplayerPanel.x + multiplayerPanel.w || y < multiplayerPanel.y || y > multiplayerPanel.y + multiplayerPanel.h) {
+            closeMultiplayerMenu();
+            return true;
+        }
         if (multiplayerMatchmaking) {
             if (isInsideRect(x, y, { x: 205, y: 345, w: 390, h: 48 })) {
                 cancelMultiplayerMatchmaking();
@@ -11291,6 +11331,12 @@ function handleSettingsTap(x, y) {
                 return true;
             }
         }
+        return true;
+    }
+
+    if (!shopOpen && !inventoryOpen && !settingsOpen && !multiplayerOpen && !questOpen && !skinOpen && isInsideRect(x, y, skinButton)) {
+        skinOpen = true;
+        requestSettingsRender();
         return true;
     }
 
@@ -11659,6 +11705,7 @@ function drawStartScreen() {
 
 
     drawQuestButton();
+    drawSkinButton();
     drawShopButton();
     drawInventoryButton();
     drawSettingsGear();
