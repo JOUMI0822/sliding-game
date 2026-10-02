@@ -471,11 +471,12 @@ canvas {
     min-width: 92px;
     height: 34px;
     padding: 0 10px;
-    border: 1px solid rgba(255,255,255,0.18);
-    border-radius: 8px;
-    background: rgba(15,19,25,0.82);
-    color: #f2f5f7;
+    border: 1px solid rgba(255,255,255,0.14);
+    border-radius: 9px;
+    background: rgba(9,12,17,0.68);
+    color: #cbd4dc;
     font: 700 12px Pretendard, "Noto Sans KR", Arial, sans-serif;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.025);
     cursor: pointer;
     touch-action: manipulation;
 }
@@ -5527,8 +5528,8 @@ function getQuestButton() {
 function drawQuestButton() {
     const b = getQuestButton();
     ctx.save();
-    ctx.fillStyle = "rgba(255,255,255,0.10)";
-    ctx.strokeStyle = "rgba(255,255,255,0.25)";
+    ctx.fillStyle = "rgba(9,12,17,0.68)";
+    ctx.strokeStyle = "rgba(255,255,255,0.14)";
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.roundRect(b.x, b.y, b.w, b.h, 12);
@@ -10147,8 +10148,8 @@ function drawShopButton() {
     const button = getShopButton();
 
     ctx.save();
-    ctx.fillStyle = "rgba(255,255,255,0.10)";
-    ctx.strokeStyle = "rgba(255,255,255,0.25)";
+    ctx.fillStyle = "rgba(9,12,17,0.68)";
+    ctx.strokeStyle = "rgba(255,255,255,0.14)";
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.roundRect(button.x, button.y, button.w, button.h, 12);
@@ -10197,10 +10198,10 @@ function drawSettingsGear() {
     ctx.save();
 
     ctx.fillStyle =
-        "rgba(255,255,255,0.10)";
+        "rgba(9,12,17,0.68)";
 
     ctx.strokeStyle =
-        "rgba(255,255,255,0.25)";
+        "rgba(255,255,255,0.14)";
 
     ctx.lineWidth = 1;
 
@@ -10218,7 +10219,7 @@ function drawSettingsGear() {
     ctx.stroke();
 
     ctx.fillStyle =
-        "#dfe5ea";
+        "#cbd4dc";
 
     ctx.font =
         "bold 25px Arial, sans-serif";
@@ -10248,45 +10249,22 @@ function drawSettingsButton(
     h,
     textValue
 ) {
-
-    ctx.fillStyle =
-        "rgba(255,255,255,0.08)";
-
-    ctx.strokeStyle =
-        "rgba(255,255,255,0.22)";
-
+    // 닉네임 박스와 동일한 공통 버튼 스타일
+    ctx.save();
+    ctx.fillStyle = "rgba(9,12,17,0.68)";
+    ctx.strokeStyle = "rgba(255,255,255,0.14)";
     ctx.lineWidth = 1;
-
     ctx.beginPath();
-
-    ctx.roundRect(
-        x,
-        y,
-        w,
-        h,
-        9
-    );
-
+    ctx.roundRect(x, y, w, h, Math.min(9, h / 2));
     ctx.fill();
     ctx.stroke();
 
-    ctx.fillStyle =
-        "#f0f3f6";
-
-    ctx.font =
-        "600 15px Pretendard, Noto Sans KR, sans-serif";
-
-    ctx.textAlign =
-        "center";
-
-    ctx.textBaseline =
-        "middle";
-
-    ctx.fillText(
-        textValue,
-        x + w / 2,
-        y + h / 2
-    );
+    ctx.fillStyle = "#cbd4dc";
+    ctx.font = "700 15px Pretendard, Noto Sans KR, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(textValue, x + w / 2, y + h / 2);
+    ctx.restore();
 }
 
 
@@ -10445,8 +10423,8 @@ function getInventoryButton() {
 function drawInventoryButton() {
     const button = getInventoryButton();
     ctx.save();
-    ctx.fillStyle = "rgba(255,255,255,0.10)";
-    ctx.strokeStyle = "rgba(255,255,255,0.25)";
+    ctx.fillStyle = "rgba(9,12,17,0.68)";
+    ctx.strokeStyle = "rgba(255,255,255,0.14)";
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.roundRect(button.x, button.y, button.w, button.h, 12);
