@@ -708,7 +708,9 @@ canvas {
                     <div class="start-account-exp-text">EXP · 랭킹/레벨 저장 제외</div>
                 </div>
             </div>
-            <div class="start-menu-competitive" aria-hidden="true"></div>
+            <div class="start-menu-competitive">
+                <button id="startMultiplayerButton" class="start-menu-button" type="button">⚔ 2인 대전</button>
+            </div>
             <div class="start-menu-ranking">
                 <button id="startRankingButton" class="start-menu-button" type="button">🏆 랭킹</button>
             </div>
@@ -1264,6 +1266,13 @@ function bindEntryAndRankingUI() {
         openRankingPanel("today");
     });
 
+    document.getElementById("startMultiplayerButton")?.addEventListener("click", event => {
+        event.preventDefault();
+        event.stopPropagation();
+        playUIClickSound();
+        openMultiplayerMenu();
+    });
+
     document.getElementById("rankingClose")?.addEventListener("click", event => {
         event.preventDefault();
         event.stopPropagation();
@@ -1301,7 +1310,7 @@ bindEntryAndRankingUI();
 showEntryGate();
 
 /* =========================================================
-   2인용 경쟁 모드 준비 상태
+   2인 대전 모드 준비 상태
    - 현재는 방/코드/시드 UI까지 준비
    - 실제 기기 간 연결은 다음 단계에서 WebRTC + 시그널링 서버 연결
 ========================================================= */
@@ -1901,7 +1910,7 @@ function drawMultiplayerMenu() {
 
     ctx.fillStyle = "#f3f5f7";
     ctx.font = "bold 30px Pretendard, Noto Sans KR, sans-serif";
-    ctx.fillText("2인용 경쟁", WIDTH / 2, 125);
+    ctx.fillText("2인 대전", WIDTH / 2, 125);
 
     if (multiplayerMatchmaking) {
         ctx.fillStyle = "#aeb8c4";
@@ -2560,7 +2569,7 @@ let volumeTouchPointerId = null;
 
 function positionVolumeTouchArea() {
     if (!volumeTouchArea || !canvas) return;
-    // 볼륨 조절은 ⚙ 설정에서만 표시합니다. 👔 스킨 창에는 표시하지 않습니다.
+    // 볼륨은 ⚙ 설정에서만 표시. 👔 스킨 창에는 표시하지 않습니다.
     if (!settingsOpen || skinOpen) {
         volumeTouchArea.style.display = "none";
         return;
@@ -11862,7 +11871,7 @@ function drawMultiplayerResultScreen() {
     ctx.fillText(title, WIDTH / 2, 205);
     ctx.fillStyle = "#aeb8c4";
     ctx.font = "600 18px Pretendard, Noto Sans KR, sans-serif";
-    ctx.fillText(gameState === "multiplayerWaitingResult" ? "상대 플레이어의 결과를 기다리고 있습니다." : "2인용 경쟁 경기가 종료되었습니다.", WIDTH / 2, 270);
+    ctx.fillText(gameState === "multiplayerWaitingResult" ? "상대 플레이어의 결과를 기다리고 있습니다." : "2인 대전 경기가 종료되었습니다.", WIDTH / 2, 270);
     ctx.fillStyle = "#7ddcff";
     ctx.font = "600 16px Pretendard, Noto Sans KR, sans-serif";
     ctx.fillText(`방 코드 ${multiplayerRoomCode}`, WIDTH / 2, 325);
