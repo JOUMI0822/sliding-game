@@ -421,11 +421,8 @@ canvas {
     top: 12px;
     left: 12px;
     right: auto;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 6px;
-    pointer-events: auto;
+    display: block;
+    pointer-events: none;
 }
 
 .start-menu-account {
@@ -448,6 +445,20 @@ canvas {
 .start-account-exp { width:100%; height:5px; margin-top:5px; overflow:hidden; border-radius:999px; background:rgba(255,255,255,0.10); }
 .start-account-exp-fill { width:0%; height:100%; border-radius:inherit; background:linear-gradient(90deg,#63b8ff,#7ddcff); transition:width .18s ease; }
 .start-account-exp-text { margin-top:3px; color:#7f8b99; font-size:8px; text-align:right; white-space:nowrap; }
+
+.start-menu-competitive {
+    position: absolute;
+    top: 58px;
+    right: 12px;
+    pointer-events: auto;
+}
+
+.start-menu-ranking {
+    position: absolute;
+    top: 100px;
+    right: 12px;
+    pointer-events: auto;
+}
 
 .start-menu-logout {
     position: absolute;
@@ -613,6 +624,8 @@ canvas {
         left: 8px;
         right: auto;
     }
+    .start-menu-competitive { top: 54px; right: 8px; }
+    .start-menu-ranking { top: 91px; right: 8px; }
 
     .start-menu-logout {
         right: 8px;
@@ -688,12 +701,15 @@ canvas {
 
         <div id="startMenuOverlay" aria-hidden="true">
             <div class="start-menu-actions">
-                <button id="startRankingButton" class="start-menu-button" type="button">🏆 랭킹</button>
                 <div class="start-menu-account" id="startMenuAccount">
                     <div class="start-account-main"><span class="start-account-level">Lv. 1</span><span class="start-account-name">게스트 모드</span></div>
                     <div class="start-account-exp"><div class="start-account-exp-fill"></div></div>
-                    <div class="start-account-exp-text">EXP 0 / 100</div>
+                    <div class="start-account-exp-text">EXP · 랭킹/레벨 저장 제외</div>
                 </div>
+            </div>
+            <div class="start-menu-competitive" aria-hidden="true"></div>
+            <div class="start-menu-ranking">
+                <button id="startRankingButton" class="start-menu-button" type="button">🏆 랭킹</button>
             </div>
             <div class="start-menu-logout">
                 <button id="startLogoutButton" class="start-menu-button" type="button">🚪 로그아웃</button>
@@ -813,7 +829,6 @@ let pendingExpAward = 0;
 let pendingExpReason = "";
 let expResultData = null;
 let expResultSubmitting = false;
-let expResultSaved = true;
 let expAnimation = null;
 
 function getLevelRequiredExp(level) {
@@ -844,6 +859,17 @@ function buildLocalProgressAfterAward(amount) {
     return {level:lv,exp:xp};
 }
 function formatExp(value) { return Math.max(0,Math.floor(Number(value)||0)).toLocaleString("ko-KR"); }
+async function refreshPlayerProgress() {
+    if (!currentAccount || guestMode) { setPlayerProgress(DEFAULT_LEVEL,DEFAULT_EXP); return; }
+    try { const data=await apiJSON("/api/progress"); setPlayerProgress(data?.level ?? DEFAULT_LEVEL,data?.exp ?? DEFAULT_EXP); }
+    catch(error){ setPlayerProgress(currentAccount.level ?? DEFAULT_LEVEL,currentAccount.exp ?? DEFAULT_EXP); console.warn("레벨/EXP 불러오기 실패",error); }
+}
+async function submitExperienceAward(amount, reason, stats={}) {
+    if(!currentAccount || guestMode || !gameAccessGranted || amount<=0) return {level:playerLevel,exp:playerExp,saved:true};
+    try { const data=await apiJSON("/api/progress/award",{method:"POST",body:JSON.stringify({amount,reason,...stats})}); setPlayerProgress(data?.level ?? playerLevel,data?.exp ?? playerExp); return data; }
+    catch(error){ console.warn("EXP 저장 실패",error); return {level:playerLevel,exp:playerExp,awarded:amount,saved:false}; }
+}
+
 
 let lifeLossCount = 0;
 let mapSkipCount = 0;
@@ -970,17 +996,6 @@ async function apiJSON(path, options = {}) {
     }
 
     return data;
-}
-
-async function refreshPlayerProgress() {
-    if (!currentAccount || guestMode) { setPlayerProgress(DEFAULT_LEVEL,DEFAULT_EXP); return; }
-    try { const data=await apiJSON("/api/progress"); setPlayerProgress(data?.level ?? DEFAULT_LEVEL,data?.exp ?? DEFAULT_EXP); }
-    catch(error){ setPlayerProgress(currentAccount.level ?? DEFAULT_LEVEL,currentAccount.exp ?? DEFAULT_EXP); console.warn("레벨/EXP 불러오기 실패",error); }
-}
-async function submitExperienceAward(amount, reason, stats={}) {
-    if(!currentAccount || guestMode || !gameAccessGranted || amount<=0) return {level:playerLevel,exp:playerExp,awarded:0,saved:true};
-    try { const data=await apiJSON("/api/progress/award",{method:"POST",body:JSON.stringify({amount,reason,...stats})}); setPlayerProgress(data?.level ?? playerLevel,data?.exp ?? playerExp); return data; }
-    catch(error){ console.warn("EXP 저장 실패",error); return {level:playerLevel,exp:playerExp,awarded:amount,saved:false,error:error.message}; }
 }
 
 const LOGIN_REMEMBER_KEY = "slidingMazeRememberLogin_v1";
@@ -1544,9 +1559,6 @@ function handleMultiplayerMessage(data) {
         multiplayerOpen = false;
         pendingExpAward = calculateMultiplayerExperience();
         pendingExpReason = multiplayerResult === multiplayerRole ? "multiplayer_win" : "multiplayer_loss";
-        expResultData = null;
-        expResultSubmitting = false;
-        expResultSaved = true;
         setMessage(
             multiplayerResult === multiplayerRole ? "승리했습니다!" :
             multiplayerResult === "draw" ? "무승부입니다." : "패배했습니다."
@@ -1676,9 +1688,6 @@ function handleMultiplayerMessage(data) {
         multiplayerOpen = false;
         pendingExpAward = calculateMultiplayerExperience();
         pendingExpReason = multiplayerResult === multiplayerRole ? "multiplayer_win" : "multiplayer_loss";
-        expResultData = null;
-        expResultSubmitting = false;
-        expResultSaved = true;
         setMessage(
             multiplayerResult === multiplayerRole ? "승리했습니다!" :
             multiplayerResult === "draw" ? "무승부입니다." : "패배했습니다."
@@ -5498,7 +5507,7 @@ function onDailyQuestShieldBlock() {
 }
 
 function getQuestButton() {
-    return { x: WIDTH - 234, y: 28, w: 42, h: 42 };
+    return { x: 168, y: 74, w: 42, h: 42 };
 }
 
 function drawQuestButton() {
@@ -6669,9 +6678,6 @@ function finishGameOver() {
     submitV28Score();
     pendingExpAward = calculateSoloExperience();
     pendingExpReason = "solo";
-    expResultData = null;
-    expResultSubmitting = false;
-    expResultSaved = true;
 
     setMessage(
         `게임 오버 — ${clearCount}회 클리어 / ${maxClearStreak}회 연속 클리어`
@@ -6828,7 +6834,7 @@ function updateUI() {
 
     const mapSkipsElement = document.getElementById("mapSkips");
     mapSkipsElement.textContent = `맵 넘기기 ${skipIcons}`;
-    mapSkipsElement.style.display = (multiplayerMatchActive || gameState === "multiplayerWaitingRound" || gameState === "multiplayerWaitingResult" || gameState === "multiplayerResult" || gameState === "expResult") ? "none" : "block";
+    mapSkipsElement.style.display = (multiplayerMatchActive || gameState === "multiplayerWaitingRound" || gameState === "multiplayerWaitingResult" || gameState === "multiplayerResult") ? "none" : "block";
 
     const itemInfo = document.getElementById("itemInfo");
     const itemWarning = document.getElementById("itemWarning");
@@ -6851,57 +6857,31 @@ function updateUI() {
    EXP 결과 화면
 ========================================================= */
 function startExperienceResult() {
-    if (expResultSubmitting) return;
+    if (expResultData) return;
     const amount=Math.max(0,Math.floor(pendingExpAward||0));
-    const before=normalizeProgress(playerLevel,playerExp);
-    const target=buildLocalProgressAfterAward(amount);
-    expResultData={beforeLevel:before.level,beforeExp:before.exp,targetLevel:target.level,targetExp:target.exp,amount,reason:pendingExpReason,saved:true,displayLevel:before.level,displayExp:before.exp,levelUp:false};
-    expResultSubmitting=true; expResultSaved=true; expAnimation=null; gameState="expResult";
-    const stats=pendingExpReason==="solo" ? {mode:"solo",clears:clearCount,maxStreak:maxClearStreak} : {mode:"multiplayer",result:multiplayerResult,role:multiplayerRole,clears:clearCount,maxStreak:maxClearStreak,livesRemaining:lives};
-    submitExperienceAward(amount,pendingExpReason,stats).then(data=>{
-        if(!expResultData) return;
-        if(data?.saved===false){expResultData.saved=false;expResultSaved=false;} else {expResultData.targetLevel=Number(data?.level??expResultData.targetLevel);expResultData.targetExp=Number(data?.exp??expResultData.targetExp);expResultSaved=true;}
-        expResultSubmitting=false;
-    });
-    updateUI();
+    const before=normalizeProgress(playerLevel,playerExp), target=buildLocalProgressAfterAward(amount);
+    expResultData={beforeLevel:before.level,beforeExp:before.exp,targetLevel:target.level,targetExp:target.exp,amount,displayLevel:before.level,displayExp:before.exp,saved:true};
+    expAnimation={start:performance.now(),duration:1800,done:false};
+    gameState="expResult"; updateStartMenuOverlay();
+    const stats=pendingExpReason==="solo"?{mode:"solo",clears:clearCount,maxStreak:maxClearStreak}:{mode:"multiplayer",result:multiplayerResult,role:multiplayerRole,clears:clearCount,maxStreak:maxClearStreak,livesRemaining:lives};
+    submitExperienceAward(amount,pendingExpReason,stats).then(data=>{ if(!expResultData)return; expResultData.saved=data?.saved!==false; expResultData.targetLevel=Number(data?.level??expResultData.targetLevel); expResultData.targetExp=Number(data?.exp??expResultData.targetExp); });
 }
 function finishExperienceResult() {
-    if(expResultData && expAnimation && !expAnimation.done) return;
-    if(expResultData) setPlayerProgress(expResultData.targetLevel,expResultData.targetExp);
+    if(!expResultData || !expAnimation?.done) return;
+    setPlayerProgress(expResultData.targetLevel,expResultData.targetExp);
     closeMultiplayerSocket(); multiplayerOpen=false; multiplayerRole=null; multiplayerResult=null;
-    pendingExpAward=0; pendingExpReason=""; expResultData=null; expAnimation=null; expResultSubmitting=false;
-    gameState="start"; setMessage(""); updateStartMenuOverlay(); updateUI();
+    pendingExpAward=0; pendingExpReason=""; expResultData=null; expAnimation=null; gameState="start"; setMessage(""); updateStartMenuOverlay(); updateUI();
 }
 function updateExpAnimation(now) {
-    if(gameState!=="expResult" || !expResultData) return;
-    if(!expAnimation) expAnimation={start:now,duration:1800,done:false};
-    const targetLevel=expResultData.targetLevel,targetExp=expResultData.targetExp,startLevel=expResultData.beforeLevel,startExp=expResultData.beforeExp;
-    const t=Math.max(0,Math.min(1,(now-expAnimation.start)/expAnimation.duration));
-    const eased=1-Math.pow(1-t,3);
-    let total=startExp+(targetExp+Array.from({length:Math.max(0,targetLevel-startLevel)},(_,i)=>getLevelRequiredExp(startLevel+i)).reduce((a,b)=>a+b,0)-startExp)*eased;
-    let level=startLevel,exp=total;
-    while(level<targetLevel && exp>=getLevelRequiredExp(level)){exp-=getLevelRequiredExp(level);level++;}
-    expResultData.displayLevel=level; expResultData.displayExp=Math.max(0,exp); expResultData.levelUp=level>startLevel;
-    if(t>=1){expResultData.displayLevel=targetLevel;expResultData.displayExp=targetExp;expAnimation.done=true;setPlayerProgress(targetLevel,targetExp);}
+    if(gameState!=="expResult"||!expResultData||!expAnimation)return;
+    const t=Math.min(1,Math.max(0,(now-expAnimation.start)/expAnimation.duration));
+    const eased=1-Math.pow(1-t,3); const start=expResultData.beforeLevel, target=expResultData.targetLevel;
+    let total=expResultData.beforeExp + (expResultData.targetExp + Array.from({length:Math.max(0,target-start)},(_,i)=>getLevelRequiredExp(start+i)).reduce((a,b)=>a+b,0)-expResultData.beforeExp)*eased;
+    let lv=start, xp=total; while(lv<target&&xp>=getLevelRequiredExp(lv)){xp-=getLevelRequiredExp(lv);lv++;}
+    expResultData.displayLevel=lv; expResultData.displayExp=Math.max(0,xp); if(t>=1){expResultData.displayLevel=target;expResultData.displayExp=expResultData.targetExp;expAnimation.done=true;setPlayerProgress(target,expResultData.targetExp);}
 }
-function drawExpProgressBar(x,y,w,h,level,exp){
-    const ratio=Math.max(0,Math.min(1,exp/getLevelRequiredExp(level)));
-    ctx.fillStyle="rgba(255,255,255,0.09)";ctx.beginPath();ctx.roundRect(x,y,w,h,h/2);ctx.fill();
-    ctx.fillStyle="#63b8ff";ctx.beginPath();ctx.roundRect(x,y,w*ratio,h,h/2);ctx.fill();
-    ctx.strokeStyle="rgba(255,255,255,0.18)";ctx.lineWidth=1;ctx.stroke();
-}
-function drawExperienceResultScreen(now=performance.now()){
-    updateExpAnimation(now); drawBackground(); ctx.save(); ctx.fillStyle="rgba(5,8,13,0.92)";ctx.fillRect(0,0,WIDTH,HEIGHT);ctx.textAlign="center";ctx.textBaseline="middle";
-    ctx.fillStyle=expResultData?.levelUp?"#ffd76a":"#f3f5f7";ctx.font="bold 48px Pretendard, Noto Sans KR, sans-serif";ctx.fillText(expResultData?.levelUp?"LEVEL UP!":"EXP 획득",WIDTH/2,135);
-    ctx.fillStyle="#7ddcff";ctx.font="bold 30px Pretendard, Noto Sans KR, sans-serif";ctx.fillText(`+${formatExp(expResultData?.amount||0)} EXP`,WIDTH/2,215);
-    const level=expResultData?.displayLevel||playerLevel,exp=expResultData?.displayExp||0;
-    ctx.fillStyle="#fff";ctx.font="bold 30px Pretendard, Noto Sans KR, sans-serif";ctx.fillText(`Lv. ${level}`,WIDTH/2,285);
-    drawExpProgressBar(170,330,460,22,level,exp);
-    ctx.fillStyle="#aeb8c4";ctx.font="600 15px Pretendard, Noto Sans KR, sans-serif";ctx.fillText(`EXP ${formatExp(exp)} / ${formatExp(getLevelRequiredExp(level))}`,WIDTH/2,375);
-    if(expResultData?.levelUp&&!expAnimation?.done){ctx.fillStyle="#ffd76a";ctx.font="bold 22px Pretendard, Noto Sans KR, sans-serif";ctx.fillText(`Lv. ${level} 달성!`,WIDTH/2,425);}
-    else if(expResultData?.saved===false){ctx.fillStyle="#ff8f9b";ctx.font="13px Pretendard, Noto Sans KR, sans-serif";ctx.fillText("EXP 저장에 실패했습니다.",WIDTH/2,425);}
-    ctx.fillStyle="#8d98a6";ctx.font="14px Pretendard, Noto Sans KR, sans-serif";ctx.fillText(expAnimation?.done?"R / SPACE 또는 화면 터치 : 시작 화면":"EXP가 올라가는 중...",WIDTH/2,490);ctx.restore();
-}
+function drawExpProgressBar(x,y,w,h,level,exp){const ratio=Math.max(0,Math.min(1,exp/getLevelRequiredExp(level)));ctx.fillStyle="rgba(255,255,255,.09)";ctx.beginPath();ctx.roundRect(x,y,w,h,h/2);ctx.fill();ctx.fillStyle="#63b8ff";ctx.beginPath();ctx.roundRect(x,y,w*ratio,h,h/2);ctx.fill();}
+function drawExperienceResultScreen(now=performance.now()) { updateExpAnimation(now); ctx.fillStyle="#090b10";ctx.fillRect(0,0,WIDTH,HEIGHT);ctx.save();ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillStyle=expResultData?.targetLevel>expResultData?.beforeLevel?"#ffd76a":"#f3f5f7";ctx.font="bold 46px Pretendard,Noto Sans KR,sans-serif";ctx.fillText(expResultData?.targetLevel>expResultData?.beforeLevel?"LEVEL UP!":"EXP 획득",WIDTH/2,140);ctx.fillStyle="#7ddcff";ctx.font="bold 30px Pretendard,Noto Sans KR,sans-serif";ctx.fillText(`+${formatExp(expResultData?.amount||0)} EXP`,WIDTH/2,215);const lv=expResultData?.displayLevel||playerLevel,xp=expResultData?.displayExp||0;ctx.fillStyle="#fff";ctx.font="bold 30px Pretendard,Noto Sans KR,sans-serif";ctx.fillText(`Lv. ${lv}`,WIDTH/2,285);drawExpProgressBar(170,330,460,22,lv,xp);ctx.fillStyle="#aeb8c4";ctx.font="600 15px Pretendard,Noto Sans KR,sans-serif";ctx.fillText(`EXP ${formatExp(xp)} / ${formatExp(getLevelRequiredExp(lv))}`,WIDTH/2,375);ctx.fillStyle="#8d98a6";ctx.font="14px Pretendard,Noto Sans KR,sans-serif";ctx.fillText(expAnimation?.done?"R / SPACE 또는 화면 터치 : 홈으로":"EXP가 올라가는 중...",WIDTH/2,490);ctx.restore(); }
 
 /* =========================================================
    PC 키보드
@@ -6943,8 +6923,6 @@ window.addEventListener(
 
                 startNewGame();
 
-            } else if (gameState === "expResult") {
-                return;
             } else if (
                 gameState !==
                 "gameover"
@@ -6967,9 +6945,27 @@ window.addEventListener(
             event.preventDefault();
 
             if (gameState === "gameover") { startExperienceResult(); return; }
-            if (gameState === "expResult") { finishExperienceResult(); return; }
             if (gameState === "multiplayerResult") { startExperienceResult(); return; }
+            if (gameState === "expResult") { finishExperienceResult(); return; }
             if (gameState === "multiplayerWaitingResult") { return; }
+
+            if (false) {
+                gameState = "start";
+                updateStartMenuOverlay();
+
+                settingsOpen =
+                    false;
+
+                resetRecoil();
+
+                flash.alpha = 0;
+
+                setMessage("");
+
+                updateUI();
+            }
+
+            return;
         }
 
         if (
@@ -7154,10 +7150,11 @@ gameWrapper.addEventListener(
             return;
         }
 
-        if (gameState === "multiplayerResult" || gameState === "multiplayerWaitingResult") {
-            if (distance < SWIPE_MIN_DISTANCE && duration <= TAP_MAX_DURATION && gameState === "multiplayerResult") startExperienceResult();
+        if (gameState === "multiplayerResult") {
+            if (distance < SWIPE_MIN_DISTANCE && duration <= TAP_MAX_DURATION) startExperienceResult();
             return;
         }
+        if (gameState === "multiplayerWaitingResult") return;
         if (gameState === "expResult") {
             if (distance < SWIPE_MIN_DISTANCE && duration <= TAP_MAX_DURATION) finishExperienceResult();
             return;
@@ -7250,8 +7247,52 @@ gameWrapper.addEventListener(
             return;
         }
 
-        if (gameState === "gameover") {
-            if (distance < SWIPE_MIN_DISTANCE && duration <= TAP_MAX_DURATION) startExperienceResult();
+        if (
+            gameState === "gameover"
+        ) {
+
+            if (
+                distance >=
+                SWIPE_MIN_DISTANCE ||
+                duration >
+                TAP_MAX_DURATION
+            ) {
+
+                lastTapTime = 0;
+
+                return;
+            }
+
+            const now =
+                performance.now();
+
+            if (
+                now -
+                lastTapTime <=
+                DOUBLE_TAP_DELAY
+            ) {
+
+                lastTapTime = 0;
+
+                gameState = "start";
+
+                settingsOpen =
+                    false;
+
+                resetRecoil();
+
+                flash.alpha = 0;
+
+                setMessage("");
+
+                updateUI();
+
+            } else {
+
+                lastTapTime =
+                    now;
+            }
+
             return;
         }
 
@@ -10081,8 +10122,8 @@ function drawGame() {
 
 function getShopButton() {
     return {
-        x: WIDTH - 126,
-        y: 28,
+        x: 116,
+        y: 74,
         w: 42,
         h: 42
     };
@@ -10111,8 +10152,8 @@ function drawShopButton() {
 function getStartSettingsButton() {
 
     return {
-        x: WIDTH - 72,
-        y: 28,
+        x: 12,
+        y: 74,
         w: 42,
         h: 42
     };
@@ -10384,7 +10425,7 @@ function drawShopPanel() {
 }
 
 function getInventoryButton() {
-    return { x: WIDTH - 180, y: 28, w: 42, h: 42 };
+    return { x: 64, y: 74, w: 42, h: 42 };
 }
 
 function drawInventoryButton() {
@@ -11391,7 +11432,7 @@ function handleSettingsTap(x, y) {
         return true;
     }
 
-    if (!settingsOpen && isInsideRect(x, y, { x: 570, y: 350, w: 200, h: 38 })) {
+    if (!settingsOpen && isInsideRect(x, y, { x: 570, y: 58, w: 200, h: 38 })) {
         openMultiplayerMenu();
         return true;
     }
@@ -11640,7 +11681,7 @@ function drawStartScreen() {
     drawSettingsGear();
 
     // 2인용 경쟁 버튼
-    drawSettingsButton(570, 350, 200, 38, "⚔ 2인용 경쟁");
+    drawSettingsButton(570, 58, 200, 38, "⚔ 2인용 경쟁");
 
 
     if (questOpen) {
@@ -11764,13 +11805,13 @@ function drawGameOverScreen() {
         "16px Pretendard, Noto Sans KR, sans-serif";
 
     ctx.fillText(
-        "R 또는 SPACE : EXP 결과",
+        "R 또는 SPACE : 시작 화면",
         WIDTH / 2,
         430
     );
 
     ctx.fillText(
-        "R / SPACE 또는 화면 터치로 EXP 결과를 확인합니다.",
+        "G 또는 Space, 또는 화면 더블 터치로 시작 화면으로 돌아갑니다.",
         WIDTH / 2,
         470
     );
@@ -11821,7 +11862,7 @@ function drawMultiplayerResultScreen() {
     ctx.fillText(`방 코드 ${multiplayerRoomCode}`, WIDTH / 2, 325);
     ctx.fillStyle = "#ffffff";
     ctx.font = "bold 18px Pretendard, Noto Sans KR, sans-serif";
-    ctx.fillText("Space 또는 화면 터치로 EXP 결과 보기", WIDTH / 2, 470);
+    ctx.fillText("Space 또는 화면 터치로 시작 화면으로", WIDTH / 2, 470);
     ctx.restore();
 }
 
@@ -11910,25 +11951,23 @@ function draw(now = performance.now()) {
         syncQuestRewardOverlay(true);
     }
 
-    if (gameState === "gameover") {
+    if (
+        gameState === "gameover"
+    ) {
+
         drawGameOverScreen();
+
+        return;
+    }
+
+    if (gameState === "multiplayerResult" || gameState === "multiplayerWaitingResult") {
+        drawMultiplayerResultScreen();
         return;
     }
     if (gameState === "expResult") {
         drawExperienceResultScreen(now);
         return;
     }
-
-    if (
-        gameState === "multiplayerResult" ||
-        gameState === "multiplayerWaitingResult"
-    ) {
-
-        drawMultiplayerResultScreen();
-
-        return;
-    }
-
 
     drawGame();
     drawEnergyRecoveryChoice();
