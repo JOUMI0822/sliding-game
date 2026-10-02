@@ -626,14 +626,13 @@ canvas {
         right: auto;
     }
 
-    /* 모바일에서는 닉네임/ID 박스와 버튼이 겹치지 않도록 버튼을 아래로 배치 */
     .start-menu-ranking {
-        top: 52px;
+        top: 8px;
         right: 8px;
     }
 
     .start-menu-competitive {
-        top: 89px;
+        top: 50px;
         right: 8px;
     }
 
@@ -5616,7 +5615,7 @@ function onDailyQuestShieldBlock() {
     saveDailyQuestState();
 }
 
-function getSkinButton() { return { x: 168, y: 74, w: 42, h: 42 }; }
+function getSkinButton() { return { x: 168, y: window.innerWidth <= 520 ? 112 : 74, w: 42, h: 42 }; }
 
 function drawSkinButton() {
     const b = getSkinButton();
@@ -5630,7 +5629,7 @@ function drawSkinButton() {
 }
 
 function getQuestButton() {
-    return { x: 220, y: 74, w: 42, h: 42 };
+    return { x: 220, y: window.innerWidth <= 520 ? 112 : 74, w: 42, h: 42 };
 }
 
 function drawQuestButton() {
@@ -10246,7 +10245,7 @@ function drawGame() {
 function getShopButton() {
     return {
         x: 116,
-        y: 74,
+        y: window.innerWidth <= 520 ? 112 : 74,
         w: 42,
         h: 42
     };
@@ -10276,7 +10275,7 @@ function getStartSettingsButton() {
 
     return {
         x: 12,
-        y: 74,
+        y: window.innerWidth <= 520 ? 112 : 74,
         w: 42,
         h: 42
     };
@@ -10525,7 +10524,7 @@ function drawShopPanel() {
 }
 
 function getInventoryButton() {
-    return { x: 64, y: 74, w: 42, h: 42 };
+    return { x: 64, y: window.innerWidth <= 520 ? 112 : 74, w: 42, h: 42 };
 }
 
 function drawInventoryButton() {
