@@ -453,6 +453,17 @@ canvas {
     pointer-events: auto;
 }
 
+/* 2인용 경쟁은 랭킹과 같은 계열의 카드형 디자인을 유지하되,
+   메인 기능 버튼이라 랭킹보다 한 단계 크게 표시합니다. */
+.start-menu-competitive .start-menu-button {
+    min-width: 158px;
+    width: 158px;
+    height: 42px;
+    padding: 0 14px;
+    border-radius: 9px;
+    font-size: 13px;
+}
+
 .start-menu-ranking {
     position: absolute;
     top: 54px;
@@ -625,7 +636,14 @@ canvas {
         right: auto;
     }
     .start-menu-competitive { top: 8px; right: 8px; }
-    .start-menu-ranking { top: 49px; right: 8px; }
+    .start-menu-competitive .start-menu-button {
+        min-width: 136px;
+        width: 136px;
+        height: 38px;
+        padding: 0 10px;
+        font-size: 11px;
+    }
+    .start-menu-ranking { top: 54px; right: 8px; }
 
     .start-menu-logout {
         right: 8px;
@@ -12109,4 +12127,3 @@ requestAnimationFrame(
 
 </body>
     </html>
-    
