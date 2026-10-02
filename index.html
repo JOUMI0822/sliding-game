@@ -448,14 +448,14 @@ canvas {
 
 .start-menu-competitive {
     position: absolute;
-    top: 58px;
+    top: 12px;
     right: 12px;
     pointer-events: auto;
 }
 
 .start-menu-ranking {
     position: absolute;
-    top: 100px;
+    top: 54px;
     right: 12px;
     pointer-events: auto;
 }
@@ -624,8 +624,8 @@ canvas {
         left: 8px;
         right: auto;
     }
-    .start-menu-competitive { top: 54px; right: 8px; }
-    .start-menu-ranking { top: 91px; right: 8px; }
+    .start-menu-competitive { top: 8px; right: 8px; }
+    .start-menu-ranking { top: 49px; right: 8px; }
 
     .start-menu-logout {
         right: 8px;
@@ -707,7 +707,9 @@ canvas {
                     <div class="start-account-exp-text">EXP · 랭킹/레벨 저장 제외</div>
                 </div>
             </div>
-            <div class="start-menu-competitive" aria-hidden="true"></div>
+            <div class="start-menu-competitive">
+                <button id="startMultiplayerButton" class="start-menu-button" type="button">⚔ 2인용 경쟁</button>
+            </div>
             <div class="start-menu-ranking">
                 <button id="startRankingButton" class="start-menu-button" type="button">🏆 랭킹</button>
             </div>
@@ -1251,6 +1253,14 @@ function bindEntryAndRankingUI() {
         event.stopPropagation();
         playUIClickSound();
         openRankingPanel("today");
+    });
+
+    document.getElementById("startMultiplayerButton")?.addEventListener("click", event => {
+        event.preventDefault();
+        event.stopPropagation();
+        playUIClickSound();
+        openMultiplayerMenu();
+        updateStartMenuOverlay();
     });
 
     document.getElementById("startLogoutButton")?.addEventListener("click", event => {
@@ -11432,11 +11442,6 @@ function handleSettingsTap(x, y) {
         return true;
     }
 
-    if (!settingsOpen && isInsideRect(x, y, { x: 570, y: 58, w: 200, h: 38 })) {
-        openMultiplayerMenu();
-        return true;
-    }
-
     if (!settingsOpen && isInsideRect(x, y, gear)) {
         settingsOpen = true;
         requestSettingsRender();
@@ -11679,10 +11684,6 @@ function drawStartScreen() {
     drawShopButton();
     drawInventoryButton();
     drawSettingsGear();
-
-    // 2인용 경쟁 버튼
-    drawSettingsButton(570, 58, 200, 38, "⚔ 2인용 경쟁");
-
 
     if (questOpen) {
         drawQuestPanel();
@@ -12108,3 +12109,4 @@ requestAnimationFrame(
 
 </body>
     </html>
+    
