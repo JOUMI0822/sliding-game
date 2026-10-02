@@ -466,7 +466,7 @@ canvas {
 
 .start-menu-ranking {
     position: absolute;
-    top: 54px;
+    top: 62px;
     right: 12px;
     pointer-events: auto;
 }
@@ -5541,14 +5541,14 @@ function getQuestButton() {
 function drawQuestButton() {
     const b = getQuestButton();
     ctx.save();
-    ctx.fillStyle = "rgba(255,255,255,0.10)";
-    ctx.strokeStyle = "rgba(255,255,255,0.25)";
+    ctx.fillStyle = "rgba(15,19,25,0.82)";
+    ctx.strokeStyle = "rgba(255,255,255,0.18)";
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.roundRect(b.x, b.y, b.w, b.h, 12);
     ctx.fill();
     ctx.stroke();
-    ctx.fillStyle = "#f0f3f6";
+    ctx.fillStyle = "#f2f5f7";
     ctx.font = "bold 22px Arial, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
@@ -10161,15 +10161,15 @@ function drawShopButton() {
     const button = getShopButton();
 
     ctx.save();
-    ctx.fillStyle = "rgba(255,255,255,0.10)";
-    ctx.strokeStyle = "rgba(255,255,255,0.25)";
+    ctx.fillStyle = "rgba(15,19,25,0.82)";
+    ctx.strokeStyle = "rgba(255,255,255,0.18)";
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.roundRect(button.x, button.y, button.w, button.h, 12);
     ctx.fill();
     ctx.stroke();
 
-    ctx.fillStyle = "#f0f3f6";
+    ctx.fillStyle = "#f2f5f7";
     ctx.font = "bold 22px Arial, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
@@ -10211,10 +10211,10 @@ function drawSettingsGear() {
     ctx.save();
 
     ctx.fillStyle =
-        "rgba(255,255,255,0.10)";
+        "rgba(15,19,25,0.82)";
 
     ctx.strokeStyle =
-        "rgba(255,255,255,0.25)";
+        "rgba(255,255,255,0.18)";
 
     ctx.lineWidth = 1;
 
@@ -10232,7 +10232,7 @@ function drawSettingsGear() {
     ctx.stroke();
 
     ctx.fillStyle =
-        "#dfe5ea";
+        "#f2f5f7";
 
     ctx.font =
         "bold 25px Arial, sans-serif";
@@ -10459,14 +10459,14 @@ function getInventoryButton() {
 function drawInventoryButton() {
     const button = getInventoryButton();
     ctx.save();
-    ctx.fillStyle = "rgba(255,255,255,0.10)";
-    ctx.strokeStyle = "rgba(255,255,255,0.25)";
+    ctx.fillStyle = "rgba(15,19,25,0.82)";
+    ctx.strokeStyle = "rgba(255,255,255,0.18)";
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.roundRect(button.x, button.y, button.w, button.h, 12);
     ctx.fill();
     ctx.stroke();
-    ctx.fillStyle = "#f0f3f6";
+    ctx.fillStyle = "#f2f5f7";
     ctx.font = "bold 22px Arial, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
