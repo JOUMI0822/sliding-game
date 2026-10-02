@@ -1157,8 +1157,7 @@ async function submitV28Score() {
             })
         });
     } catch (error) {
-        console.error("랭킹 점수 저장 실패:", error);
-        try { setMessage(`랭킹 저장 실패: ${error.message || "알 수 없는 오류"}`); } catch (_) {}
+        console.warn("랭킹 점수 저장 실패:", error);
     }
 }
 
@@ -1201,7 +1200,10 @@ async function loadRanking(mode = rankingMode) {
     body.innerHTML = "";
 
     try {
-        const data = await apiJSON(rankingMode === "weekly" ? "/api/ranking/weekly" : "/api/ranking/today");
+        const rankingEndpoint = rankingMode === "weekly" ? "/api/ranking/weekly" : "/api/ranking/today";
+        // 랭킹은 항상 최신 서버 데이터를 읽어야 하므로 브라우저 캐시를 사용하지 않습니다.
+        const separator = rankingEndpoint.includes("?") ? "&" : "?";
+        const data = await apiJSON(`${rankingEndpoint}${separator}_t=${Date.now()}`, { cache: "no-store" });
         const rows = Array.isArray(data?.rows) ? data.rows : Array.isArray(data?.ranking) ? data.ranking : Array.isArray(data) ? data : [];
 
         if (rows.length === 0) {
