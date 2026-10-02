@@ -11,6 +11,22 @@
 }
 
 html,
+html,
+body {
+    width: 100%;
+    min-height: 100%;
+    margin: 0;
+    overscroll-behavior: none;
+}
+
+html.login-lock,
+body.login-lock {
+    overflow: hidden !important;
+    position: fixed;
+    width: 100%;
+    height: 100%;
+}
+
 body {
     margin: 0;
     padding: 0;
@@ -238,12 +254,17 @@ canvas {
     display: flex;
     align-items: center;
     justify-content: center;
+    width: 100%;
+    height: 100%;
     padding: 24px;
+    box-sizing: border-box;
     background:
         radial-gradient(circle at 50% 20%, rgba(75,163,255,0.12), transparent 35%),
         #0b0e13;
-    overflow: auto;
-    touch-action: auto;
+    overflow: hidden;
+    overscroll-behavior: none;
+    touch-action: none;
+    -webkit-overflow-scrolling: auto;
 }
 
 .entry-screen.session-checking {
@@ -1760,7 +1781,6 @@ async function copyMultiplayerRoomCode() {
         setMessage(`방 코드 ${code}가 복사되었습니다.`);
         updateUI();
     } catch (error) {
-        // iPad Safari에서 클립보드가 제한될 경우 직접 복사할 수 있는 창을 표시합니다.
         window.prompt("방 코드를 복사하세요.", code);
     }
 }
@@ -1816,7 +1836,7 @@ function drawMultiplayerMenu() {
 
         ctx.fillStyle = "#9ba7b5";
         ctx.font = "14px Pretendard, Noto Sans KR, sans-serif";
-        ctx.fillText("친구에게 이 방 코드를 알려주세요.", WIDTH / 2, 275);
+        ctx.fillText("친구에게 이 방 코드를 알려주세요.", WIDTH / 2, 270);
 
         drawSettingsButton(305, 292, 190, 38, "📋 코드 복사");
 
@@ -11464,7 +11484,7 @@ function drawStartScreen() {
         "15px Pretendard, Noto Sans KR, sans-serif";
 
     // 홈 화면에서는 개인 최고 기록 2줄만 숨깁니다.
-    // allTimeBestStreak / maxClearCount 값과 저장 기능은 그대로 유지합니다.
+    // 기록 변수와 저장 기능은 게임 오버/점수 시스템에서 그대로 유지합니다.
 
     ctx.fillStyle =
         "#dfe5ea";
@@ -11906,6 +11926,32 @@ openRankingPanel = function(mode = "today") {
    초기 실행
 ========================================================= */
 
+function setLoginScreenLock(locked) {
+    const html = document.documentElement;
+    const body = document.body;
+    if (!html || !body) return;
+
+    html.classList.toggle("login-lock", !!locked);
+    body.classList.toggle("login-lock", !!locked);
+
+    if (locked) {
+        // iPad Safari can retain the previous scroll offset when an overlay appears.
+        // Reset it while the login screen owns the viewport.
+        window.scrollTo(0, 0);
+    }
+}
+
+const loginViewportGuard = event => {
+    const gate = document.getElementById("entryGate");
+    if (!gate || gate.style.display === "none" || gate.classList.contains("session-checking")) return;
+    event.preventDefault();
+};
+
+document.addEventListener("touchmove", loginViewportGuard, { passive: false });
+document.addEventListener("gesturestart", loginViewportGuard, { passive: false });
+document.addEventListener("gesturechange", loginViewportGuard, { passive: false });
+document.addEventListener("gestureend", loginViewportGuard, { passive: false });
+
 async function restoreSavedSession() {
     loadSavedLoginId();
 
@@ -11930,6 +11976,20 @@ async function restoreSavedSession() {
     showEntryGate();
     updateUI();
 }
+
+
+const entryGateObserver = new MutationObserver(() => {
+    const gate = document.getElementById("entryGate");
+    if (!gate) return;
+    const visible = getComputedStyle(gate).display !== "none" && !gate.classList.contains("session-checking");
+    setLoginScreenLock(visible);
+});
+
+entryGateObserver.observe(document.documentElement, {
+    subtree: true,
+    attributes: true,
+    attributeFilter: ["style", "class"]
+});
 
 restoreSavedSession();
 
