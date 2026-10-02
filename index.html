@@ -735,6 +735,7 @@ canvas {
                     <tr>
                         <th>순위</th>
                         <th>닉네임</th>
+                        <th>Lv.</th>
                         <th>점수</th>
                         <th>클리어</th>
                         <th>연속</th>
@@ -1144,7 +1145,8 @@ async function submitV28Score() {
                 maxStreak: maxClearStreak,
                 skips: mapSkipCount,
                 lifeLosses: lifeLossCount,
-                score
+                score,
+                level: playerLevel
             })
         });
     } catch (error) {
@@ -1195,17 +1197,19 @@ async function loadRanking(mode = rankingMode) {
         const rows = Array.isArray(data?.rows) ? data.rows : Array.isArray(data?.ranking) ? data.ranking : Array.isArray(data) ? data : [];
 
         if (rows.length === 0) {
-            body.innerHTML = `<tr><td colspan="5">아직 랭킹 기록이 없습니다.</td></tr>`;
+            body.innerHTML = `<tr><td colspan="6">아직 랭킹 기록이 없습니다.</td></tr>`;
         } else {
             body.innerHTML = rows.map((row, index) => {
                 const rank = Number(row.rank) || index + 1;
                 const nickname = row.nickname || row.name || "-";
+                const level = Math.max(1, Number(row.level) || 1);
                 const score = Number(row.score) || 0;
                 const clears = Number(row.clears) || 0;
                 const streak = Number(row.maxStreak) || Number(row.max_streak) || 0;
                 return `<tr>
                     <td>${rank}</td>
                     <td>${escapeHTML(nickname)}</td>
+                    <td>Lv. ${level}</td>
                     <td>${score.toLocaleString("ko-KR")}</td>
                     <td>${clears}</td>
                     <td>${streak}</td>
@@ -1218,7 +1222,7 @@ async function loadRanking(mode = rankingMode) {
             : "오늘의 랭킹입니다.";
     } catch (error) {
         status.textContent = error.message || "랭킹을 불러오지 못했습니다.";
-        body.innerHTML = `<tr><td colspan="5">랭킹 정보를 불러오지 못했습니다.</td></tr>`;
+        body.innerHTML = `<tr><td colspan="6">랭킹 정보를 불러오지 못했습니다.</td></tr>`;
     } finally {
         rankingLoading = false;
     }
@@ -2094,7 +2098,9 @@ const AUDIO_FILES = {
     gameStart: "game_start.m4a"
 };
 const EFFECT_VOLUME_KEY = "slidingMazeEffectVolume_v1";
+const MUSIC_VOLUME_KEY = "slidingMazeMusicVolume_v1";
 let effectVolume = 0.70;
+let musicVolume = 0.70;
 const effectAudioCache = new Map();
 let audioUnlocked = false;
 const oneShotEffectPlayed = new Set();
@@ -2106,6 +2112,10 @@ function resetOneShotEffects() {
 try {
     const saved = Number(localStorage.getItem(EFFECT_VOLUME_KEY));
     if (Number.isFinite(saved)) effectVolume = Math.max(0, Math.min(1, saved));
+} catch (error) {}
+try {
+    const savedMusic = Number(localStorage.getItem(MUSIC_VOLUME_KEY));
+    if (Number.isFinite(savedMusic)) musicVolume = Math.max(0, Math.min(1, savedMusic));
 } catch (error) {}
 
 function saveEffectVolume() {
@@ -2120,6 +2130,9 @@ function setEffectVolume(value) {
     saveEffectVolume();
     requestSettingsRender();
 }
+
+function saveMusicVolume() { try { localStorage.setItem(MUSIC_VOLUME_KEY, String(musicVolume)); } catch (error) {} }
+function setMusicVolume(value) { musicVolume = Math.max(0, Math.min(1, Number(value) || 0)); saveMusicVolume(); requestSettingsRender(); }
 
 function getSoundVolume(type) {
     if (type === "uiClick") return effectVolume * 0.10;
@@ -2571,12 +2584,19 @@ Object.assign(volumeTouchArea.style, {
 });
 document.body.appendChild(volumeTouchArea);
 
+const musicVolumeTouchArea = document.createElement("div");
+musicVolumeTouchArea.id = "musicVolumeTouchArea";
+Object.assign(musicVolumeTouchArea.style, volumeTouchArea.style);
+document.body.appendChild(musicVolumeTouchArea);
+
 let volumeTouchPointerId = null;
+let musicVolumeTouchPointerId = null;
 
 function positionVolumeTouchArea() {
     if (!volumeTouchArea || !canvas) return;
     if (!settingsOpen || skinOpen) {
         volumeTouchArea.style.display = "none";
+        musicVolumeTouchArea.style.display = "none";
         return;
     }
 
@@ -2584,13 +2604,19 @@ function positionVolumeTouchArea() {
     const scaleX = rect.width / WIDTH;
     const scaleY = rect.height / HEIGHT;
     const bar = { x: WIDTH / 2 - 130, y: 195, w: 260, h: 8 };
+    const musicBar = { x: WIDTH / 2 - 130, y: 295, w: 260, h: 8 };
 
-    // A modest touch target around the original thin graphic slider.
+    // A modest touch target around each slider.
     volumeTouchArea.style.display = "block";
     volumeTouchArea.style.left = `${rect.left + (bar.x - 16) * scaleX}px`;
     volumeTouchArea.style.top = `${rect.top + (bar.y - 22) * scaleY}px`;
     volumeTouchArea.style.width = `${(bar.w + 32) * scaleX}px`;
     volumeTouchArea.style.height = `${52 * scaleY}px`;
+    musicVolumeTouchArea.style.display = "block";
+    musicVolumeTouchArea.style.left = `${rect.left + (musicBar.x - 16) * scaleX}px`;
+    musicVolumeTouchArea.style.top = `${rect.top + (musicBar.y - 22) * scaleY}px`;
+    musicVolumeTouchArea.style.width = `${(musicBar.w + 32) * scaleX}px`;
+    musicVolumeTouchArea.style.height = `${52 * scaleY}px`;
 }
 
 function setVolumeFromClientX(clientX) {
@@ -2598,6 +2624,13 @@ function setVolumeFromClientX(clientX) {
     const bar = { x: WIDTH / 2 - 130, w: 260 };
     const x = (clientX - rect.left) * (WIDTH / rect.width);
     setEffectVolume((x - bar.x) / bar.w);
+    requestSettingsRender();
+}
+function setMusicVolumeFromClientX(clientX) {
+    const rect = canvas.getBoundingClientRect();
+    const bar = { x: WIDTH / 2 - 130, w: 260 };
+    const x = (clientX - rect.left) * (WIDTH / rect.width);
+    setMusicVolume((x - bar.x) / bar.w);
     requestSettingsRender();
 }
 
@@ -2633,6 +2666,13 @@ volumeTouchArea.addEventListener("pointercancel", endVolumePointer, { passive: f
         event.stopPropagation();
     }, { passive: false });
 });
+
+musicVolumeTouchArea.addEventListener("pointerdown", event => { if (!settingsOpen || skinOpen) return; musicVolumeTouchPointerId=event.pointerId; try { musicVolumeTouchArea.setPointerCapture(event.pointerId); } catch(error) {} setMusicVolumeFromClientX(event.clientX); event.preventDefault(); event.stopPropagation(); }, {passive:false});
+musicVolumeTouchArea.addEventListener("pointermove", event => { if (musicVolumeTouchPointerId!==event.pointerId) return; setMusicVolumeFromClientX(event.clientX); event.preventDefault(); event.stopPropagation(); }, {passive:false});
+function endMusicVolumePointer(event) { if (musicVolumeTouchPointerId!==event.pointerId) return; setMusicVolumeFromClientX(event.clientX); try { musicVolumeTouchArea.releasePointerCapture(event.pointerId); } catch(error) {} musicVolumeTouchPointerId=null; event.preventDefault(); event.stopPropagation(); }
+musicVolumeTouchArea.addEventListener("pointerup", endMusicVolumePointer, {passive:false});
+musicVolumeTouchArea.addEventListener("pointercancel", endMusicVolumePointer, {passive:false});
+["touchstart","touchmove","touchend","touchcancel"].forEach(type => musicVolumeTouchArea.addEventListener(type, e => e.stopPropagation(), {passive:false}));
 
 window.addEventListener("resize", positionVolumeTouchArea);
 window.addEventListener("orientationchange", positionVolumeTouchArea);
@@ -10669,8 +10709,17 @@ function drawSettingsPanel() {
     ctx.beginPath(); ctx.roundRect(volumeBar.x, volumeBar.y, volumeBar.w * effectVolume, volumeBar.h, 5); ctx.fill();
     ctx.fillStyle = "#dfe5ea";
     ctx.beginPath(); ctx.arc(volumeBar.x + volumeBar.w * effectVolume, volumeBar.y + volumeBar.h / 2, 8, 0, Math.PI * 2); ctx.fill();
-    drawSettingsButton(WIDTH / 2 - 130, 270, 260, 48, "🔊 효과음 테스트");
-    drawSettingsButton(WIDTH / 2 - 130, 340, 260, 48, "🚪 로그아웃");
+    ctx.fillStyle = "#aeb8c5";
+    ctx.font = "600 15px Pretendard, Noto Sans KR, sans-serif";
+    ctx.fillText(`🎵 음악 크기  ${Math.round(musicVolume * 100)}%`, WIDTH / 2, 275);
+    const musicBar = { x: WIDTH / 2 - 130, y: 295, w: 260, h: 8 };
+    ctx.fillStyle = "rgba(255,255,255,0.10)";
+    ctx.beginPath(); ctx.roundRect(musicBar.x, musicBar.y, musicBar.w, musicBar.h, 5); ctx.fill();
+    ctx.fillStyle = "#7ddcff";
+    ctx.beginPath(); ctx.roundRect(musicBar.x, musicBar.y, musicBar.w * musicVolume, musicBar.h, 5); ctx.fill();
+    ctx.fillStyle = "#dfe5ea";
+    ctx.beginPath(); ctx.arc(musicBar.x + musicBar.w * musicVolume, musicBar.y + musicBar.h / 2, 8, 0, Math.PI * 2); ctx.fill();
+    drawSettingsButton(WIDTH / 2 - 130, 360, 260, 48, "🚪 로그아웃");
     drawSettingsButton(WIDTH / 2 - 80, 450, 160, 32, "닫기");
     ctx.restore();
 }
@@ -11522,11 +11571,10 @@ function handleSettingsTap(x, y) {
         positionVolumeTouchArea();
         return true;
     }
-    if (isInsideRect(x, y, { x: WIDTH / 2 - 130, y: 270, w: 260, h: 48 })) {
-        playEffectSound("uiClick");
+    if (isInsideRect(x, y, { x: WIDTH / 2 - 130, y: 265, w: 260, h: 70 })) {
         return true;
     }
-    if (isInsideRect(x, y, { x: WIDTH / 2 - 130, y: 340, w: 260, h: 48 })) {
+    if (isInsideRect(x, y, { x: WIDTH / 2 - 130, y: 360, w: 260, h: 48 })) {
         logoutToEntry();
         return true;
     }
