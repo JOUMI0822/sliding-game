@@ -712,9 +712,6 @@ canvas {
             <div class="start-menu-ranking">
                 <button id="startRankingButton" class="start-menu-button" type="button">🏆 랭킹</button>
             </div>
-            <div class="start-menu-logout">
-                <button id="startLogoutButton" class="start-menu-button" type="button">🚪 로그아웃</button>
-            </div>
         </div>
     </div>
 
@@ -1265,13 +1262,6 @@ function bindEntryAndRankingUI() {
         event.stopPropagation();
         playUIClickSound();
         openRankingPanel("today");
-    });
-
-    document.getElementById("startLogoutButton")?.addEventListener("click", event => {
-        event.preventDefault();
-        event.stopPropagation();
-        playUIClickSound();
-        logoutToEntry();
     });
 
     document.getElementById("rankingClose")?.addEventListener("click", event => {
@@ -2570,7 +2560,8 @@ let volumeTouchPointerId = null;
 
 function positionVolumeTouchArea() {
     if (!volumeTouchArea || !canvas) return;
-    if (!settingsOpen) {
+    // 볼륨 조절은 ⚙ 설정에서만 표시합니다. 👔 스킨 창에는 표시하지 않습니다.
+    if (!settingsOpen || skinOpen) {
         volumeTouchArea.style.display = "none";
         return;
     }
@@ -2597,7 +2588,7 @@ function setVolumeFromClientX(clientX) {
 }
 
 volumeTouchArea.addEventListener("pointerdown", event => {
-    if (!settingsOpen) return;
+    if (!settingsOpen || skinOpen) return;
     volumeTouchPointerId = event.pointerId;
     try { volumeTouchArea.setPointerCapture(event.pointerId); } catch (error) {}
     setVolumeFromClientX(event.clientX);
