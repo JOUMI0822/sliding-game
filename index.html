@@ -625,8 +625,8 @@ canvas {
         left: 8px;
         right: auto;
     }
-    .start-menu-competitive { top: 54px; right: 8px; }
-    .start-menu-ranking { top: 91px; right: 8px; }
+    .start-menu-ranking { top: 54px; right: 8px; }
+    .start-menu-competitive { top: 91px; right: 8px; }
 
     .start-menu-logout {
         right: 8px;
@@ -713,6 +713,9 @@ canvas {
             </div>
             <div class="start-menu-ranking">
                 <button id="startRankingButton" class="start-menu-button" type="button">🏆 랭킹</button>
+            </div>
+            <div class="start-menu-logout">
+                <button id="startLogoutButton" class="start-menu-button" type="button">🚪 로그아웃</button>
             </div>
         </div>
     </div>
@@ -1273,6 +1276,13 @@ function bindEntryAndRankingUI() {
         openMultiplayerMenu();
     });
 
+    document.getElementById("startLogoutButton")?.addEventListener("click", event => {
+        event.preventDefault();
+        event.stopPropagation();
+        playUIClickSound();
+        logoutToEntry();
+    });
+
     document.getElementById("rankingClose")?.addEventListener("click", event => {
         event.preventDefault();
         event.stopPropagation();
@@ -1310,7 +1320,7 @@ bindEntryAndRankingUI();
 showEntryGate();
 
 /* =========================================================
-   2인 대전 모드 준비 상태
+   2인용 경쟁 모드 준비 상태
    - 현재는 방/코드/시드 UI까지 준비
    - 실제 기기 간 연결은 다음 단계에서 WebRTC + 시그널링 서버 연결
 ========================================================= */
@@ -1910,7 +1920,7 @@ function drawMultiplayerMenu() {
 
     ctx.fillStyle = "#f3f5f7";
     ctx.font = "bold 30px Pretendard, Noto Sans KR, sans-serif";
-    ctx.fillText("2인 대전", WIDTH / 2, 125);
+    ctx.fillText("2인용 경쟁", WIDTH / 2, 125);
 
     if (multiplayerMatchmaking) {
         ctx.fillStyle = "#aeb8c4";
@@ -2569,8 +2579,7 @@ let volumeTouchPointerId = null;
 
 function positionVolumeTouchArea() {
     if (!volumeTouchArea || !canvas) return;
-    // 볼륨은 ⚙ 설정에서만 표시. 👔 스킨 창에는 표시하지 않습니다.
-    if (!settingsOpen || skinOpen) {
+    if (!settingsOpen) {
         volumeTouchArea.style.display = "none";
         return;
     }
@@ -2597,7 +2606,7 @@ function setVolumeFromClientX(clientX) {
 }
 
 volumeTouchArea.addEventListener("pointerdown", event => {
-    if (!settingsOpen || skinOpen) return;
+    if (!settingsOpen) return;
     volumeTouchPointerId = event.pointerId;
     try { volumeTouchArea.setPointerCapture(event.pointerId); } catch (error) {}
     setVolumeFromClientX(event.clientX);
@@ -5521,8 +5530,26 @@ function onDailyQuestShieldBlock() {
     saveDailyQuestState();
 }
 
-function getQuestButton() {
+function getSkinButton() {
     return { x: 168, y: 74, w: 42, h: 42 };
+}
+
+function drawSkinButton() {
+    const b = getSkinButton();
+    ctx.save();
+    ctx.fillStyle = "rgba(9,12,17,0.68)";
+    ctx.strokeStyle = "rgba(255,255,255,0.14)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(b.x, b.y, b.w, b.h, 12);
+    ctx.fill();
+    ctx.stroke();
+    drawClearEmoji("👔", b.x + b.w / 2, b.y + b.h / 2 + 1, 25);
+    ctx.restore();
+}
+
+function getQuestButton() {
+    return { x: 220, y: 74, w: 42, h: 42 };
 }
 
 function drawQuestButton() {
@@ -10458,8 +10485,6 @@ function drawInventoryPanel() {
     ctx.font = "bold 28px Pretendard, Noto Sans KR, sans-serif";
     ctx.fillText("🎒 인벤토리", WIDTH / 2, 98);
 
-    drawSettingsButton(panel.x + panel.w - 150, 78, 125, 34, "👔 스킨");
-
     const types = Object.keys(ITEM_DATA);
     const cols = 5;
     const size = 82;
@@ -11265,6 +11290,7 @@ function handleSkinSettingTap(x, y) {
 function handleSettingsTap(x, y) {
     refreshDailyQuestIfNeeded();
     const questButton = getQuestButton();
+    const skinButton = getSkinButton();
     const shopButton = getShopButton();
     const inventoryButton = getInventoryButton();
     const gear = getStartSettingsButton();
@@ -11327,6 +11353,12 @@ function handleSettingsTap(x, y) {
         return true;
     }
 
+    if (!shopOpen && !inventoryOpen && !settingsOpen && !multiplayerOpen && !questOpen && !skinOpen && isInsideRect(x, y, skinButton)) {
+        skinOpen = true;
+        requestSettingsRender();
+        return true;
+    }
+
     if (!shopOpen && !inventoryOpen && !settingsOpen && !multiplayerOpen && !questOpen && isInsideRect(x, y, questButton)) {
         questOpen = true;
         syncQuestRewardOverlay(true);
@@ -11370,14 +11402,6 @@ function handleSettingsTap(x, y) {
 
     if (inventoryOpen) {
         const panel = { x: 55, y: 55, w: 690, h: 490 };
-
-        if (isInsideRect(x, y, { x: panel.x + panel.w - 150, y: 78, w: 125, h: 34 })) {
-            inventoryOpen = false;
-            skinOpen = true;
-            closeInventoryDetail();
-            requestSettingsRender();
-            return true;
-        }
 
         if (inventoryDetailType) {
             const box = { x: 145, y: 145, w: 510, h: 320 };
@@ -11691,10 +11715,11 @@ function drawStartScreen() {
     );
 
 
-    drawQuestButton();
-    drawShopButton();
-    drawInventoryButton();
     drawSettingsGear();
+    drawInventoryButton();
+    drawShopButton();
+    drawSkinButton();
+    drawQuestButton();
 
 
     if (questOpen) {
@@ -11871,7 +11896,7 @@ function drawMultiplayerResultScreen() {
     ctx.fillText(title, WIDTH / 2, 205);
     ctx.fillStyle = "#aeb8c4";
     ctx.font = "600 18px Pretendard, Noto Sans KR, sans-serif";
-    ctx.fillText(gameState === "multiplayerWaitingResult" ? "상대 플레이어의 결과를 기다리고 있습니다." : "2인 대전 경기가 종료되었습니다.", WIDTH / 2, 270);
+    ctx.fillText(gameState === "multiplayerWaitingResult" ? "상대 플레이어의 결과를 기다리고 있습니다." : "2인용 경쟁 경기가 종료되었습니다.", WIDTH / 2, 270);
     ctx.fillStyle = "#7ddcff";
     ctx.font = "600 16px Pretendard, Noto Sans KR, sans-serif";
     ctx.fillText(`방 코드 ${multiplayerRoomCode}`, WIDTH / 2, 325);
