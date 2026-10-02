@@ -1145,8 +1145,7 @@ async function submitV28Score() {
                 maxStreak: maxClearStreak,
                 skips: mapSkipCount,
                 lifeLosses: lifeLossCount,
-                score,
-                level: playerLevel
+                score
             })
         });
     } catch (error) {
@@ -2114,8 +2113,8 @@ try {
     if (Number.isFinite(saved)) effectVolume = Math.max(0, Math.min(1, saved));
 } catch (error) {}
 try {
-    const savedMusic = Number(localStorage.getItem(MUSIC_VOLUME_KEY));
-    if (Number.isFinite(savedMusic)) musicVolume = Math.max(0, Math.min(1, savedMusic));
+    const savedMusicVolume = Number(localStorage.getItem(MUSIC_VOLUME_KEY));
+    if (Number.isFinite(savedMusicVolume)) musicVolume = Math.max(0, Math.min(1, savedMusicVolume));
 } catch (error) {}
 
 function saveEffectVolume() {
@@ -2583,7 +2582,6 @@ Object.assign(volumeTouchArea.style, {
     WebkitUserSelect: "none"
 });
 document.body.appendChild(volumeTouchArea);
-
 const musicVolumeTouchArea = document.createElement("div");
 musicVolumeTouchArea.id = "musicVolumeTouchArea";
 Object.assign(musicVolumeTouchArea.style, volumeTouchArea.style);
@@ -2604,14 +2602,14 @@ function positionVolumeTouchArea() {
     const scaleX = rect.width / WIDTH;
     const scaleY = rect.height / HEIGHT;
     const bar = { x: WIDTH / 2 - 130, y: 195, w: 260, h: 8 };
-    const musicBar = { x: WIDTH / 2 - 130, y: 295, w: 260, h: 8 };
 
-    // A modest touch target around each slider.
+    // A modest touch target around the original thin graphic slider.
     volumeTouchArea.style.display = "block";
     volumeTouchArea.style.left = `${rect.left + (bar.x - 16) * scaleX}px`;
     volumeTouchArea.style.top = `${rect.top + (bar.y - 22) * scaleY}px`;
     volumeTouchArea.style.width = `${(bar.w + 32) * scaleX}px`;
     volumeTouchArea.style.height = `${52 * scaleY}px`;
+    const musicBar = { x: WIDTH / 2 - 130, y: 295, w: 260, h: 8 };
     musicVolumeTouchArea.style.display = "block";
     musicVolumeTouchArea.style.left = `${rect.left + (musicBar.x - 16) * scaleX}px`;
     musicVolumeTouchArea.style.top = `${rect.top + (musicBar.y - 22) * scaleY}px`;
@@ -2631,8 +2629,29 @@ function setMusicVolumeFromClientX(clientX) {
     const bar = { x: WIDTH / 2 - 130, w: 260 };
     const x = (clientX - rect.left) * (WIDTH / rect.width);
     setMusicVolume((x - bar.x) / bar.w);
-    requestSettingsRender();
 }
+
+musicVolumeTouchArea.addEventListener("pointerdown", event => {
+    if (!settingsOpen || skinOpen) return;
+    musicVolumeTouchPointerId = event.pointerId;
+    try { musicVolumeTouchArea.setPointerCapture(event.pointerId); } catch (error) {}
+    setMusicVolumeFromClientX(event.clientX);
+    event.preventDefault(); event.stopPropagation();
+}, { passive: false });
+musicVolumeTouchArea.addEventListener("pointermove", event => {
+    if (musicVolumeTouchPointerId !== event.pointerId) return;
+    setMusicVolumeFromClientX(event.clientX);
+    event.preventDefault(); event.stopPropagation();
+}, { passive: false });
+function endMusicVolumePointer(event) {
+    if (musicVolumeTouchPointerId !== event.pointerId) return;
+    setMusicVolumeFromClientX(event.clientX);
+    try { musicVolumeTouchArea.releasePointerCapture(event.pointerId); } catch (error) {}
+    musicVolumeTouchPointerId = null;
+    event.preventDefault(); event.stopPropagation();
+}
+musicVolumeTouchArea.addEventListener("pointerup", endMusicVolumePointer, { passive: false });
+musicVolumeTouchArea.addEventListener("pointercancel", endMusicVolumePointer, { passive: false });
 
 volumeTouchArea.addEventListener("pointerdown", event => {
     if (!settingsOpen) return;
@@ -2666,13 +2685,6 @@ volumeTouchArea.addEventListener("pointercancel", endVolumePointer, { passive: f
         event.stopPropagation();
     }, { passive: false });
 });
-
-musicVolumeTouchArea.addEventListener("pointerdown", event => { if (!settingsOpen || skinOpen) return; musicVolumeTouchPointerId=event.pointerId; try { musicVolumeTouchArea.setPointerCapture(event.pointerId); } catch(error) {} setMusicVolumeFromClientX(event.clientX); event.preventDefault(); event.stopPropagation(); }, {passive:false});
-musicVolumeTouchArea.addEventListener("pointermove", event => { if (musicVolumeTouchPointerId!==event.pointerId) return; setMusicVolumeFromClientX(event.clientX); event.preventDefault(); event.stopPropagation(); }, {passive:false});
-function endMusicVolumePointer(event) { if (musicVolumeTouchPointerId!==event.pointerId) return; setMusicVolumeFromClientX(event.clientX); try { musicVolumeTouchArea.releasePointerCapture(event.pointerId); } catch(error) {} musicVolumeTouchPointerId=null; event.preventDefault(); event.stopPropagation(); }
-musicVolumeTouchArea.addEventListener("pointerup", endMusicVolumePointer, {passive:false});
-musicVolumeTouchArea.addEventListener("pointercancel", endMusicVolumePointer, {passive:false});
-["touchstart","touchmove","touchend","touchcancel"].forEach(type => musicVolumeTouchArea.addEventListener(type, e => e.stopPropagation(), {passive:false}));
 
 window.addEventListener("resize", positionVolumeTouchArea);
 window.addEventListener("orientationchange", positionVolumeTouchArea);
