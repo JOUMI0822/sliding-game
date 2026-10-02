@@ -5545,10 +5545,14 @@ function drawQuestButton() {
     ctx.strokeStyle = "rgba(255,255,255,0.18)";
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.roundRect(b.x, b.y, b.w, b.h, 12);
+    ctx.roundRect(b.x, b.y, b.w, b.h, 8);
     ctx.fill();
     ctx.stroke();
-    drawVectorQuestIcon(b.x + b.w / 2, b.y + b.h / 2);
+    ctx.fillStyle = "#f2f5f7";
+    ctx.font = "bold 22px Arial, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("📜", b.x + b.w / 2, b.y + b.h / 2 + 1);
     ctx.restore();
 }
 
@@ -10273,17 +10277,19 @@ function drawVectorQuestIcon(cx, cy) {
 
 function drawShopButton() {
     const button = getShopButton();
-
     ctx.save();
     ctx.fillStyle = "rgba(15,19,25,0.82)";
     ctx.strokeStyle = "rgba(255,255,255,0.18)";
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.roundRect(button.x, button.y, button.w, button.h, 12);
+    ctx.roundRect(button.x, button.y, button.w, button.h, 8);
     ctx.fill();
     ctx.stroke();
-
-    drawVectorShopIcon(button.x + button.w / 2, button.y + button.h / 2);
+    ctx.fillStyle = "#f2f5f7";
+    ctx.font = "bold 22px Arial, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("🛒", button.x + button.w / 2, button.y + button.h / 2 + 1);
     ctx.restore();
 }
 
@@ -10314,38 +10320,20 @@ function isInsideRect(
 
 
 function drawSettingsGear() {
-
-    const button =
-        getStartSettingsButton();
-
+    const button = getStartSettingsButton();
     ctx.save();
-
-    ctx.fillStyle =
-        "rgba(15,19,25,0.82)";
-
-    ctx.strokeStyle =
-        "rgba(255,255,255,0.18)";
-
+    ctx.fillStyle = "rgba(15,19,25,0.82)";
+    ctx.strokeStyle = "rgba(255,255,255,0.18)";
     ctx.lineWidth = 1;
-
     ctx.beginPath();
-
-    ctx.roundRect(
-        button.x,
-        button.y,
-        button.w,
-        button.h,
-        12
-    );
-
+    ctx.roundRect(button.x, button.y, button.w, button.h, 8);
     ctx.fill();
     ctx.stroke();
-
-    drawVectorSettingsIcon(
-        button.x + button.w / 2,
-        button.y + button.h / 2
-    );
-
+    ctx.fillStyle = "#f2f5f7";
+    ctx.font = "bold 25px Arial, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("⚙", button.x + button.w / 2, button.y + button.h / 2 + 1);
     ctx.restore();
 }
 
@@ -10558,10 +10546,14 @@ function drawInventoryButton() {
     ctx.strokeStyle = "rgba(255,255,255,0.18)";
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.roundRect(button.x, button.y, button.w, button.h, 12);
+    ctx.roundRect(button.x, button.y, button.w, button.h, 8);
     ctx.fill();
     ctx.stroke();
-    drawVectorInventoryIcon(button.x + button.w / 2, button.y + button.h / 2);
+    ctx.fillStyle = "#f2f5f7";
+    ctx.font = "bold 22px Arial, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("🎒", button.x + button.w / 2, button.y + button.h / 2 + 1);
     ctx.restore();
 }
 
