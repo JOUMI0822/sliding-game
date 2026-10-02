@@ -448,25 +448,14 @@ canvas {
 
 .start-menu-competitive {
     position: absolute;
-    top: 12px;
+    top: 58px;
     right: 12px;
     pointer-events: auto;
 }
 
-/* 2인용 경쟁은 랭킹과 같은 계열의 카드형 디자인을 유지하되,
-   메인 기능 버튼이라 랭킹보다 한 단계 크게 표시합니다. */
-.start-menu-competitive .start-menu-button {
-    min-width: 158px;
-    width: 158px;
-    height: 42px;
-    padding: 0 14px;
-    border-radius: 9px;
-    font-size: 13px;
-}
-
 .start-menu-ranking {
     position: absolute;
-    top: 62px;
+    top: 100px;
     right: 12px;
     pointer-events: auto;
 }
@@ -635,15 +624,8 @@ canvas {
         left: 8px;
         right: auto;
     }
-    .start-menu-competitive { top: 8px; right: 8px; }
-    .start-menu-competitive .start-menu-button {
-        min-width: 136px;
-        width: 136px;
-        height: 38px;
-        padding: 0 10px;
-        font-size: 11px;
-    }
-    .start-menu-ranking { top: 54px; right: 8px; }
+    .start-menu-competitive { top: 54px; right: 8px; }
+    .start-menu-ranking { top: 91px; right: 8px; }
 
     .start-menu-logout {
         right: 8px;
@@ -725,9 +707,7 @@ canvas {
                     <div class="start-account-exp-text">EXP · 랭킹/레벨 저장 제외</div>
                 </div>
             </div>
-            <div class="start-menu-competitive">
-                <button id="startMultiplayerButton" class="start-menu-button" type="button">⚔ 2인용 경쟁</button>
-            </div>
+            <div class="start-menu-competitive" aria-hidden="true"></div>
             <div class="start-menu-ranking">
                 <button id="startRankingButton" class="start-menu-button" type="button">🏆 랭킹</button>
             </div>
@@ -943,6 +923,7 @@ function enterGameAsAccount(account) {
     questOpen = false;
     shopOpen = false;
     inventoryOpen = false;
+    skinOpen = false;
     settingsOpen = false;
     multiplayerOpen = false;
     updateStartMenuOverlay();
@@ -964,6 +945,7 @@ function enterGameAsGuest() {
     questOpen = false;
     shopOpen = false;
     inventoryOpen = false;
+    skinOpen = false;
     settingsOpen = false;
     multiplayerOpen = false;
     updateStartMenuOverlay();
@@ -975,7 +957,7 @@ function updateStartMenuOverlay() {
     const accountLabel = document.getElementById("startMenuAccount");
     if (!overlay || !accountLabel) return;
 
-    const visible = gameAccessGranted && gameState === "start" && !questOpen && !shopOpen && !inventoryOpen && !settingsOpen && !multiplayerOpen;
+    const visible = gameAccessGranted && gameState === "start" && !questOpen && !shopOpen && !inventoryOpen && !skinOpen && !settingsOpen && !multiplayerOpen;
     overlay.classList.toggle("visible", visible);
     overlay.setAttribute("aria-hidden", visible ? "false" : "true");
 
@@ -1271,14 +1253,6 @@ function bindEntryAndRankingUI() {
         event.stopPropagation();
         playUIClickSound();
         openRankingPanel("today");
-    });
-
-    document.getElementById("startMultiplayerButton")?.addEventListener("click", event => {
-        event.preventDefault();
-        event.stopPropagation();
-        playUIClickSound();
-        openMultiplayerMenu();
-        updateStartMenuOverlay();
     });
 
     document.getElementById("startLogoutButton")?.addEventListener("click", event => {
@@ -2346,6 +2320,7 @@ let shopPage = 0;
 const SHOP_PAGE_SIZE = 3;
 let inventoryOpen = false;
 let inventoryDetailType = null;
+let skinOpen = false;
 const purchaseQuantities = {
     timeClock: 1,
     energyShield: 1,
@@ -2591,7 +2566,7 @@ function positionVolumeTouchArea() {
     const rect = canvas.getBoundingClientRect();
     const scaleX = rect.width / WIDTH;
     const scaleY = rect.height / HEIGHT;
-    const bar = { x: WIDTH / 2 - 130, y: 516, w: 260, h: 8 };
+    const bar = { x: WIDTH / 2 - 130, y: 195, w: 260, h: 8 };
 
     // A modest touch target around the original thin graphic slider.
     volumeTouchArea.style.display = "block";
@@ -5539,7 +5514,21 @@ function getQuestButton() {
 }
 
 function drawQuestButton() {
-    drawIconMenuButton(getQuestButton(), "📜");
+    const b = getQuestButton();
+    ctx.save();
+    ctx.fillStyle = "rgba(255,255,255,0.10)";
+    ctx.strokeStyle = "rgba(255,255,255,0.25)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(b.x, b.y, b.w, b.h, 12);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "#f0f3f6";
+    ctx.font = "bold 22px Arial, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("📜", b.x + b.w / 2, b.y + b.h / 2 + 1);
+    ctx.restore();
 }
 
 let questOpen = false;
@@ -10143,144 +10132,24 @@ function getShopButton() {
     };
 }
 
-function drawVectorSettingsIcon(cx, cy) {
+function drawShopButton() {
+    const button = getShopButton();
+
     ctx.save();
-    ctx.translate(cx, cy);
-    ctx.strokeStyle = "#f2f5f7";
-    ctx.fillStyle = "#f2f5f7";
-    ctx.lineWidth = 2.2;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-
-    ctx.beginPath();
-    for (let i = 0; i < 8; i++) {
-        const a = (Math.PI * 2 * i) / 8;
-        const r1 = 7.5;
-        const r2 = 10;
-        const x1 = Math.cos(a - 0.16) * r1;
-        const y1 = Math.sin(a - 0.16) * r1;
-        const x2 = Math.cos(a) * r2;
-        const y2 = Math.sin(a) * r2;
-        const x3 = Math.cos(a + 0.16) * r1;
-        const y3 = Math.sin(a + 0.16) * r1;
-        if (i === 0) ctx.moveTo(x1, y1); else ctx.lineTo(x1, y1);
-        ctx.lineTo(x2, y2);
-        ctx.lineTo(x3, y3);
-    }
-    ctx.closePath();
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.arc(0, 0, 4.1, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.restore();
-}
-
-function drawVectorShopIcon(cx, cy) {
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.strokeStyle = "#f2f5f7";
-    ctx.fillStyle = "#f2f5f7";
-    ctx.lineWidth = 2.2;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-
-    ctx.beginPath();
-    ctx.moveTo(-9, -6);
-    ctx.lineTo(-6.5, -6);
-    ctx.lineTo(-4.5, 5.5);
-    ctx.lineTo(8, 5.5);
-    ctx.lineTo(10, -2.5);
-    ctx.lineTo(-5.5, -2.5);
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.arc(-1.5, 9, 1.5, 0, Math.PI * 2);
-    ctx.arc(7, 9, 1.5, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.beginPath();
-    ctx.moveTo(-4.5, -7.5);
-    ctx.lineTo(7.5, -7.5);
-    ctx.stroke();
-    ctx.restore();
-}
-
-function drawVectorInventoryIcon(cx, cy) {
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.strokeStyle = "#f2f5f7";
-    ctx.lineWidth = 2.2;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-
-    ctx.beginPath();
-    ctx.roundRect(-9, -6, 18, 14, 3);
-    ctx.moveTo(-5, -6);
-    ctx.lineTo(-3, -10);
-    ctx.lineTo(3, -10);
-    ctx.lineTo(5, -6);
-    ctx.moveTo(-9, -1);
-    ctx.lineTo(9, -1);
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.moveTo(0, -1);
-    ctx.lineTo(0, 4);
-    ctx.stroke();
-    ctx.restore();
-}
-
-function drawVectorQuestIcon(cx, cy) {
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.strokeStyle = "#f2f5f7";
-    ctx.lineWidth = 2.1;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-
-    ctx.beginPath();
-    ctx.moveTo(-7, -9);
-    ctx.lineTo(5, -9);
-    ctx.quadraticCurveTo(8, -9, 8, -6);
-    ctx.lineTo(8, 9);
-    ctx.lineTo(-5, 9);
-    ctx.quadraticCurveTo(-8, 9, -8, 6);
-    ctx.lineTo(-8, -7);
-    ctx.quadraticCurveTo(-8, -9, -7, -9);
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.moveTo(-4, -4);
-    ctx.lineTo(4, -4);
-    ctx.moveTo(-4, 0);
-    ctx.lineTo(4, 0);
-    ctx.moveTo(-4, 4);
-    ctx.lineTo(2, 4);
-    ctx.stroke();
-    ctx.restore();
-}
-
-function drawIconMenuButton(button, emoji) {
-    ctx.save();
-    ctx.fillStyle = "rgba(15,19,25,0.82)";
-    ctx.strokeStyle = "rgba(255,255,255,0.18)";
+    ctx.fillStyle = "rgba(255,255,255,0.10)";
+    ctx.strokeStyle = "rgba(255,255,255,0.25)";
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.roundRect(button.x, button.y, button.w, button.h, 8);
+    ctx.roundRect(button.x, button.y, button.w, button.h, 12);
     ctx.fill();
     ctx.stroke();
 
-    ctx.fillStyle = "#f2f5f7";
-    ctx.font = '20px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
+    ctx.fillStyle = "#f0f3f6";
+    ctx.font = "bold 22px Arial, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(emoji, button.x + button.w / 2, button.y + button.h / 2 + 0.5);
+    ctx.fillText("🛒", button.x + button.w / 2, button.y + button.h / 2 + 1);
     ctx.restore();
-}
-
-function drawShopButton() {
-    drawIconMenuButton(getShopButton(), "🛒");
 }
 
 function getStartSettingsButton() {
@@ -10317,10 +10186,10 @@ function drawSettingsGear() {
     ctx.save();
 
     ctx.fillStyle =
-        "rgba(15,19,25,0.82)";
+        "rgba(255,255,255,0.10)";
 
     ctx.strokeStyle =
-        "rgba(255,255,255,0.18)";
+        "rgba(255,255,255,0.25)";
 
     ctx.lineWidth = 1;
 
@@ -10337,11 +10206,25 @@ function drawSettingsGear() {
     ctx.fill();
     ctx.stroke();
 
-    ctx.fillStyle = "#f2f5f7";
-    ctx.font = '20px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText("⚙", button.x + button.w / 2, button.y + button.h / 2 + 0.5);
+    ctx.fillStyle =
+        "#dfe5ea";
+
+    ctx.font =
+        "bold 25px Arial, sans-serif";
+
+    ctx.textAlign =
+        "center";
+
+    ctx.textBaseline =
+        "middle";
+
+    ctx.fillText(
+        "⚙",
+        button.x +
+        button.w / 2,
+        button.y +
+        button.h / 2 + 1
+    );
 
     ctx.restore();
 }
@@ -10549,7 +10432,21 @@ function getInventoryButton() {
 }
 
 function drawInventoryButton() {
-    drawIconMenuButton(getInventoryButton(), "🎒");
+    const button = getInventoryButton();
+    ctx.save();
+    ctx.fillStyle = "rgba(255,255,255,0.10)";
+    ctx.strokeStyle = "rgba(255,255,255,0.25)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(button.x, button.y, button.w, button.h, 12);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "#f0f3f6";
+    ctx.font = "bold 22px Arial, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("🎒", button.x + button.w / 2, button.y + button.h / 2 + 1);
+    ctx.restore();
 }
 
 function drawInventoryPanel() {
@@ -10571,6 +10468,8 @@ function drawInventoryPanel() {
     ctx.fillStyle = "#fff";
     ctx.font = "bold 28px Pretendard, Noto Sans KR, sans-serif";
     ctx.fillText("🎒 인벤토리", WIDTH / 2, 98);
+
+    drawSettingsButton(panel.x + panel.w - 150, 78, 125, 34, "👔 스킨");
 
     const types = Object.keys(ITEM_DATA);
     const cols = 5;
@@ -10741,6 +10640,37 @@ function getShopPanelRect() {
 ========================================================= */
 
 function drawSettingsPanel() {
+    ctx.save();
+    ctx.fillStyle = "rgba(0,0,0,0.72)";
+    ctx.fillRect(0, 0, WIDTH, HEIGHT);
+    const panel = { x: 120, y: 65, w: 560, h: 455 };
+    ctx.fillStyle = "#171c25";
+    ctx.strokeStyle = "#394352";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(panel.x, panel.y, panel.w, panel.h, 20);
+    ctx.fill(); ctx.stroke();
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 28px Pretendard, Noto Sans KR, sans-serif";
+    ctx.fillText("⚙ 설정", WIDTH / 2, 108);
+    ctx.fillStyle = "#aeb8c5";
+    ctx.font = "600 15px Pretendard, Noto Sans KR, sans-serif";
+    ctx.fillText(`효과음 크기  ${Math.round(effectVolume * 100)}%`, WIDTH / 2, 175);
+    const volumeBar = { x: WIDTH / 2 - 130, y: 195, w: 260, h: 8 };
+    ctx.fillStyle = "rgba(255,255,255,0.10)";
+    ctx.beginPath(); ctx.roundRect(volumeBar.x, volumeBar.y, volumeBar.w, volumeBar.h, 5); ctx.fill();
+    ctx.fillStyle = "#7ddcff";
+    ctx.beginPath(); ctx.roundRect(volumeBar.x, volumeBar.y, volumeBar.w * effectVolume, volumeBar.h, 5); ctx.fill();
+    ctx.fillStyle = "#dfe5ea";
+    ctx.beginPath(); ctx.arc(volumeBar.x + volumeBar.w * effectVolume, volumeBar.y + volumeBar.h / 2, 8, 0, Math.PI * 2); ctx.fill();
+    drawSettingsButton(WIDTH / 2 - 130, 270, 260, 48, "🔊 효과음 테스트");
+    drawSettingsButton(WIDTH / 2 - 130, 340, 260, 48, "🚪 로그아웃");
+    drawSettingsButton(WIDTH / 2 - 80, 450, 160, 32, "닫기");
+    ctx.restore();
+}
+
+function drawSkinPanel() {
 
     ctx.save();
 
@@ -10795,7 +10725,7 @@ function drawSettingsPanel() {
         "bold 28px Pretendard, Noto Sans KR, sans-serif";
 
     ctx.fillText(
-        "⚙ 설정",
+        "👔 스킨",
         WIDTH / 2,
         62
     );
@@ -11320,6 +11250,29 @@ function handleQuestRewardTap(x, y) {
     return false;
 }
 
+function handleSkinSettingTap(x, y) {
+    const panel = { x: 70, y: 20, w: 660, h: 560 };
+    const rows = [
+        { key: "wall", list: WALL_COLORS, centerY: 112 },
+        { key: "background", list: BACKGROUND_COLORS, centerY: 180 },
+        { key: "dangerSkin", list: DANGER_SKINS, centerY: 305 },
+        { key: "streakEffect", list: STREAK_EFFECTS, centerY: 440 }
+    ];
+    for (const row of rows) {
+        const centerY = row.centerY;
+        if ((row.key === "wall" || row.key === "background") && row.list[visualSettings[row.key]]?.custom && isInsideRect(x, y, { x: WIDTH / 2 - 155, y: centerY - 21, w: 310, h: 42 })) {
+            setCustomColor(row.key); return true;
+        }
+        if (isInsideRect(x, y, { x: panel.x + 24, y: centerY - 21, w: 62, h: 42 })) {
+            cycleSetting(row.key, row.list, -1); return true;
+        }
+        if (isInsideRect(x, y, { x: panel.x + panel.w - 86, y: centerY - 21, w: 62, h: 42 })) {
+            cycleSetting(row.key, row.list, 1); return true;
+        }
+    }
+    return true;
+}
+
 function handleSettingsTap(x, y) {
     refreshDailyQuestIfNeeded();
     const questButton = getQuestButton();
@@ -11429,6 +11382,14 @@ function handleSettingsTap(x, y) {
     if (inventoryOpen) {
         const panel = { x: 55, y: 55, w: 690, h: 490 };
 
+        if (isInsideRect(x, y, { x: panel.x + panel.w - 150, y: 78, w: 125, h: 34 })) {
+            inventoryOpen = false;
+            skinOpen = true;
+            closeInventoryDetail();
+            requestSettingsRender();
+            return true;
+        }
+
         if (inventoryDetailType) {
             const box = { x: 145, y: 145, w: 510, h: 320 };
 
@@ -11504,6 +11465,17 @@ function handleSettingsTap(x, y) {
         return true;
     }
 
+    if (skinOpen) {
+        const panel = { x: 70, y: 20, w: 660, h: 560 };
+        if (isInsideRect(x, y, { x: WIDTH / 2 - 80, y: 550, w: 160, h: 26 })) {
+            skinOpen = false; requestSettingsRender(); return true;
+        }
+        if (x < panel.x || x > panel.x + panel.w || y < panel.y || y > panel.y + panel.h) {
+            skinOpen = false; requestSettingsRender(); return true;
+        }
+        return handleSkinSettingTap(x, y);
+    }
+
     if (shopOpen) {
         const panel = getShopPanelRect();
         const types = ["timeClock", "energyShield", "pathGuide", "firstAid", "energyRecovery"];
@@ -11538,6 +11510,11 @@ function handleSettingsTap(x, y) {
         return true;
     }
 
+    if (!settingsOpen && isInsideRect(x, y, { x: 570, y: 58, w: 200, h: 38 })) {
+        openMultiplayerMenu();
+        return true;
+    }
+
     if (!settingsOpen && isInsideRect(x, y, gear)) {
         settingsOpen = true;
         requestSettingsRender();
@@ -11547,76 +11524,25 @@ function handleSettingsTap(x, y) {
 
     if (!settingsOpen) return false;
 
-    const panel = { x: 70, y: 20, w: 660, h: 560 };
-
-    if (isInsideRect(x, y, { x: WIDTH / 2 - 80, y: 550, w: 160, h: 26 })) {
+    const settingsPanel = { x: 120, y: 65, w: 560, h: 455 };
+    if (isInsideRect(x, y, { x: WIDTH / 2 - 80, y: 450, w: 160, h: 32 })) {
         settingsOpen = false;
         positionVolumeTouchArea();
         return true;
     }
-
-    if (
-        x < panel.x ||
-        x > panel.x + panel.w ||
-        y < panel.y ||
-        y > panel.y + panel.h
-    ) {
-        settingsOpen = false;
+    if (isInsideRect(x, y, { x: WIDTH / 2 - 130, y: 270, w: 260, h: 48 })) {
+        playEffectSound("uiClick");
         return true;
     }
-
-    const rows = [
-        { key: "wall", list: WALL_COLORS },
-        { key: "background", list: BACKGROUND_COLORS },
-        { key: "dangerSkin", list: DANGER_SKINS },
-        { key: "streakEffect", list: STREAK_EFFECTS }
-    ];
-
-    const settingRows = [
-        { key: "wall", list: WALL_COLORS, centerY: 112 },
-        { key: "background", list: BACKGROUND_COLORS, centerY: 180 },
-        { key: "dangerSkin", list: DANGER_SKINS, centerY: 305 },
-        { key: "streakEffect", list: STREAK_EFFECTS, centerY: 440 }
-    ];
-
-    settingRows.forEach((row) => {
-        const centerY = row.centerY;
-
-        /* 사용자 지정은 가운데 문구/색상 영역을 눌렀을 때만 입력창을 엽니다. */
-        if (
-            (row.key === "wall" || row.key === "background") &&
-            row.list[visualSettings[row.key]]?.custom &&
-            isInsideRect(x, y, {
-                x: WIDTH / 2 - 155,
-                y: centerY - 21,
-                w: 310,
-                h: 42
-            })
-        ) {
-            setCustomColor(row.key);
-            return;
-        }
-
-        if (isInsideRect(x, y, {
-            x: panel.x + 24,
-            y: centerY - 21,
-            w: 62,
-            h: 42
-        })) {
-            cycleSetting(row.key, row.list, -1);
-            return;
-        }
-
-        if (isInsideRect(x, y, {
-            x: panel.x + panel.w - 86,
-            y: centerY - 21,
-            w: 62,
-            h: 42
-        })) {
-            cycleSetting(row.key, row.list, 1);
-        }
-    });
-
+    if (isInsideRect(x, y, { x: WIDTH / 2 - 130, y: 340, w: 260, h: 48 })) {
+        logoutToEntry();
+        return true;
+    }
+    if (x < settingsPanel.x || x > settingsPanel.x + settingsPanel.w || y < settingsPanel.y || y > settingsPanel.y + settingsPanel.h) {
+        settingsOpen = false;
+        positionVolumeTouchArea();
+        return true;
+    }
     return true;
 }
 
@@ -11781,12 +11707,15 @@ function drawStartScreen() {
     drawInventoryButton();
     drawSettingsGear();
 
+
     if (questOpen) {
         drawQuestPanel();
     } else if (shopOpen) {
         drawShopPanel();
     } else if (inventoryOpen) {
         drawInventoryPanel();
+    } else if (skinOpen) {
+        drawSkinPanel();
     } else if (settingsOpen) {
         drawSettingsPanel();
     } else if (multiplayerOpen) {
@@ -12022,7 +11951,7 @@ function draw(now = performance.now()) {
         // Canvas 연산을 없애 화살표 입력 시 발생하는 순간적인 지연을 줄입니다.
         if (questOpen) {
             drawStartScreen();
-        } else if (settingsOpen) {
+        } else if (settingsOpen || skinOpen) {
             const previewFrameInterval = 1000 / 24;
 
             if (
@@ -12035,7 +11964,8 @@ function draw(now = performance.now()) {
             settingsRenderRequested = false;
             lastSettingsRenderTime = now;
             drawBackground();
-            drawSettingsPanel();
+            if (skinOpen) drawSkinPanel();
+            else drawSettingsPanel();
         } else {
             drawStartScreen();
         }
