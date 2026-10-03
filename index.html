@@ -599,11 +599,47 @@ canvas {
     color: #e7edf2;
 }
 
+.ranking-table {
+    table-layout: fixed;
+}
+
+.ranking-table th:nth-child(1),
+.ranking-table td:nth-child(1) {
+    width: 10%;
+    text-align: center !important;
+}
+
+.ranking-table th:nth-child(2),
 .ranking-table td:nth-child(2) {
-    text-align: left;
-    max-width: 220px;
+    width: 14%;
+    text-align: center !important;
+    font-variant-numeric: tabular-nums;
+}
+
+.ranking-table th:nth-child(3),
+.ranking-table td:nth-child(3) {
+    width: 24%;
+    text-align: center !important;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+.ranking-table th:nth-child(4),
+.ranking-table td:nth-child(4) {
+    width: 18%;
+    text-align: center !important;
+}
+
+.ranking-table th:nth-child(5),
+.ranking-table td:nth-child(5) {
+    width: 17%;
+    text-align: center !important;
+}
+
+.ranking-table th:nth-child(6),
+.ranking-table td:nth-child(6) {
+    width: 17%;
+    text-align: center !important;
 }
 
 @media (max-width: 520px) {
