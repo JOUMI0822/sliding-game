@@ -578,6 +578,7 @@ canvas {
 
 .ranking-table {
     width: 100%;
+    table-layout: fixed;
     border-collapse: collapse;
     font-size: 13px;
 }
@@ -588,6 +589,7 @@ canvas {
     border-bottom: 1px solid rgba(255,255,255,0.07);
     text-align: center;
     white-space: nowrap;
+    box-sizing: border-box;
 }
 
 .ranking-table th {
@@ -599,47 +601,47 @@ canvas {
     color: #e7edf2;
 }
 
-.ranking-table {
-    table-layout: fixed;
-}
-
+/* 순위 / 레벨 / 점수 / 클리어 / 연속은 헤더와 값의 중심축을 정확히 맞춥니다. */
 .ranking-table th:nth-child(1),
 .ranking-table td:nth-child(1) {
-    width: 56px;
+    width: 10%;
+    text-align: center !important;
 }
 
 .ranking-table th:nth-child(2),
 .ranking-table td:nth-child(2) {
-    width: 72px;
-    text-align: center;
+    width: 14%;
+    text-align: center !important;
     font-variant-numeric: tabular-nums;
 }
 
 .ranking-table th:nth-child(3),
 .ranking-table td:nth-child(3) {
-    width: auto;
-    text-align: left;
-    max-width: 220px;
+    width: 24%;
+    text-align: center !important;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
 .ranking-table th:nth-child(4),
 .ranking-table td:nth-child(4) {
-    width: 86px;
+    width: 18%;
+    text-align: center !important;
     font-variant-numeric: tabular-nums;
 }
 
 .ranking-table th:nth-child(5),
-.ranking-table td:nth-child(5),
-.ranking-table th:nth-child(6),
-.ranking-table td:nth-child(6) {
-    width: 66px;
+.ranking-table td:nth-child(5) {
+    width: 17%;
+    text-align: center !important;
     font-variant-numeric: tabular-nums;
 }
 
-.ranking-table td {
-    vertical-align: middle;
+.ranking-table th:nth-child(6),
+.ranking-table td:nth-child(6) {
+    width: 17%;
+    text-align: center !important;
+    font-variant-numeric: tabular-nums;
 }
 
 @media (max-width: 520px) {
@@ -681,6 +683,10 @@ canvas {
         min-width: 78px;
         height: 31px;
         font-size: 10px;
+    }
+
+    .ranking-table {
+        min-width: 560px;
     }
 }
 
@@ -1250,9 +1256,9 @@ async function loadRanking(mode = rankingMode) {
                 const clears = Number(row.clears) || 0;
                 const streak = Number(row.maxStreak) || Number(row.max_streak) || 0;
                 return `<tr>
-                    <td>${rank}</td>
-                    <td>Lv. ${level}</td>
-                    <td>${escapeHTML(nickname)}</td>
+                    <td class="ranking-rank">${rank}</td>
+                    <td class="ranking-level">Lv. ${level}</td>
+                    <td class="ranking-nickname">${escapeHTML(nickname)}</td>
                     <td>${score.toLocaleString("ko-KR")}</td>
                     <td>${clears}</td>
                     <td>${streak}</td>
