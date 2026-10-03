@@ -578,7 +578,6 @@ canvas {
 
 .ranking-table {
     width: 100%;
-    table-layout: fixed;
     border-collapse: collapse;
     font-size: 13px;
 }
@@ -589,7 +588,6 @@ canvas {
     border-bottom: 1px solid rgba(255,255,255,0.07);
     text-align: center;
     white-space: nowrap;
-    box-sizing: border-box;
 }
 
 .ranking-table th {
@@ -601,47 +599,11 @@ canvas {
     color: #e7edf2;
 }
 
-/* 순위 / 레벨 / 점수 / 클리어 / 연속은 헤더와 값의 중심축을 정확히 맞춥니다. */
-.ranking-table th:nth-child(1),
-.ranking-table td:nth-child(1) {
-    width: 10%;
-    text-align: center !important;
-}
-
-.ranking-table th:nth-child(2),
 .ranking-table td:nth-child(2) {
-    width: 14%;
-    text-align: center !important;
-    font-variant-numeric: tabular-nums;
-}
-
-.ranking-table th:nth-child(3),
-.ranking-table td:nth-child(3) {
-    width: 24%;
-    text-align: center !important;
+    text-align: left;
+    max-width: 220px;
     overflow: hidden;
     text-overflow: ellipsis;
-}
-
-.ranking-table th:nth-child(4),
-.ranking-table td:nth-child(4) {
-    width: 18%;
-    text-align: center !important;
-    font-variant-numeric: tabular-nums;
-}
-
-.ranking-table th:nth-child(5),
-.ranking-table td:nth-child(5) {
-    width: 17%;
-    text-align: center !important;
-    font-variant-numeric: tabular-nums;
-}
-
-.ranking-table th:nth-child(6),
-.ranking-table td:nth-child(6) {
-    width: 17%;
-    text-align: center !important;
-    font-variant-numeric: tabular-nums;
 }
 
 @media (max-width: 520px) {
@@ -683,10 +645,6 @@ canvas {
         min-width: 78px;
         height: 31px;
         font-size: 10px;
-    }
-
-    .ranking-table {
-        min-width: 560px;
     }
 }
 
@@ -1203,6 +1161,38 @@ async function submitV28Score() {
     }
 }
 
+let rankingBodyOverflowBackup = null;
+
+function lockPageForRanking() {
+    const body = document.body;
+    const html = document.documentElement;
+    if (!body || !html) return;
+    rankingBodyOverflowBackup = {
+        bodyOverflow: body.style.overflow,
+        htmlOverflow: html.style.overflow
+    };
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+}
+
+function unlockPageForRanking() {
+    const body = document.body;
+    const html = document.documentElement;
+    if (!body || !html) return;
+    const backup = rankingBodyOverflowBackup || { bodyOverflow: "", htmlOverflow: "" };
+    body.style.overflow = backup.bodyOverflow;
+    html.style.overflow = backup.htmlOverflow;
+    rankingBodyOverflowBackup = null;
+}
+
+// iPad/iOS keyboard가 input을 화면에 맞추기 위해 자동 스크롤할 때
+// body를 fixed로 잠그지 않고, 모달이 열려 있을 때만 배경 스크롤을 막습니다.
+window.addEventListener("focusin", event => {
+    if (!event.target || !["INPUT", "TEXTAREA", "SELECT"].includes(event.target.tagName)) return;
+    if (document.getElementById("rankingPanel")?.hidden === false) return;
+    // 입력창을 fixed body와 함께 움직이지 않게 하는 별도 스크롤 강제는 하지 않습니다.
+}, { passive: true });
+
 function openRankingPanel(mode = "today") {
     if (!currentAccount) {
         window.alert("게스트 모드에서는 랭킹을 볼 수 없습니다. 회원으로 로그인해 주세요.");
@@ -1211,6 +1201,7 @@ function openRankingPanel(mode = "today") {
 
     rankingMode = mode === "weekly" ? "weekly" : "today";
     const panel = document.getElementById("rankingPanel");
+    lockPageForRanking();
     panel.hidden = false;
     panel.classList.add("ranking-open");
     panel.setAttribute("aria-hidden", "false");
@@ -1224,6 +1215,7 @@ function closeRankingPanel() {
     panel.hidden = true;
     panel.classList.remove("ranking-open");
     panel.setAttribute("aria-hidden", "true");
+    unlockPageForRanking();
 }
 
 function updateRankingTabs() {
@@ -1256,9 +1248,9 @@ async function loadRanking(mode = rankingMode) {
                 const clears = Number(row.clears) || 0;
                 const streak = Number(row.maxStreak) || Number(row.max_streak) || 0;
                 return `<tr>
-                    <td class="ranking-rank">${rank}</td>
-                    <td class="ranking-level">Lv. ${level}</td>
-                    <td class="ranking-nickname">${escapeHTML(nickname)}</td>
+                    <td>${rank}</td>
+                    <td>Lv. ${level}</td>
+                    <td>${escapeHTML(nickname)}</td>
                     <td>${score.toLocaleString("ko-KR")}</td>
                     <td>${clears}</td>
                     <td>${streak}</td>
