@@ -599,11 +599,47 @@ canvas {
     color: #e7edf2;
 }
 
+.ranking-table {
+    table-layout: fixed;
+}
+
+.ranking-table th:nth-child(1),
+.ranking-table td:nth-child(1) {
+    width: 56px;
+}
+
+.ranking-table th:nth-child(2),
 .ranking-table td:nth-child(2) {
+    width: 72px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+
+.ranking-table th:nth-child(3),
+.ranking-table td:nth-child(3) {
+    width: auto;
     text-align: left;
     max-width: 220px;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+.ranking-table th:nth-child(4),
+.ranking-table td:nth-child(4) {
+    width: 86px;
+    font-variant-numeric: tabular-nums;
+}
+
+.ranking-table th:nth-child(5),
+.ranking-table td:nth-child(5),
+.ranking-table th:nth-child(6),
+.ranking-table td:nth-child(6) {
+    width: 66px;
+    font-variant-numeric: tabular-nums;
+}
+
+.ranking-table td {
+    vertical-align: middle;
 }
 
 @media (max-width: 520px) {
@@ -1000,12 +1036,9 @@ function escapeHTML(value) {
 async function apiJSON(path, options = {}) {
     const response = await fetch(`${RANKING_API_BASE}${path}`, {
         credentials: "include",
-        cache: "no-store",
         ...options,
         headers: {
             "Content-Type": "application/json",
-            "Cache-Control": "no-cache",
-            "Pragma": "no-cache",
             ...(options.headers || {})
         }
     });
@@ -1144,36 +1177,23 @@ function calculateV28Score() {
 }
 
 async function submitV28Score() {
-    if (!currentAccount || guestMode || !gameAccessGranted) {
-        return { saved: false, skipped: true };
-    }
+    if (!currentAccount || guestMode || !gameAccessGranted) return;
 
     const score = calculateV28Score();
-    const payload = {
-        clears: Math.max(0, Math.floor(clearCount)),
-        maxStreak: Math.max(0, Math.floor(maxClearStreak)),
-        skips: Math.max(0, Math.floor(mapSkipCount)),
-        lifeLosses: Math.max(0, Math.floor(lifeLossCount)),
-        score
-    };
 
     try {
-        const data = await apiJSON(`/api/ranking/score?_t=${Date.now()}`, {
+        await apiJSON("/api/ranking/score", {
             method: "POST",
-            body: JSON.stringify(payload)
+            body: JSON.stringify({
+                clears: clearCount,
+                maxStreak: maxClearStreak,
+                skips: mapSkipCount,
+                lifeLosses: lifeLossCount,
+                score
+            })
         });
-
-        if (!data?.saved) {
-            throw new Error("서버가 랭킹 저장 성공을 확인하지 않았습니다.");
-        }
-
-        console.log("[RANKING] 저장 성공", data);
-        return data;
     } catch (error) {
-        console.error("[RANKING] 저장 실패", error);
-        setMessage(`⚠️ 랭킹 저장 실패: ${error.message || "알 수 없는 오류"}`);
-        updateUI();
-        return { saved: false, error: error.message || String(error) };
+        console.warn("랭킹 점수 저장 실패:", error);
     }
 }
 
@@ -1216,8 +1236,7 @@ async function loadRanking(mode = rankingMode) {
     body.innerHTML = "";
 
     try {
-        const endpoint = rankingMode === "weekly" ? "/api/ranking/weekly" : "/api/ranking/today";
-        const data = await apiJSON(`${endpoint}?_t=${Date.now()}`);
+        const data = await apiJSON(rankingMode === "weekly" ? "/api/ranking/weekly" : "/api/ranking/today");
         const rows = Array.isArray(data?.rows) ? data.rows : Array.isArray(data?.ranking) ? data.ranking : Array.isArray(data) ? data : [];
 
         if (rows.length === 0) {
