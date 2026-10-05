@@ -684,10 +684,92 @@ canvas {
     }
 }
 
+
+
+/* 로그아웃 확인용 커스텀 대화상자 */
+#logoutConfirmOverlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(0,0,0,0.62);
+    touch-action: none;
+}
+
+#logoutConfirmOverlay.visible {
+    display: flex;
+}
+
+#logoutConfirmDialog {
+    width: min(360px, calc(100vw - 40px));
+    padding: 24px 22px 20px;
+    border: 1px solid #394352;
+    border-radius: 18px;
+    background: #171c25;
+    box-shadow: 0 18px 50px rgba(0,0,0,0.45);
+    text-align: center;
+}
+
+#logoutConfirmDialogTitle {
+    margin: 0 0 10px;
+    color: #ffffff;
+    font-size: 21px;
+    font-weight: 700;
+}
+
+#logoutConfirmDialogMessage {
+    margin: 0 0 20px;
+    color: #aeb8c5;
+    font-size: 15px;
+    line-height: 1.5;
+}
+
+.logout-confirm-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.logout-confirm-actions button {
+    flex: 1;
+    min-height: 44px;
+    border: 1px solid #46515f;
+    border-radius: 10px;
+    font: 600 14px Pretendard, Noto Sans KR, sans-serif;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+#logoutCancelButton {
+    color: #dfe5ea;
+    background: #222934;
+}
+
+#logoutConfirmButton {
+    color: #ffffff;
+    background: #b83b49;
+    border-color: #d15a67;
+}
+
 </style>
 </head>
 
 <body>
+
+
+
+<div id="logoutConfirmOverlay" aria-hidden="true">
+    <div id="logoutConfirmDialog" role="dialog" aria-modal="true" aria-labelledby="logoutConfirmDialogTitle">
+        <h2 id="logoutConfirmDialogTitle">로그아웃</h2>
+        <p id="logoutConfirmDialogMessage">로그아웃하시겠습니까?</p>
+        <div class="logout-confirm-actions">
+            <button id="logoutCancelButton" type="button">취소</button>
+            <button id="logoutConfirmButton" type="button">로그아웃</button>
+        </div>
+    </div>
+</div>
 
 <div id="entryGate" class="entry-screen">
     <div id="loginView" class="entry-card">
@@ -1147,8 +1229,50 @@ async function registerAccount() {
     }
 }
 
+let logoutConfirmOpen = false;
+
+function closeLogoutConfirm() {
+    const overlay = document.getElementById("logoutConfirmOverlay");
+    if (!overlay) return;
+    overlay.classList.remove("visible");
+    overlay.setAttribute("aria-hidden", "true");
+    logoutConfirmOpen = false;
+}
+
+function openLogoutConfirm() {
+    const overlay = document.getElementById("logoutConfirmOverlay");
+    if (!overlay || logoutConfirmOpen) return;
+
+    logoutConfirmOpen = true;
+    overlay.classList.add("visible");
+    overlay.setAttribute("aria-hidden", "false");
+
+    const cancelButton = document.getElementById("logoutCancelButton");
+    const confirmButton = document.getElementById("logoutConfirmButton");
+    if (cancelButton) cancelButton.focus();
+
+    return new Promise(resolve => {
+        const finish = confirmed => {
+            overlay.removeEventListener("click", onOverlayClick);
+            cancelButton?.removeEventListener("click", onCancel);
+            confirmButton?.removeEventListener("click", onConfirm);
+            closeLogoutConfirm();
+            resolve(confirmed);
+        };
+        const onCancel = () => finish(false);
+        const onConfirm = () => finish(true);
+        const onOverlayClick = event => {
+            if (event.target === overlay) finish(false);
+        };
+
+        cancelButton?.addEventListener("click", onCancel, { once: true });
+        confirmButton?.addEventListener("click", onConfirm, { once: true });
+        overlay.addEventListener("click", onOverlayClick);
+    });
+}
+
 async function logoutToEntry() {
-    const confirmed = window.confirm("로그아웃하시겠습니까?");
+    const confirmed = await openLogoutConfirm();
     if (!confirmed) return;
 
     try {
