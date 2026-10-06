@@ -1880,7 +1880,7 @@ function handleMultiplayerMessage(data) {
             try {
                 localStorage.setItem("slideMazeBestStreak", String(allTimeBestStreak));
             } catch (error) {}
-            if (activeItem === "energyShield" && clearCount % 3 === 0) {
+            if (activeItem === "energyShield" && clearCount % 2 === 0) {
                 shieldCharges++;
             }
             if (activeItem === "firstAid" && clearCount % 4 === 0) {
@@ -2498,7 +2498,7 @@ const ITEM_PRICES = {
     timeClock: 2,
     energyShield: 5,
     pathGuide: 10,
-    firstAid: 5,
+    firstAid: 7,
     energyRecovery: 3
 };
 
@@ -2511,7 +2511,7 @@ const ITEM_DATA = {
     energyShield: {
         name: "에너지 보호막 시스템",
         icon: "🔰",
-        description: "위험 블록 충돌 1회 방어 · 3스테이지 마다 복구"
+        description: "위험 블록 충돌 1회 방어 · 2스테이지 마다 복구"
     },
     pathGuide: {
         name: "경로 안내 장치",
@@ -3932,30 +3932,87 @@ function canPlaceRectangle(
 }
 
 
+function isWalkableAreaFullyConnected(wallSet) {
+
+    const startKey =
+        keyOf(
+            stageStart.c,
+            stageStart.r
+        );
+
+    if (wallSet.has(startKey)) {
+        return false;
+    }
+
+    const visited =
+        new Set([startKey]);
+
+    const queue = [startKey];
+
+    while (
+        queue.length > 0
+    ) {
+
+        const current =
+            queue.shift();
+
+        const { c, r } =
+            parseKey(current);
+
+        const neighbors = [
+            [c + 1, r],
+            [c - 1, r],
+            [c, r + 1],
+            [c, r - 1]
+        ];
+
+        for (
+            const [nc, nr] of neighbors
+        ) {
+
+            if (
+                nc <= 0 ||
+                nr <= 0 ||
+                nc >= COLS - 1 ||
+                nr >= ROWS - 1
+            ) {
+                continue;
+            }
+
+            const nextKey =
+                keyOf(nc, nr);
+
+            if (
+                wallSet.has(nextKey) ||
+                visited.has(nextKey)
+            ) {
+                continue;
+            }
+
+            visited.add(nextKey);
+            queue.push(nextKey);
+        }
+    }
+
+    const totalOpenCells =
+        (COLS - 2) *
+        (ROWS - 2) -
+        [...wallSet].filter(key => {
+            const { c, r } = parseKey(key);
+            return !isBoundary(c, r);
+        }).length;
+
+    return visited.size === totalOpenCells;
+}
+
+
 function createRandomWalls() {
 
-    const difficulty =
-        Math.min(
-            10,
-            Math.floor(
-                clearCount / 3
-            )
-        );
-
-    const minRectangles =
-        20 +
-        difficulty * 2;
-
-    const maxRectangles =
-        31 +
-        difficulty * 3;
-
-    const maxDensity =
-        Math.min(
-            0.56,
-            0.38 +
-            difficulty * 0.018
-        );
+    // 맵 구조는 클리어 횟수와 무관하게 일정한 범위에서 생성합니다.
+    // 난이도 상승은 기존의 제한시간 시스템만 담당합니다.
+    const minRectangles = 20;
+    const maxRectangles = 31;
+    const maxDensity = 0.40;
 
     const result =
         createBoundaryWalls();
@@ -3974,35 +4031,16 @@ function createRandomWalls() {
 
         if (
             result.size >
-            COLS * ROWS *
-            maxDensity
+            COLS * ROWS * maxDensity
         ) {
             break;
         }
 
         const w =
-            randomInt(
-                1,
-                Math.min(
-                    5,
-                    4 +
-                    Math.floor(
-                        difficulty / 3
-                    )
-                )
-            );
+            randomInt(1, 4);
 
         const h =
-            randomInt(
-                1,
-                Math.min(
-                    4,
-                    3 +
-                    Math.floor(
-                        difficulty / 4
-                    )
-                )
-            );
+            randomInt(1, 3);
 
         const x =
             randomInt(
@@ -4044,6 +4082,14 @@ function createRandomWalls() {
                 }
             }
         }
+    }
+
+    // 벽으로 둘러싸여 의미 없이 갇힌 빈 공간이 생기지 않도록
+    // 모든 내부 빈 칸이 하나의 연결된 영역인지 확인합니다.
+    if (
+        !isWalkableAreaFullyConnected(result)
+    ) {
+        return null;
     }
 
     return result;
@@ -4585,14 +4631,6 @@ function getGoalCandidates(
     startKey
 ) {
 
-    const difficulty =
-        Math.min(
-            10,
-            Math.floor(
-                clearCount / 3
-            )
-        );
-
     const candidates = [];
 
     for (
@@ -4619,12 +4657,7 @@ function getGoalCandidates(
 
         if (
             path.length - 1 >=
-            (
-                MIN_PATH_LENGTH +
-                Math.floor(
-                    difficulty / 2
-                )
-            )
+            MIN_PATH_LENGTH
         ) {
 
             candidates.push({
@@ -4697,19 +4730,9 @@ function createDanger(
         candidates.push(state);
     }
 
-    const difficulty =
-        Math.min(
-            10,
-            Math.floor(
-                clearCount / 3
-            )
-        );
-
+    // 위험 블록은 항상 5~10개 범위에서만 생성합니다.
     const dangerCount =
-        randomInt(
-            4 + difficulty,
-            7 + difficulty * 2
-        );
+        randomInt(5, 10);
 
     for (
         let i = 0;
@@ -4841,9 +4864,6 @@ function createMap() {
     const oldWallSnapshot =
         new Set(walls);
 
-    // 새 맵을 충분히 찾지 못하더라도, 검증을 통과한 기존 맵을
-    // 다시 사용하는 후보를 하나 보관합니다.
-    // 빈(경계만 있는) 맵으로 떨어지는 것보다 기존 맵을 재사용하는 편이 낫습니다.
     let repeatedMapCandidate = null;
 
     for (
@@ -4854,6 +4874,11 @@ function createMap() {
 
         const candidateWalls =
             createRandomWalls();
+
+        // 연결되지 않은 빈 공간이 만들어진 맵은 즉시 폐기합니다.
+        if (!candidateWalls) {
+            continue;
+        }
 
         const graph =
             buildSlideGraph(
@@ -4872,34 +4897,17 @@ function createMap() {
                 startKey
             );
 
-        const difficulty =
-            Math.min(
-                10,
-                Math.floor(
-                    clearCount / 3
-                )
-            );
-
-        const requiredReachable =
-            MIN_REACHABLE_STATES +
-            difficulty * 2;
-
-        const requiredBranching =
-            MIN_BRANCHING_STATES +
-            Math.floor(
-                difficulty / 2
-            );
-
+        // 맵 구조 조건은 고정합니다.
         if (
             analysis.reachableCount <
-            requiredReachable
+            MIN_REACHABLE_STATES
         ) {
             continue;
         }
 
         if (
             analysis.branchingStates <
-            requiredBranching
+            MIN_BRANCHING_STATES
         ) {
             continue;
         }
@@ -4943,9 +4951,7 @@ function createMap() {
                 goalKey
             );
 
-        if (
-            !escapeCheck.valid
-        ) {
+        if (!escapeCheck.valid) {
             continue;
         }
 
@@ -4971,6 +4977,13 @@ function createMap() {
                 safePath
             );
 
+        // 위험 블록은 최소 5개가 실제로 배치된 맵만 사용합니다.
+        if (
+            candidateDangers.size < 5
+        ) {
+            continue;
+        }
+
         if (
             !verifySafeGoalPath(
                 graph,
@@ -4993,9 +5006,6 @@ function createMap() {
                 signature
             )
         ) {
-            // 이미 나온 맵이면 일단 보관만 하고,
-            // 아직 한 번도 나오지 않은 맵을 계속 찾습니다.
-            // 끝까지 새 맵을 못 찾으면 이 검증된 맵을 재사용합니다.
             if (!repeatedMapCandidate) {
                 repeatedMapCandidate = {
                     walls: new Set(candidateWalls),
@@ -5037,8 +5047,6 @@ function createMap() {
         return true;
     }
 
-    // 새 맵을 모두 찾지 못한 경우에는 검증을 통과했던 기존 맵을 재사용합니다.
-    // 이 경우에도 맵 생성/길찾기 검증을 통과한 상태이므로 빈 맵이 출력되지 않습니다.
     if (repeatedMapCandidate) {
         walls =
             repeatedMapCandidate.walls;
@@ -5265,8 +5273,19 @@ function createFallbackMap(
         };
     }
 
+    const fallbackSafePath =
+        getPathTo(
+            simpleGraph,
+            startKey,
+            keyOf(goal.c, goal.r)
+        ) || [];
+
     dangers =
-        new Set();
+        createDanger(
+            simpleGraph,
+            keyOf(goal.c, goal.r),
+            fallbackSafePath
+        );
 
     return true;
 }
@@ -6668,7 +6687,7 @@ function clearGame() {
     coins++;
     saveCoins();
 
-    if (activeItem === "energyShield" && clearCount % 3 === 0) {
+    if (activeItem === "energyShield" && clearCount % 2 === 0) {
         shieldCharges++;
         showItemWarning(`에너지 보호 시스템 재정비 완료 · 보호막 ${shieldCharges}개`);
     }
