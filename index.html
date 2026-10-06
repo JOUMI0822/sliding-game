@@ -2334,7 +2334,7 @@ function setEffectVolume(value) {
 }
 
 function getSoundVolume(type) {
-    if (type === "uiClick") return effectVolume * 0.50;
+    if (type === "uiClick") return effectVolume;
     if (type === "gameStart") return effectVolume * 0.12;
     return effectVolume;
 }
