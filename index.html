@@ -2771,9 +2771,97 @@ function saveMusicVolume() {
 }
 function setMusicVolume(value) {
     musicVolume = Math.max(0, Math.min(1, Number(value) || 0));
+    if (backgroundMusic) backgroundMusic.volume = musicVolume;
+    if (musicVolume <= 0 && backgroundMusic) {
+        backgroundMusic.pause();
+        backgroundMusic.currentTime = 0;
+        backgroundMusicPlayRequested = false;
+    }
     saveMusicVolume();
     requestSettingsRender();
 }
+
+/* =========================================================
+   배경음악: 실제 미로 플레이 중에만 반복 재생
+   GitHub 저장소의 Last.m4a를 직접 불러옵니다.
+========================================================= */
+const BACKGROUND_MUSIC_URL = "https://raw.githubusercontent.com/JOUMI0822/sliding-game/main/Last.m4a";
+let backgroundMusic = null;
+let backgroundMusicPlayRequested = false;
+let backgroundMusicWasPlaying = false;
+
+function getBackgroundMusic() {
+    if (backgroundMusic) return backgroundMusic;
+    try {
+        backgroundMusic = new Audio(BACKGROUND_MUSIC_URL);
+        backgroundMusic.loop = true;
+        backgroundMusic.preload = "auto";
+        backgroundMusic.volume = musicVolume;
+        backgroundMusic.setAttribute("playsinline", "");
+        backgroundMusic.addEventListener("pause", () => {
+            if (!isGameplayMusicWanted()) backgroundMusicPlayRequested = false;
+        });
+        return backgroundMusic;
+    } catch (error) {
+        console.warn("배경음악을 준비하지 못했습니다.", error);
+        return null;
+    }
+}
+
+function isGameplayMusicWanted() {
+    return gameAccessGranted && gameState === "playing" && musicVolume > 0;
+}
+
+function startBackgroundMusic() {
+    if (!isGameplayMusicWanted()) return;
+    const audio = getBackgroundMusic();
+    if (!audio || backgroundMusicPlayRequested && !audio.paused) return;
+    audio.volume = musicVolume;
+    backgroundMusicPlayRequested = true;
+    const promise = audio.play();
+    if (promise && typeof promise.catch === "function") {
+        promise.catch(error => {
+            backgroundMusicPlayRequested = false;
+            // 브라우저가 자동 재생을 막으면 다음 사용자 입력 때 다시 시도합니다.
+            if (error && error.name !== "NotAllowedError") {
+                console.warn("배경음악 재생에 실패했습니다.", error);
+            }
+        });
+    }
+}
+
+function stopBackgroundMusic() {
+    if (!backgroundMusic) {
+        backgroundMusicPlayRequested = false;
+        backgroundMusicWasPlaying = false;
+        return;
+    }
+    if (!backgroundMusic.paused) {
+        backgroundMusic.pause();
+        try { backgroundMusic.currentTime = 0; } catch (error) {}
+    }
+    backgroundMusicPlayRequested = false;
+    backgroundMusicWasPlaying = false;
+}
+
+function syncBackgroundMusic() {
+    const wanted = isGameplayMusicWanted();
+    if (wanted) {
+        // 한 번만 자동 재생을 시도하고, 차단된 경우 다음 사용자 입력에서 재시도합니다.
+        if (!backgroundMusicWasPlaying) startBackgroundMusic();
+        backgroundMusicWasPlaying = true;
+    } else {
+        stopBackgroundMusic();
+    }
+}
+
+// 모바일 브라우저에서 재생 권한이 필요한 경우, 실제 사용자 입력에서 재시도합니다.
+document.addEventListener("pointerdown", () => {
+    if (isGameplayMusicWanted()) startBackgroundMusic();
+}, { passive: true });
+document.addEventListener("keydown", () => {
+    if (isGameplayMusicWanted()) startBackgroundMusic();
+}, { passive: true });
 
 const volumeTouchArea = document.createElement("div");
 volumeTouchArea.id = "volumeTouchArea";
@@ -12303,6 +12391,9 @@ function gameLoop(
         );
 
     update(delta);
+
+    // 게임 상태에 맞춰 배경음악을 시작/정지합니다.
+    syncBackgroundMusic();
 
     draw(now);
 
