@@ -11712,7 +11712,7 @@ function handleSettingsTap(x, y) {
     if (multiplayerOpen) {
         const multiplayerPanel = { x: 135, y: 80, w: 530, h: 440 };
         if (x < multiplayerPanel.x || x > multiplayerPanel.x + multiplayerPanel.w || y < multiplayerPanel.y || y > multiplayerPanel.y + multiplayerPanel.h) {
-            closeMultiplayerMenu();
+            // 바깥 클릭으로 메뉴를 닫지 않습니다. 뒤쪽 버튼만 차단합니다.
             return true;
         }
         if (multiplayerMatchmaking) {
@@ -11799,10 +11799,7 @@ function handleSettingsTap(x, y) {
             syncQuestRewardOverlay(true);
             return true;
         }
-        if (x < 35 || x > 765 || y < 25 || y > 575) {
-            questOpen = false;
-            syncQuestRewardOverlay(true);
-        }
+        // 바깥 클릭은 창을 닫지 않고 배경 UI에도 전달하지 않습니다.
         return true;
     }
 
@@ -11827,7 +11824,7 @@ function handleSettingsTap(x, y) {
             // 상세창 바깥의 빈 공간을 누르면 상세창만 닫고
             // 인벤토리 화면은 그대로 유지합니다.
             if (x < box.x || x > box.x + box.w || y < box.y || y > box.y + box.h) {
-                closeInventoryDetail();
+                // 상세창 바깥 클릭도 닫기 동작으로 사용하지 않습니다.
                 return true;
             }
 
@@ -11870,8 +11867,7 @@ function handleSettingsTap(x, y) {
         }
 
         if (x < panel.x || x > panel.x + panel.w || y < panel.y || y > panel.y + panel.h) {
-            closeInventoryDetail();
-            inventoryOpen = false;
+            // 바깥 클릭은 인벤토리를 닫지 않고 배경 UI만 차단합니다.
             return true;
         }
 
@@ -11902,7 +11898,8 @@ function handleSettingsTap(x, y) {
             skinOpen = false; requestSettingsRender(); return true;
         }
         if (x < panel.x || x > panel.x + panel.w || y < panel.y || y > panel.y + panel.h) {
-            skinOpen = false; requestSettingsRender(); return true;
+            // 바깥 클릭은 무시하고, 명시적인 닫기 버튼으로만 닫습니다.
+            return true;
         }
         return handleSkinSettingTap(x, y);
     }
@@ -11926,7 +11923,7 @@ function handleSettingsTap(x, y) {
             return true;
         }
         if (x < panel.x || x > panel.x + panel.w || y < panel.y || y > panel.y + panel.h) {
-            shopOpen = false;
+            // 바깥 클릭은 무시하고, 명시적인 닫기 버튼으로만 닫습니다.
             return true;
         }
 
@@ -11966,8 +11963,7 @@ function handleSettingsTap(x, y) {
         return true;
     }
     if (x < settingsPanel.x || x > settingsPanel.x + settingsPanel.w || y < settingsPanel.y || y > settingsPanel.y + settingsPanel.h) {
-        settingsOpen = false;
-        positionVolumeTouchArea();
+        // 바깥 클릭은 무시하고, 명시적인 닫기 버튼으로만 닫습니다.
         return true;
     }
     return true;
