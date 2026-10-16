@@ -2809,7 +2809,10 @@ function getBackgroundMusic() {
 }
 
 function isGameplayMusicWanted() {
-    return gameAccessGranted && gameState === "playing" && musicVolume > 0;
+    // 음악은 플레이 중 발생하는 상태 변화(피격, 시간 초과, 클리어,
+    // 리스폰, 결과 표시 등)로 끊기지 않게 합니다.
+    // 홈/시작 화면(gameState === "start")으로 돌아갈 때만 정지합니다.
+    return gameAccessGranted && gameState !== "start" && musicVolume > 0;
 }
 
 function startBackgroundMusic() {
@@ -2837,8 +2840,9 @@ function stopBackgroundMusic() {
         return;
     }
     if (!backgroundMusic.paused) {
+        // 정지할 때 재생 위치를 0으로 되돌리지 않습니다.
+        // 상태 전환 때문에 잠깐 멈췄다가 다시 재생되어도 처음부터 시작하지 않게 합니다.
         backgroundMusic.pause();
-        try { backgroundMusic.currentTime = 0; } catch (error) {}
     }
     backgroundMusicPlayRequested = false;
     backgroundMusicWasPlaying = false;
@@ -2847,10 +2851,17 @@ function stopBackgroundMusic() {
 function syncBackgroundMusic() {
     const wanted = isGameplayMusicWanted();
     if (wanted) {
-        // 한 번만 자동 재생을 시도하고, 차단된 경우 다음 사용자 입력에서 재시도합니다.
-        if (!backgroundMusicWasPlaying) startBackgroundMusic();
-        backgroundMusicWasPlaying = true;
+        const audio = getBackgroundMusic();
+        // 게임 상태가 바뀌어도 재생 중인 BGM은 건드리지 않습니다.
+        // 실제로 일시 정지된 경우에만 이어서 재생을 시도합니다.
+        if (audio && audio.paused) {
+            startBackgroundMusic();
+        } else if (audio && !audio.paused) {
+            backgroundMusicWasPlaying = true;
+        }
     } else {
+        // 홈/시작 화면 또는 로그아웃 상태에서만 정지합니다.
+        // currentTime은 유지해, 재생 재개 시 처음부터 시작하지 않습니다.
         stopBackgroundMusic();
     }
 }
@@ -12504,4 +12515,3 @@ requestAnimationFrame(
 
 </body>
     </html>
-    
