@@ -2811,7 +2811,7 @@ function getBackgroundMusic() {
 function isGameplayMusicWanted() {
     // 실제 플레이 중에만 BGM 재생을 시작합니다.
     // 시간 초과, 피격, 클리어, 리스폰 등의 상태 변화는 정지 조건이 아닙니다.
-    return gameAccessGranted && !["start", "gameover"].includes(gameState) && musicVolume > 0;
+    return gameAccessGranted && !["start", "gameover", "expResult"].includes(gameState) && musicVolume > 0;
 }
 
 function startBackgroundMusic() {
@@ -2852,7 +2852,9 @@ function stopBackgroundMusic(resetPosition = false) {
 function syncBackgroundMusic() {
     // 홈/시작 화면으로 돌아오면 BGM을 정지하되, 재생 위치는 유지합니다.
     // 재생 위치를 0초로 초기화하는 것은 게임 오버 진입 또는 새 게임 시작 때만 합니다.
-    if (gameState === "start") {
+    if (gameState === "start" || gameState === "expResult") {
+        // 홈 화면과 EXP 결과 화면에서는 음악을 재생하지 않습니다.
+        // EXP 화면에서는 재생 위치를 초기화하지 않습니다.
         stopBackgroundMusic(false);
         return;
     }
