@@ -1574,9 +1574,61 @@ let opponent = {
     visible: false
 };
 
+// 빠른 대전 연결 진단: 게임 로직은 바꾸지 않고 브라우저 콘솔에 상태만 기록합니다.
+function logMultiplayerDebug(eventName, details = {}) {
+    try {
+        console.info("[QUICK CLIENT DEBUG]", JSON.stringify({
+            time: new Date().toISOString(),
+            event: eventName,
+            state: gameState,
+            role: multiplayerRole,
+            matchType: multiplayerMatchType,
+            active: multiplayerMatchActive,
+            connected: multiplayerConnected,
+            peerJoined: multiplayerPeerJoined,
+            socketState: multiplayerSocket ? multiplayerSocket.readyState : null,
+            round: multiplayerRound,
+            visibility: document.visibilityState,
+            ...details
+        }));
+    } catch (error) {
+        console.info("[QUICK CLIENT DEBUG]", eventName, details);
+    }
+}
+
+window.addEventListener("error", event => {
+    logMultiplayerDebug("windowError", {
+        message: event.message || "",
+        source: event.filename || "",
+        line: event.lineno || 0,
+        column: event.colno || 0
+    });
+});
+window.addEventListener("unhandledrejection", event => {
+    logMultiplayerDebug("unhandledRejection", { reason: String(event.reason || "unknown") });
+});
+window.addEventListener("pagehide", event => {
+    logMultiplayerDebug("pageHide", { persisted: !!event.persisted });
+});
+document.addEventListener("visibilitychange", () => {
+    logMultiplayerDebug("visibilityChange", { visibility: document.visibilityState });
+});
+
 function multiplayerSend(data) {
-    if (!multiplayerSocket || multiplayerSocket.readyState !== WebSocket.OPEN) return false;
-    try { multiplayerSocket.send(JSON.stringify(data)); return true; } catch (error) { return false; }
+    if (!multiplayerSocket || multiplayerSocket.readyState !== WebSocket.OPEN) {
+        logMultiplayerDebug("sendSkipped", { messageType: data && data.type, reason: "socket-not-open" });
+        return false;
+    }
+    try {
+        multiplayerSocket.send(JSON.stringify(data));
+        if (data && ["matchmake", "matchReady", "matchStart", "position"].includes(data.type) && data.type !== "position") {
+            logMultiplayerDebug("sentMessage", { messageType: data.type, round: data.round });
+        }
+        return true;
+    } catch (error) {
+        logMultiplayerDebug("sendError", { messageType: data && data.type, error: String(error) });
+        return false;
+    }
 }
 
 function closeMultiplayerSocket() {
@@ -1659,6 +1711,7 @@ function connectMultiplayerSocket(onConnected) {
     multiplayerSocket = socket;
 
     socket.addEventListener("open", () => {
+        logMultiplayerDebug("socketOpen", { socketState: socket.readyState });
         if (multiplayerSocket !== socket) return;
         multiplayerConnected = true;
         multiplayerStatus = "서버 연결 완료";
@@ -1667,15 +1720,30 @@ function connectMultiplayerSocket(onConnected) {
     });
     socket.addEventListener("message", event => {
         let data;
-        try { data = JSON.parse(event.data); } catch (error) { return; }
+        try { data = JSON.parse(event.data); } catch (error) {
+            logMultiplayerDebug("invalidSocketMessage", { error: String(error) });
+            return;
+        }
+        if (data && data.type !== "position") {
+            logMultiplayerDebug("receivedMessage", { messageType: data.type, round: data.round, roleFromServer: data.role });
+        }
         handleMultiplayerMessage(data);
     });
-    socket.addEventListener("error", () => {
+    socket.addEventListener("error", event => {
+        logMultiplayerDebug("socketError", { eventType: event && event.type, socketState: socket.readyState });
         if (multiplayerSocket !== socket) return;
         multiplayerStatus = "서버 연결 오류";
         updateUI();
     });
-    socket.addEventListener("close", () => {
+    socket.addEventListener("close", event => {
+        logMultiplayerDebug("socketClose", {
+            closeCode: event.code,
+            closeReason: event.reason || "",
+            wasClean: event.wasClean,
+            socketState: socket.readyState,
+            activeAtClose: multiplayerMatchActive,
+            matchmakingAtClose: multiplayerMatchmaking
+        });
         if (multiplayerSocket !== socket) return;
         multiplayerConnected = false;
         multiplayerPeerJoined = false;
@@ -1714,6 +1782,7 @@ function handleMultiplayerMessage(data) {
         return;
     }
     if (data.type === "matchFound") {
+        logMultiplayerDebug("matchFoundHandling", { serverRole: data.role });
         multiplayerMatchmaking = false;
         multiplayerRole = data.role === "guest" ? "guest" : "host";
         // 빠른 대전은 내부 방 코드를 사용자에게 표시하지 않습니다.
@@ -1736,6 +1805,7 @@ function handleMultiplayerMessage(data) {
         return;
     }
     if (data.type === "quickMatchReady") {
+        logMultiplayerDebug("quickMatchReadyHandling");
         if (multiplayerMatchType === "quick" && multiplayerRole === "host" && !multiplayerMatchActive) {
             startMultiplayerMatch();
         }
@@ -1839,6 +1909,7 @@ function handleMultiplayerMessage(data) {
         return;
     }
     if (data.type === "matchStart") {
+        logMultiplayerDebug("matchStartReceived", { incomingRound: data.round, incomingSeed: data.seed, isGuest: multiplayerRole === "guest" });
         if (multiplayerRole !== "guest") return;
         multiplayerMatchActive = true;
         multiplayerResult = null;
@@ -1872,6 +1943,7 @@ function handleMultiplayerMessage(data) {
         }
 
         gameState = "playing";
+        logMultiplayerDebug("guestGameStatePlaying", { incomingRound: data.round, wallCount: walls.size, dangerCount: dangers.size, hasGoal: !!goal });
         onDailyQuestMultiplayerRoundStart();
         remainingTime = getStageTimeLimit() + activeTimeBonus;
         stageStart = data.startPosition && Number.isFinite(Number(data.startPosition.c)) && Number.isFinite(Number(data.startPosition.r))
@@ -1965,10 +2037,15 @@ function handleMultiplayerMessage(data) {
 }
 
 function startMultiplayerMatch() {
-    if (multiplayerRole !== "host" || !multiplayerConnected || !multiplayerPeerJoined) return;
+    logMultiplayerDebug("startMultiplayerMatchCalled", { roleAllowed: multiplayerRole === "host", round: multiplayerRound });
+    if (multiplayerRole !== "host" || !multiplayerConnected || !multiplayerPeerJoined) {
+        logMultiplayerDebug("startMultiplayerMatchSkipped", { reason: "role-or-connection-not-ready" });
+        return;
+    }
     multiplayerSeed = generateMatchSeed();
     multiplayerRound = 1;
     multiplayerMatchActive = true;
+    logMultiplayerDebug("hostGameStarting", { round: multiplayerRound, seed: multiplayerSeed });
     multiplayerResult = null;
     multiplayerResultSoundPlayed = false;
     resetOneShotEffects();
