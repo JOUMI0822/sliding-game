@@ -1304,7 +1304,7 @@ function calculateV28Score() {
 }
 
 async function submitV28Score() {
-    if (!currentAccount || guestMode || !gameAccessGranted) return;
+    if (!currentAccount || guestMode || !gameAccessGranted) return false;
 
     const score = calculateV28Score();
 
@@ -1319,8 +1319,21 @@ async function submitV28Score() {
                 score
             })
         });
+
+        // 랭킹 창이 열려 있으면 저장이 끝난 뒤 현재 탭을 다시 불러옵니다.
+        const panel = document.getElementById("rankingPanel");
+        if (panel && panel.hidden === false && currentAccount && !guestMode) {
+            await loadRanking(rankingMode);
+        }
+        return true;
     } catch (error) {
         console.warn("랭킹 점수 저장 실패:", error);
+        const status = document.getElementById("rankingStatus");
+        const panel = document.getElementById("rankingPanel");
+        if (panel && panel.hidden === false && status) {
+            status.textContent = `랭킹 저장에 실패했습니다: ${error?.message || "서버 응답 오류"}. 잠시 후 다시 시도해 주세요.`;
+        }
+        return false;
     }
 }
 
@@ -1710,15 +1723,13 @@ function handleMultiplayerMessage(data) {
         multiplayerOpen = false;
         updateUI();
 
-        // 빠른 대전은 게스트가 서버에 준비 완료를 알린 뒤,
-        // 서버가 방장에게 quickMatchReady를 보내면 시작합니다.
-        // 매칭 직후 한쪽만 먼저 게임에 진입하는 타이밍 문제를 방지합니다.
+        // 빠른 대전에서는 양쪽 클라이언트가 matchFound를 실제로 수신한 뒤
+        // 모두 준비 완료를 서버에 알려야 방장이 시작할 수 있습니다.
+        // 서로 다른 WebSocket 연결의 메시지 도착 순서가 뒤바뀌는 경쟁 조건을 방지합니다.
         if (multiplayerMatchType === "quick") {
-            if (multiplayerRole === "guest") {
-                multiplayerSend({ type: "matchReady" });
-                multiplayerStatus = "상대 플레이어 연결을 확인하는 중...";
-                updateUI();
-            }
+            multiplayerSend({ type: "matchReady" });
+            multiplayerStatus = "두 플레이어의 연결을 확인하는 중...";
+            updateUI();
         } else if (multiplayerRole === "host") {
             startMultiplayerMatch();
         }
@@ -1800,6 +1811,8 @@ function handleMultiplayerMessage(data) {
         multiplayerOpen = false;
         pendingExpAward = calculateMultiplayerExperience();
         pendingExpReason = multiplayerResult === multiplayerRole ? "multiplayer_win" : "multiplayer_loss";
+        // 경기 종료 시에도 최종 기록을 한 번 더 저장합니다. (저장 실패/마지막 라운드 보완)
+        void submitV28Score();
         setMessage(
             multiplayerResult === multiplayerRole ? "승리했습니다!" :
             multiplayerResult === "draw" ? "무승부입니다." : "패배했습니다."
@@ -1907,6 +1920,9 @@ function handleMultiplayerMessage(data) {
             if (activeItem === "firstAid" && clearCount % 4 === 0) {
                 firstAidCharged = true;
             }
+            // 멀티플레이 라운드에서 클리어 기록이 갱신된 직후 서버에 저장합니다.
+            // 단독 플레이 클리어 함수에만 의존하면 멀티플레이 기록이 누락될 수 있습니다.
+            void submitV28Score();
         } else if (winner !== "draw") {
             clearStreak = 0;
         }
