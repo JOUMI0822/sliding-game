@@ -1952,6 +1952,10 @@ function handleMultiplayerMessage(data) {
         multiplayerOpen = false;
         pendingExpAward = calculateMultiplayerExperience();
         pendingExpReason = multiplayerResult === multiplayerRole ? "multiplayer_win" : "multiplayer_loss";
+        // 멀티플레이의 정상 종료(matchOver)에서도 최종 기록을 저장합니다.
+        // 기존에는 라운드 클리어 때만 저장되어, 목숨 소진으로 경기가 끝나면
+        // 마지막 기록/랭킹 갱신 요청이 누락될 수 있었습니다.
+        void submitV28Score();
         setMessage(
             multiplayerResult === multiplayerRole ? "승리했습니다!" :
             multiplayerResult === "draw" ? "무승부입니다." : "패배했습니다."
