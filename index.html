@@ -1710,8 +1710,22 @@ function handleMultiplayerMessage(data) {
         multiplayerOpen = false;
         updateUI();
 
-        // 자동 매칭에서는 방장 역할을 받은 클라이언트가 즉시 첫 라운드를 시작합니다.
-        if (multiplayerRole === "host") {
+        // 빠른 대전은 게스트가 서버에 준비 완료를 알린 뒤,
+        // 서버가 방장에게 quickMatchReady를 보내면 시작합니다.
+        // 매칭 직후 한쪽만 먼저 게임에 진입하는 타이밍 문제를 방지합니다.
+        if (multiplayerMatchType === "quick") {
+            if (multiplayerRole === "guest") {
+                multiplayerSend({ type: "matchReady" });
+                multiplayerStatus = "상대 플레이어 연결을 확인하는 중...";
+                updateUI();
+            }
+        } else if (multiplayerRole === "host") {
+            startMultiplayerMatch();
+        }
+        return;
+    }
+    if (data.type === "quickMatchReady") {
+        if (multiplayerMatchType === "quick" && multiplayerRole === "host" && !multiplayerMatchActive) {
             startMultiplayerMatch();
         }
         return;
