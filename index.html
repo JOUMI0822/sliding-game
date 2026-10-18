@@ -1793,8 +1793,15 @@ function handleMultiplayerMessage(data) {
         updateUI();
         return;
     }
+    if (data.type === "opponentEliminated") {
+        if (Number(data.round) !== multiplayerRound) return;
+        opponentEliminatedRound = multiplayerRound;
+        opponent.visible = false;
+        return;
+    }
     if (data.type === "position") {
         if (!multiplayerMatchActive) return;
+        if (opponentEliminatedRound === multiplayerRound) return;
         const x = Number(data.x), y = Number(data.y);
         if (!Number.isFinite(x) || !Number.isFinite(y)) return;
         opponent.targetX = x;
@@ -1812,6 +1819,7 @@ function handleMultiplayerMessage(data) {
         resetOneShotEffects();
         multiplayerEliminatedSent = false;
         multiplayerRoundTransition = false;
+        opponentEliminatedRound = 0;
         multiplayerPlayerVisible = true;
         multiplayerSeed = Number(data.seed) || 0;
         multiplayerRound = Number(data.round) || (multiplayerRound + 1);
