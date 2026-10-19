@@ -1748,10 +1748,14 @@ function connectMultiplayerSocket(onConnected) {
         multiplayerConnected = false;
         multiplayerPeerJoined = false;
         if (multiplayerMatchActive) {
-            // 연결 종료만으로 게임 상태를 홈 화면으로 강제 변경하지 않습니다.
-            // 연결 종료 원인 확인 및 재연결 처리는 별도로 가능하도록 현재 화면을 유지합니다.
-            multiplayerStatus = "멀티플레이 서버 연결이 끊어졌습니다. 다시 접속해 주세요.";
-            setMessage("멀티플레이 연결이 끊어졌습니다. 게임 화면은 유지됩니다.");
+            // 연결이 잠깐 끊어져도 홈 화면으로 보내면 한쪽만 경기에서
+            // 이탈한 것처럼 보입니다. 결과 대기 화면을 유지합니다.
+            multiplayerMatchActive = false;
+            gameState = "multiplayerWaitingResult";
+            multiplayerOpen = false;
+            movement = null;
+            opponent.visible = false;
+            setMessage("서버 연결이 끊어졌습니다. 상대 연결 및 경기 결과를 확인해 주세요.");
         } else if (multiplayerMatchmaking) {
             multiplayerStatus = "매칭 서버 연결이 종료되었습니다.";
             multiplayerMatchmaking = false;
@@ -1802,6 +1806,19 @@ function handleMultiplayerMessage(data) {
         } else if (multiplayerRole === "host") {
             startMultiplayerMatch();
         }
+        return;
+    }
+    if (data.type === "quickMatchTimeout") {
+        logMultiplayerDebug("quickMatchTimeoutReceived");
+        multiplayerMatchmaking = false;
+        multiplayerMatchActive = false;
+        multiplayerPeerJoined = false;
+        multiplayerOpen = true;
+        multiplayerRole = null;
+        gameState = "start";
+        multiplayerStatus = data.message || "빠른 대전 연결 시간이 초과되었습니다. 다시 시도해 주세요.";
+        setMessage(multiplayerStatus);
+        updateUI();
         return;
     }
     if (data.type === "quickMatchReady") {
@@ -1943,7 +1960,6 @@ function handleMultiplayerMessage(data) {
         }
 
         gameState = "playing";
-        logMultiplayerDebug("guestGameStatePlaying", { incomingRound: data.round, wallCount: walls.size, dangerCount: dangers.size, hasGoal: !!goal });
         onDailyQuestMultiplayerRoundStart();
         remainingTime = getStageTimeLimit() + activeTimeBonus;
         stageStart = data.startPosition && Number.isFinite(Number(data.startPosition.c)) && Number.isFinite(Number(data.startPosition.r))
@@ -1952,6 +1968,7 @@ function handleMultiplayerMessage(data) {
         walls = new Set(Array.isArray(data.walls) ? data.walls.map(String) : []);
         goal = data.goal ? { c: Number(data.goal.c), r: Number(data.goal.r) } : null;
         dangers = new Set(Array.isArray(data.dangers) ? data.dangers.map(String) : []);
+        logMultiplayerDebug("guestGameStatePlaying", { incomingRound: data.round, wallCount: walls.size, dangerCount: dangers.size, hasGoal: !!goal });
         resetPlayer();
         mapTransition.active = false;
         pathGuideUses = 0;
