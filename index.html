@@ -1748,10 +1748,10 @@ function connectMultiplayerSocket(onConnected) {
         multiplayerConnected = false;
         multiplayerPeerJoined = false;
         if (multiplayerMatchActive) {
-            multiplayerMatchActive = false;
-            gameState = "start";
-            multiplayerOpen = false;
-            setMessage("상대 플레이어와의 연결이 끊어졌습니다.");
+            // 연결 종료만으로 게임 상태를 홈 화면으로 강제 변경하지 않습니다.
+            // 연결 종료 원인 확인 및 재연결 처리는 별도로 가능하도록 현재 화면을 유지합니다.
+            multiplayerStatus = "멀티플레이 서버 연결이 끊어졌습니다. 다시 접속해 주세요.";
+            setMessage("멀티플레이 연결이 끊어졌습니다. 게임 화면은 유지됩니다.");
         } else if (multiplayerMatchmaking) {
             multiplayerStatus = "매칭 서버 연결이 종료되었습니다.";
             multiplayerMatchmaking = false;
