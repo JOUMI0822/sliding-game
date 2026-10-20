@@ -1720,17 +1720,17 @@ function cancelMultiplayerMatchmaking() {
 }
 
 function connectMultiplayerSocket(onConnected) {
-    // 방 생성/참가에서는 연결을 열기 전에 friend 모드와 역할을 지정합니다.
-    // closeMultiplayerSocket()이 모드 값을 초기화하므로, 새 소켓을 만들 때
-    // 현재 작업의 모드/역할/방 코드를 보존해 매칭 상태가 유실되지 않게 합니다.
+    // 친구 방 생성/참가에서 설정한 모드와 역할이 소켓 정리 과정에서
+    // 초기화되지 않도록 연결 전에 보존합니다. 빠른 매칭은 기존 흐름을 유지합니다.
     const requestedMatchType = multiplayerMatchType;
     const requestedRole = multiplayerRole;
     const requestedRoomCode = multiplayerRoomCode;
     closeMultiplayerSocket();
-    multiplayerMatchType = requestedMatchType;
-    multiplayerRole = requestedRole;
-    multiplayerRoomCode = requestedRoomCode;
-
+    if (requestedMatchType === "friend") {
+        multiplayerMatchType = requestedMatchType;
+        multiplayerRole = requestedRole;
+        multiplayerRoomCode = requestedRoomCode;
+    }
     multiplayerStatus = "서버 연결 중...";
     let socket;
     try { socket = new WebSocket(MULTIPLAYER_SERVER_URL); }
@@ -1953,8 +1953,25 @@ function handleMultiplayerMessage(data) {
         return;
     }
     if (data.type === "matchStart") {
-        logMultiplayerDebug("matchStartReceived", { incomingRound: data.round, incomingSeed: data.seed, isGuest: multiplayerRole === "guest" });
-        if (multiplayerRole !== "guest") return;
+        // 메시지를 받았다는 사실과 실제 게임 상태 전환을 분리해서 기록합니다.
+        logMultiplayerDebug("matchStartReceived", {
+            incomingRound: data.round,
+            incomingSeed: data.seed,
+            role: multiplayerRole,
+            matchType: multiplayerMatchType,
+            socketState: multiplayerSocket ? multiplayerSocket.readyState : null
+        });
+        if (multiplayerRole === "guest") {
+            multiplayerSend({
+                type: "matchStartAck",
+                round: Number(data.round) || 0,
+                phase: "received"
+            });
+        }
+        if (multiplayerRole !== "guest") {
+            logMultiplayerDebug("matchStartIgnoredWrongRole", { role: multiplayerRole, room: multiplayerRoomCode });
+            return;
+        }
         multiplayerMatchActive = true;
         multiplayerResult = null;
         multiplayerResultSoundPlayed = false;
@@ -1987,6 +2004,18 @@ function handleMultiplayerMessage(data) {
         }
 
         gameState = "playing";
+        logMultiplayerDebug("guestGameStatePlayingEntered", {
+            round: multiplayerRound,
+            gameState,
+            matchActive: multiplayerMatchActive,
+            matchType: multiplayerMatchType,
+            role: multiplayerRole
+        });
+        multiplayerSend({
+            type: "matchStartAck",
+            round: multiplayerRound,
+            phase: "playing"
+        });
         onDailyQuestMultiplayerRoundStart();
         remainingTime = getStageTimeLimit() + activeTimeBonus;
         stageStart = data.startPosition && Number.isFinite(Number(data.startPosition.c)) && Number.isFinite(Number(data.startPosition.r))
