@@ -1115,25 +1115,14 @@ function escapeHTML(value) {
         .replaceAll("'", "&#039;");
 }
 
-const AUTH_TOKEN_KEY = "slidingMazeAuthToken_v2";
-
 async function apiJSON(path, options = {}) {
-    let savedToken = "";
-    try { savedToken = localStorage.getItem(AUTH_TOKEN_KEY) || ""; } catch (error) {}
-
-    const requestHeaders = {
-        "Content-Type": "application/json",
-        ...(savedToken ? { "Authorization": `Bearer ${savedToken}` } : {}),
-        ...(options.headers || {})
-    };
-
     const response = await fetch(`${RANKING_API_BASE}${path}`, {
+        credentials: "include",
         ...options,
-        // Login state is stored per browser in localStorage and sent as a bearer token.
-        // This avoids third-party-cookie restrictions between GitHub Pages and Render.
-        credentials: "omit",
-        headers: requestHeaders,
-        cache: "no-store"
+        headers: {
+            "Content-Type": "application/json",
+            ...(options.headers || {})
+        }
     });
 
     let data = null;
@@ -1189,11 +1178,6 @@ async function loginAccount() {
             body: JSON.stringify({ id, password })
         });
         const account = data?.account || data?.user || data;
-        if (data?.sessionToken) {
-            try { localStorage.setItem(AUTH_TOKEN_KEY, data.sessionToken); } catch (error) {}
-        } else {
-            throw new Error("로그인 세션 토큰을 받지 못했습니다. 서버 코드를 함께 업데이트해 주세요.");
-        }
         saveLoginPreference(id);
         document.getElementById("loginPassword").value = "";
         enterGameAsAccount(account);
@@ -1294,7 +1278,6 @@ async function logoutToEntry() {
     try {
         await apiJSON("/api/logout", { method: "POST", body: "{}" });
     } catch (error) {}
-    try { localStorage.removeItem(AUTH_TOKEN_KEY); } catch (error) {}
 
     closeRankingPanel();
     closeMultiplayerSocket();
@@ -1720,7 +1703,16 @@ function cancelMultiplayerMatchmaking() {
 }
 
 function connectMultiplayerSocket(onConnected) {
+    // 방 생성/참가에서는 연결을 열기 전에 friend 모드와 역할을 지정합니다.
+    // closeMultiplayerSocket()이 모드 값을 초기화하므로, 새 소켓을 만들 때
+    // 현재 작업의 모드/역할/방 코드를 보존해 매칭 상태가 유실되지 않게 합니다.
+    const requestedMatchType = multiplayerMatchType;
+    const requestedRole = multiplayerRole;
+    const requestedRoomCode = multiplayerRoomCode;
     closeMultiplayerSocket();
+    multiplayerMatchType = requestedMatchType;
+    multiplayerRole = requestedRole;
+    multiplayerRoomCode = requestedRoomCode;
     multiplayerStatus = "서버 연결 중...";
     let socket;
     try { socket = new WebSocket(MULTIPLAYER_SERVER_URL); }
