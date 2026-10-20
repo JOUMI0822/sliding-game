@@ -1678,7 +1678,7 @@ function resetOpponent() {
 
 function sendMultiplayerPosition(force = false) {
     if (!multiplayerMatchActive) return;
-    if (!force && multiplayerSendAccumulator < 0.05) return;
+    if (!force && multiplayerSendAccumulator < 0.08) return;
     multiplayerSendAccumulator = 0;
     multiplayerSend({
         type: "position",
@@ -1937,8 +1937,13 @@ function handleMultiplayerMessage(data) {
         if (!Number.isFinite(x) || !Number.isFinite(y)) return;
         opponent.targetX = x;
         opponent.targetY = y;
-        opponent.c = Number(data.c) || 0;
-        opponent.r = Number(data.r) || 0;
+        opponent.c = Number.isFinite(Number(data.c)) ? Number(data.c) : 0;
+        opponent.r = Number.isFinite(Number(data.r)) ? Number(data.r) : 0;
+        // 처음 수신할 때는 이전 라운드 위치에서 이동시키지 않고 즉시 표시합니다.
+        if (!opponent.visible) {
+            opponent.x = x;
+            opponent.y = y;
+        }
         opponent.visible = true;
         return;
     }
@@ -1977,18 +1982,14 @@ function handleMultiplayerMessage(data) {
         }
 
         gameState = "playing";
+        gameplayUIAccumulator = 0;
         onDailyQuestMultiplayerRoundStart();
         remainingTime = getStageTimeLimit() + activeTimeBonus;
         stageStart = data.startPosition && Number.isFinite(Number(data.startPosition.c)) && Number.isFinite(Number(data.startPosition.r))
             ? { c: Number(data.startPosition.c), r: Number(data.startPosition.r) }
             : { c: START.c, r: START.r };
-        // 맵은 방장이 생성한 것을 그대로 사용합니다. 참가자는 별도 createMap()을 호출하지 않습니다.
-        // 라운드 전환 애니메이션/경로 안내 잔여 상태도 제거해 양쪽 렌더링을 일치시킵니다.
-        walls = new Set(Array.isArray(data.walls) ? data.walls.map(String) : []);
-        goal = data.goal && Number.isFinite(Number(data.goal.c)) && Number.isFinite(Number(data.goal.r))
-            ? { c: Number(data.goal.c), r: Number(data.goal.r) }
-            : null;
-        dangers = new Set(Array.isArray(data.dangers) ? data.dangers.map(String) : []);
+        // 방장에게서 맵 배열을 받지 않습니다. 양쪽이 같은 시드와 시작 위치로
+        // 동일한 맵을 각자 생성해 네트워크 전송량과 시작 시 지연을 줄입니다.
         mapTransition.active = false;
         pathGuideUses = 0;
         pathGuidePath = [];
@@ -1998,17 +1999,20 @@ function handleMultiplayerMessage(data) {
         firstAidCharged = false;
         logMultiplayerDebug("guestGameStatePlaying", {
             incomingRound: data.round,
-            wallCount: walls.size,
-            dangerCount: dangers.size,
-            hasGoal: !!goal,
-            mapSignature: [...walls].sort().join(",") + "|" + (goal ? `${goal.c},${goal.r}` : "none") + "|" + [...dangers].sort().join(",")
+            seed: multiplayerSeed,
+            startPosition: stageStart
         });
         resetPlayer();
         mapTransition.active = false;
         pathGuideUses = 0;
         pathGuidePath = [];
+        createMapWithSeed(multiplayerSeed);
         if (activeItem === "pathGuide") { showPathGuide(); pathGuideUses = 1; }
         resetOpponent();
+        multiplayerPlayerVisible = true;
+        multiplayerOpen = false;
+        gameState = "playing";
+        // 방장이 보낸 맵을 적용하고 플레이어 위치를 초기화한 다음에 첫 위치를 보냅니다.
         sendMultiplayerPosition(true);
         setMessage(multiplayerRound === 1 ? "경기 시작!" : `다음 맵 · ${multiplayerRound}라운드`);
         updateUI();
@@ -2104,26 +2108,27 @@ function startMultiplayerMatch() {
     multiplayerRoundTransition = false;
     multiplayerOpen = false;
     startNewGame();
+    gameplayUIAccumulator = 0;
+    // 멀티플레이 시작 시 홈/대전 메뉴가 다시 표시되지 않도록 플레이 상태를 확정합니다.
+    gameState = "playing";
+    multiplayerOpen = false;
+    questOpen = false;
+    shopOpen = false;
+    inventoryOpen = false;
+    skinOpen = false;
+    settingsOpen = false;
     onDailyQuestMultiplayerMatchStart(multiplayerMatchType || "quick");
     onDailyQuestMultiplayerRoundStart();
-    const sharedMap = {
-        walls: [...walls].map(String),
-        goal: goal ? { c: Number(goal.c), r: Number(goal.r) } : null,
-        dangers: [...dangers].map(String)
-    };
-    logMultiplayerDebug("hostSharedMap", {
-        round: multiplayerRound,
-        wallCount: sharedMap.walls.length,
-        dangerCount: sharedMap.dangers.length,
-        hasGoal: !!sharedMap.goal,
-        mapSignature: [...sharedMap.walls].sort().join(",") + "|" + (sharedMap.goal ? `${sharedMap.goal.c},${sharedMap.goal.r}` : "none") + "|" + [...sharedMap.dangers].sort().join(",")
-    });
+    updateUI();
+    // 맵 데이터 배열은 보내지 않고 시드만 전달합니다. 참가자도 같은 맵을 생성합니다.
     multiplayerSend({
         type: "matchStart", round: multiplayerRound, seed: multiplayerSeed,
-        startPosition: { c: stageStart.c, r: stageStart.r },
-        ...sharedMap
+        startPosition: { c: stageStart.c, r: stageStart.r }
     });
     resetOpponent();
+    multiplayerPlayerVisible = true;
+    gameState = "playing";
+    updateUI();
     sendMultiplayerPosition(true);
 }
 
@@ -2144,22 +2149,10 @@ function startNextMultiplayerRound(nextStart = { c: player.c, r: player.r }) {
     startRound();
     onDailyQuestMultiplayerRoundStart();
 
-    const sharedMap = {
-        walls: [...walls].map(String),
-        goal: goal ? { c: Number(goal.c), r: Number(goal.r) } : null,
-        dangers: [...dangers].map(String)
-    };
-    logMultiplayerDebug("hostSharedMap", {
-        round: multiplayerRound,
-        wallCount: sharedMap.walls.length,
-        dangerCount: sharedMap.dangers.length,
-        hasGoal: !!sharedMap.goal,
-        mapSignature: [...sharedMap.walls].sort().join(",") + "|" + (sharedMap.goal ? `${sharedMap.goal.c},${sharedMap.goal.r}` : "none") + "|" + [...sharedMap.dangers].sort().join(",")
-    });
+    // 다음 라운드도 맵 배열 대신 새 시드만 전달합니다.
     multiplayerSend({
         type: "matchStart", round: multiplayerRound, seed: multiplayerSeed,
-        startPosition: { c: stageStart.c, r: stageStart.r },
-        ...sharedMap
+        startPosition: { c: stageStart.c, r: stageStart.r }
     });
     resetOpponent();
     sendMultiplayerPosition(true);
@@ -5335,6 +5328,7 @@ function createMap() {
             );
 
         if (
+            !multiplayerMatchActive &&
             previousLayouts.includes(
                 signature
             )
@@ -5403,6 +5397,23 @@ function createMap() {
     return createFallbackMap(
         oldWallSnapshot
     );
+}
+
+// 멀티플레이에서는 각 클라이언트가 같은 시드로 맵을 직접 생성합니다.
+// createMap 내부의 기존 난수 기반 생성 로직을 그대로 사용하되, 생성 중에만
+// Math.random을 시드 기반 난수로 바꿔 양쪽 맵이 동일하게 나오도록 합니다.
+function createMapWithSeed(seed) {
+    const originalRandom = Math.random;
+    let state = (Number(seed) >>> 0) || 1;
+    Math.random = function seededRandom() {
+        state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+        return state / 4294967296;
+    };
+    try {
+        return createMap();
+    } finally {
+        Math.random = originalRandom;
+    }
 }
 
 
@@ -6613,7 +6624,11 @@ function startRound() {
     pathGuideUses = 0;
     pathGuidePath = [];
 
-    createMap();
+    if (multiplayerMatchActive) {
+        createMapWithSeed(multiplayerSeed);
+    } else {
+        createMap();
+    }
 
     if (activeItem === "pathGuide") {
         showPathGuide();
@@ -8155,6 +8170,7 @@ canvas.addEventListener(
    업데이트
 ========================================================= */
 
+let gameplayUIAccumulator = 0;
 function update(delta) {
     refreshDailyQuestIfNeeded();
 
@@ -8236,7 +8252,13 @@ function update(delta) {
         updateMovement(delta);
         sendMultiplayerPosition();
 
-        updateUI();
+        // 매 프레임 DOM 전체를 갱신하면 멀티플레이에서 입력/렌더링이 끊기므로
+        // 화면의 숫자/UI는 초당 약 10회만 갱신합니다.
+        gameplayUIAccumulator += delta;
+        if (gameplayUIAccumulator >= 0.10) {
+            gameplayUIAccumulator = 0;
+            updateUI();
+        }
     }
 }
 
@@ -10652,6 +10674,9 @@ function drawGame() {
         const opy = opponent.y + 7;
         ctx.fillStyle = "#ff9f43";
         ctx.fillRect(opx, opy, CELL - 14, CELL - 14);
+        ctx.strokeStyle = "#fff1d6";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(opx, opy, CELL - 14, CELL - 14);
         ctx.fillStyle = "rgba(255,255,255,0.32)";
         ctx.fillRect(opx + 4, opy + 4, CELL - 22, 4);
         ctx.fillStyle = "#ffd29a";
