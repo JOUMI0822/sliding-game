@@ -1575,6 +1575,8 @@ let multiplayerPeerJoined = false;
 let multiplayerMatchActive = false;
 let multiplayerResult = null;
 let multiplayerResultSoundPlayed = false;
+let multiplayerScores = { host: 0, guest: 0 };   // 서버가 보내주는 실시간 점수
+let multiplayerFinalScores = null;               // 경기 종료 시 최종 점수
 let multiplayerStatus = "서버 연결 중...";
 let multiplayerSendAccumulator = 0;
 let multiplayerEliminatedSent = false;
@@ -1925,6 +1927,10 @@ function handleMultiplayerMessage(data) {
         updateUI();
         return;
     }
+    if (data.type === "scoreUpdate") {
+        if (data.scores) multiplayerScores = data.scores;
+        return;
+    }
     if (data.type === "opponentEliminated") {
         if (Number(data.round) !== multiplayerRound) return;
         opponentEliminatedRound = multiplayerRound;
@@ -1976,6 +1982,8 @@ function handleMultiplayerMessage(data) {
             maxClearStreak = 0;
             lifeLossCount = 0;
             mapSkipCount = 0;
+            multiplayerScores = { host: 0, guest: 0 };
+            multiplayerFinalScores = null;
             mapSkips = MAX_MAP_SKIPS;
             stageStart = { c: START.c, r: START.r };
             recordSavedForRun = false;
@@ -2023,6 +2031,7 @@ function handleMultiplayerMessage(data) {
         return;
     }
     if (data.type === "roundWon") {
+        if (data.scores) multiplayerScores = data.scores;
         if (!multiplayerMatchActive) return;
         if (Number(data.round) !== multiplayerRound) return;
         if (multiplayerRoundTransition) return;
@@ -2074,6 +2083,10 @@ function handleMultiplayerMessage(data) {
     }
     if (data.type === "matchOver") {
         if (!multiplayerMatchActive && gameState !== "multiplayerWaitingResult") return;
+        if (data.scores) {
+            multiplayerScores = data.scores;
+            multiplayerFinalScores = data.scores;
+        }
         multiplayerMatchActive = false;
         multiplayerResult = data.winner || "draw";
         onDailyQuestMultiplayerMatchEnd(multiplayerResult);
@@ -2106,6 +2119,8 @@ function startMultiplayerMatch() {
     multiplayerMatchActive = true;
     logMultiplayerDebug("hostGameStarting", { round: multiplayerRound, seed: multiplayerSeed });
     opponentEliminatedRound = 0;
+    multiplayerScores = { host: 0, guest: 0 };
+    multiplayerFinalScores = null;
     multiplayerResult = null;
     multiplayerResultSoundPlayed = false;
     resetOneShotEffects();
@@ -10302,6 +10317,37 @@ function drawDangerBlock(
    게임 화면
 ========================================================= */
 
+function getMultiplayerScorePair(scores = multiplayerScores) {
+    const me = multiplayerRole === "guest" ? "guest" : "host";
+    const other = me === "host" ? "guest" : "host";
+    return {
+        mine: Number(scores && scores[me]) || 0,
+        theirs: Number(scores && scores[other]) || 0
+    };
+}
+
+function drawMultiplayerScoreHUD() {
+    if (!multiplayerMatchActive) return;
+    const pair = getMultiplayerScorePair();
+    const text = `나 ${pair.mine} : ${pair.theirs} 상대`;
+    ctx.save();
+    ctx.font = "700 13px Pretendard, Noto Sans KR, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const w = ctx.measureText(text).width + 24;
+    const x = WIDTH / 2 - w / 2;
+    ctx.fillStyle = "rgba(9,12,17,0.72)";
+    ctx.strokeStyle = "rgba(255,255,255,0.16)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(x, 6, w, 24, 12);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = pair.mine >= pair.theirs ? "#9dffb4" : "#ffb3b3";
+    ctx.fillText(text, WIDTH / 2, 18);
+    ctx.restore();
+}
+
 function drawGame() {
 
     drawBackground();
@@ -10819,6 +10865,7 @@ function drawGame() {
 
 
     drawStreakEffect();
+    drawMultiplayerScoreHUD();
 }
 
 
@@ -12559,7 +12606,20 @@ function drawMultiplayerResultScreen() {
     ctx.fillText(gameState === "multiplayerWaitingResult" ? "상대 플레이어의 결과를 기다리고 있습니다." : "2인용 경쟁 경기가 종료되었습니다.", WIDTH / 2, 270);
     ctx.fillStyle = "#7ddcff";
     ctx.font = "600 16px Pretendard, Noto Sans KR, sans-serif";
-    if (multiplayerRoomCode) ctx.fillText(`방 코드 ${multiplayerRoomCode}`, WIDTH / 2, 325);
+    if (gameState === "multiplayerResult" && multiplayerFinalScores) {
+        const pair = getMultiplayerScorePair(multiplayerFinalScores);
+        ctx.fillStyle = "#ffd76a";
+        ctx.font = "bold 26px Pretendard, Noto Sans KR, sans-serif";
+        ctx.fillText(`내 점수 ${pair.mine.toLocaleString("ko-KR")}  :  ${pair.theirs.toLocaleString("ko-KR")} 상대 점수`, WIDTH / 2, 325);
+        ctx.fillStyle = "#8d98a6";
+        ctx.font = "14px Pretendard, Noto Sans KR, sans-serif";
+        ctx.fillText("점수가 더 높은 플레이어가 승리합니다.", WIDTH / 2, 362);
+    }
+    if (multiplayerRoomCode) {
+        ctx.fillStyle = "#7ddcff";
+        ctx.font = "600 16px Pretendard, Noto Sans KR, sans-serif";
+        ctx.fillText(`방 코드 ${multiplayerRoomCode}`, WIDTH / 2, 405);
+    }
     ctx.fillStyle = "#ffffff";
     ctx.font = "bold 18px Pretendard, Noto Sans KR, sans-serif";
     ctx.fillText("Space 또는 화면 터치로 시작 화면으로", WIDTH / 2, 470);
