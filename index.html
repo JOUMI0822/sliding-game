@@ -1720,7 +1720,17 @@ function cancelMultiplayerMatchmaking() {
 }
 
 function connectMultiplayerSocket(onConnected) {
+    // 방 생성/참가에서는 연결을 열기 전에 friend 모드와 역할을 지정합니다.
+    // closeMultiplayerSocket()이 모드 값을 초기화하므로, 새 소켓을 만들 때
+    // 현재 작업의 모드/역할/방 코드를 보존해 매칭 상태가 유실되지 않게 합니다.
+    const requestedMatchType = multiplayerMatchType;
+    const requestedRole = multiplayerRole;
+    const requestedRoomCode = multiplayerRoomCode;
     closeMultiplayerSocket();
+    multiplayerMatchType = requestedMatchType;
+    multiplayerRole = requestedRole;
+    multiplayerRoomCode = requestedRoomCode;
+
     multiplayerStatus = "서버 연결 중...";
     let socket;
     try { socket = new WebSocket(MULTIPLAYER_SERVER_URL); }
