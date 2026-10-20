@@ -1720,17 +1720,7 @@ function cancelMultiplayerMatchmaking() {
 }
 
 function connectMultiplayerSocket(onConnected) {
-    // 친구 방 생성/참가에서 설정한 모드와 역할이 소켓 정리 과정에서
-    // 초기화되지 않도록 연결 전에 보존합니다. 빠른 매칭은 기존 흐름을 유지합니다.
-    const requestedMatchType = multiplayerMatchType;
-    const requestedRole = multiplayerRole;
-    const requestedRoomCode = multiplayerRoomCode;
     closeMultiplayerSocket();
-    if (requestedMatchType === "friend") {
-        multiplayerMatchType = requestedMatchType;
-        multiplayerRole = requestedRole;
-        multiplayerRoomCode = requestedRoomCode;
-    }
     multiplayerStatus = "서버 연결 중...";
     let socket;
     try { socket = new WebSocket(MULTIPLAYER_SERVER_URL); }
@@ -1986,27 +1976,33 @@ function handleMultiplayerMessage(data) {
             flash.alpha = 0;
         }
 
-        // 게스트가 시작 메시지를 받은 경우 게임 상태를 먼저 확정하고,
-        // 라운드 데이터 반영과 UI 갱신이 끝난 뒤 상태를 다시 기록합니다.
         gameState = "playing";
-        multiplayerOpen = false;
-        settingsOpen = false;
-        logMultiplayerDebug("guestGameStatePlayingEntered", {
-            round: multiplayerRound,
-            gameState,
-            matchActive: multiplayerMatchActive,
-            matchType: multiplayerMatchType,
-            role: multiplayerRole
-        });
         onDailyQuestMultiplayerRoundStart();
         remainingTime = getStageTimeLimit() + activeTimeBonus;
         stageStart = data.startPosition && Number.isFinite(Number(data.startPosition.c)) && Number.isFinite(Number(data.startPosition.r))
             ? { c: Number(data.startPosition.c), r: Number(data.startPosition.r) }
             : { c: START.c, r: START.r };
+        // 맵은 방장이 생성한 것을 그대로 사용합니다. 참가자는 별도 createMap()을 호출하지 않습니다.
+        // 라운드 전환 애니메이션/경로 안내 잔여 상태도 제거해 양쪽 렌더링을 일치시킵니다.
         walls = new Set(Array.isArray(data.walls) ? data.walls.map(String) : []);
-        goal = data.goal ? { c: Number(data.goal.c), r: Number(data.goal.r) } : null;
+        goal = data.goal && Number.isFinite(Number(data.goal.c)) && Number.isFinite(Number(data.goal.r))
+            ? { c: Number(data.goal.c), r: Number(data.goal.r) }
+            : null;
         dangers = new Set(Array.isArray(data.dangers) ? data.dangers.map(String) : []);
-        logMultiplayerDebug("guestGameStatePlaying", { incomingRound: data.round, wallCount: walls.size, dangerCount: dangers.size, hasGoal: !!goal });
+        mapTransition.active = false;
+        pathGuideUses = 0;
+        pathGuidePath = [];
+        activeItem = null;
+        activeTimeBonus = 0;
+        shieldCharges = 0;
+        firstAidCharged = false;
+        logMultiplayerDebug("guestGameStatePlaying", {
+            incomingRound: data.round,
+            wallCount: walls.size,
+            dangerCount: dangers.size,
+            hasGoal: !!goal,
+            mapSignature: [...walls].sort().join(",") + "|" + (goal ? `${goal.c},${goal.r}` : "none") + "|" + [...dangers].sort().join(",")
+        });
         resetPlayer();
         mapTransition.active = false;
         pathGuideUses = 0;
@@ -2016,16 +2012,6 @@ function handleMultiplayerMessage(data) {
         sendMultiplayerPosition(true);
         setMessage(multiplayerRound === 1 ? "경기 시작!" : `다음 맵 · ${multiplayerRound}라운드`);
         updateUI();
-        logMultiplayerDebug("guestGameStatePlayingRendered", {
-            gameState,
-            matchActive: multiplayerMatchActive,
-            multiplayerOpen,
-            settingsOpen,
-            round: multiplayerRound,
-            hasGoal: !!goal,
-            canvasWidth: canvas ? canvas.width : null,
-            canvasHeight: canvas ? canvas.height : null
-        });
         return;
     }
     if (data.type === "roundWon") {
@@ -2120,13 +2106,25 @@ function startMultiplayerMatch() {
     startNewGame();
     onDailyQuestMultiplayerMatchStart(multiplayerMatchType || "quick");
     onDailyQuestMultiplayerRoundStart();
+    const sharedMap = {
+        walls: [...walls].map(String),
+        goal: goal ? { c: Number(goal.c), r: Number(goal.r) } : null,
+        dangers: [...dangers].map(String)
+    };
+    logMultiplayerDebug("hostSharedMap", {
+        round: multiplayerRound,
+        wallCount: sharedMap.walls.length,
+        dangerCount: sharedMap.dangers.length,
+        hasGoal: !!sharedMap.goal,
+        mapSignature: [...sharedMap.walls].sort().join(",") + "|" + (sharedMap.goal ? `${sharedMap.goal.c},${sharedMap.goal.r}` : "none") + "|" + [...sharedMap.dangers].sort().join(",")
+    });
     multiplayerSend({
         type: "matchStart", round: multiplayerRound, seed: multiplayerSeed,
         startPosition: { c: stageStart.c, r: stageStart.r },
-        walls: [...walls], goal: goal ? { c: goal.c, r: goal.r } : null,
-        dangers: [...dangers]
+        ...sharedMap
     });
-    resetOpponent(); sendMultiplayerPosition(true);
+    resetOpponent();
+    sendMultiplayerPosition(true);
 }
 
 function startNextMultiplayerRound(nextStart = { c: player.c, r: player.r }) {
@@ -2146,11 +2144,22 @@ function startNextMultiplayerRound(nextStart = { c: player.c, r: player.r }) {
     startRound();
     onDailyQuestMultiplayerRoundStart();
 
+    const sharedMap = {
+        walls: [...walls].map(String),
+        goal: goal ? { c: Number(goal.c), r: Number(goal.r) } : null,
+        dangers: [...dangers].map(String)
+    };
+    logMultiplayerDebug("hostSharedMap", {
+        round: multiplayerRound,
+        wallCount: sharedMap.walls.length,
+        dangerCount: sharedMap.dangers.length,
+        hasGoal: !!sharedMap.goal,
+        mapSignature: [...sharedMap.walls].sort().join(",") + "|" + (sharedMap.goal ? `${sharedMap.goal.c},${sharedMap.goal.r}` : "none") + "|" + [...sharedMap.dangers].sort().join(",")
+    });
     multiplayerSend({
         type: "matchStart", round: multiplayerRound, seed: multiplayerSeed,
         startPosition: { c: stageStart.c, r: stageStart.r },
-        walls: [...walls], goal: goal ? { c: goal.c, r: goal.r } : null,
-        dangers: [...dangers]
+        ...sharedMap
     });
     resetOpponent();
     sendMultiplayerPosition(true);
@@ -3638,6 +3647,18 @@ function consumeEquippedItem(type, amount = 1) {
 }
 
 function activateItemForRun() {
+    // 2인용 경쟁에서는 아이템 효과와 소모를 모두 비활성화합니다.
+    // 방장/참가자 모두 동일하게 적용하여 아이템으로 제한시간이나 맵 표시가 달라지지 않게 합니다.
+    if (multiplayerMatchActive) {
+        activeItem = null;
+        activeTimeBonus = 0;
+        activeEnergyRecoveryChoice = 1;
+        shieldCharges = 0;
+        firstAidCharged = false;
+        pathGuideUses = 0;
+        pathGuidePath = [];
+        return;
+    }
     /*
        아이템 소비 규칙
        - 시간 조작 시계: 선택한 개수만큼 게임 시작 시 즉시 소비
