@@ -1964,6 +1964,13 @@ function handleMultiplayerMessage(data) {
         if (multiplayerSelfDead && Number(data.round) > 1) {
             multiplayerRound = Number(data.round) || (multiplayerRound + 1);
             multiplayerRoundTransition = false;
+            opponentEliminatedRound = 0;
+            opponent.visible = false;
+            multiplayerSeed = Number(data.seed) || 0;
+            stageStart = data.startPosition && Number.isFinite(Number(data.startPosition.c)) && Number.isFinite(Number(data.startPosition.r))
+                ? { c: Number(data.startPosition.c), r: Number(data.startPosition.r) }
+                : { c: START.c, r: START.r };
+            buildSpectatorMap();
             return;
         }
         multiplayerMatchActive = true;
@@ -2174,6 +2181,19 @@ function startMultiplayerMatch() {
     sendMultiplayerPosition(true);
 }
 
+// 먼저 죽은 플레이어도 다음 라운드 맵을 만들어 상대를 관전할 수 있게 합니다.
+function buildSpectatorMap() {
+    movement = null;
+    mapTransition.active = false;
+    pathGuidePath = [];
+    createMapWithSeed(multiplayerSeed);
+    // createMap이 gameState를 "transition"으로 바꾸므로 관전 상태로 되돌립니다.
+    gameState = "multiplayerWaitingResult";
+    remainingTime = getStageTimeLimit();
+    setMessage("관전 중 · 상대 플레이어의 경기가 끝나기를 기다립니다.");
+    updateUI();
+}
+
 function startNextMultiplayerRound(nextStart = { c: player.c, r: player.r }) {
     if (multiplayerRole !== "host" || !multiplayerMatchActive) return;
 
@@ -2191,6 +2211,9 @@ function startNextMultiplayerRound(nextStart = { c: player.c, r: player.r }) {
             type: "matchStart", round: multiplayerRound, seed: multiplayerSeed,
             startPosition: { c: stageStart.c, r: stageStart.r }
         });
+        opponentEliminatedRound = 0;
+        opponent.visible = false;
+        buildSpectatorMap();
         return;
     }
 
@@ -2231,7 +2254,7 @@ function sendMultiplayerEliminated() {
         onDailyQuestMultiplayerElimination();
         multiplayerRoundTransition = false;
         gameState = "multiplayerWaitingResult";
-        setMessage("목숨을 모두 잃었습니다. 상대의 경기가 끝나기를 기다리는 중...");
+        setMessage("목숨을 모두 잃었습니다. 관전 중 · 상대의 경기가 끝나기를 기다립니다.");
     } else {
         gameState = "multiplayerWaitingRound";
         setMessage(`목숨을 잃었습니다. ${lives}개 남음 · 다음 맵을 기다리는 중...`);
@@ -5760,7 +5783,9 @@ function updateMapTransition(
             false;
 
         gameState =
-            "playing";
+            (multiplayerSelfDead && multiplayerMatchActive)
+                ? "multiplayerWaitingResult"
+                : "playing";
     }
 }
 
@@ -8334,6 +8359,18 @@ function update(delta) {
 
         // 매 프레임 DOM 전체를 갱신하면 멀티플레이에서 입력/렌더링이 끊기므로
         // 화면의 숫자/UI는 초당 약 10회만 갱신합니다.
+        gameplayUIAccumulator += delta;
+        if (gameplayUIAccumulator >= 0.10) {
+            gameplayUIAccumulator = 0;
+            updateUI();
+        }
+    } else if (
+        gameState === "multiplayerWaitingResult" &&
+        multiplayerSelfDead &&
+        multiplayerMatchActive
+    ) {
+        // 관전 중에는 표시용으로만 시간을 줄입니다. (시간 초과 처리는 하지 않음)
+        remainingTime = Math.max(0, remainingTime - delta);
         gameplayUIAccumulator += delta;
         if (gameplayUIAccumulator >= 0.10) {
             gameplayUIAccumulator = 0;
@@ -12622,6 +12659,25 @@ function drawGameOverScreen() {
 }
 
 
+function drawSpectatorBanner() {
+    ctx.save();
+    const text = "👁 관전 중";
+    ctx.font = "700 13px Pretendard, Noto Sans KR, sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    const w = ctx.measureText(text).width + 24;
+    ctx.fillStyle = "rgba(9,12,17,0.72)";
+    ctx.strokeStyle = "rgba(255,215,106,0.55)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(10, 6, w, 24, 12);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "#ffd76a";
+    ctx.fillText(text, 22, 18);
+    ctx.restore();
+}
+
 function drawMultiplayerResultScreen() {
     drawBackground();
     ctx.save();
@@ -12754,6 +12810,11 @@ function draw(now = performance.now()) {
         return;
     }
 
+    if (gameState === "multiplayerWaitingResult" && multiplayerMatchActive && multiplayerSelfDead) {
+        drawGame();
+        drawSpectatorBanner();
+        return;
+    }
     if (gameState === "multiplayerResult" || gameState === "multiplayerWaitingResult") {
         drawMultiplayerResultScreen();
         return;
