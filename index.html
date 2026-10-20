@@ -2993,7 +2993,7 @@ function isGameplayMusicWanted() {
     // 실제 플레이 중이고, 사이트 탭/창이 활성화되어 있을 때만 BGM을 재생합니다.
     // 다른 탭으로 이동하거나 브라우저 창에서 벗어나면 재생을 멈춥니다.
     const pageIsActive = !document.hidden && (typeof document.hasFocus !== "function" || document.hasFocus());
-    return pageIsActive && gameAccessGranted && !["start", "gameover", "expResult"].includes(gameState) && musicVolume > 0;
+    return pageIsActive && gameAccessGranted && !["start", "gameover", "expResult", "multiplayerResult"].includes(gameState) && musicVolume > 0;
 }
 
 function startBackgroundMusic() {
@@ -3034,6 +3034,17 @@ function stopBackgroundMusic(resetPosition = false) {
 function syncBackgroundMusic() {
     // 홈/시작 화면으로 돌아오면 BGM을 정지하되, 재생 위치는 유지합니다.
     // 재생 위치를 0초로 초기화하는 것은 게임 오버 진입 또는 새 게임 시작 때만 합니다.
+    // 2인 대전 승/패/무승부 결과 화면에서는 음악을 끄고 처음 위치로 되돌립니다.
+    if (gameState === "multiplayerResult") {
+        if (backgroundMusic && (!backgroundMusic.paused || backgroundMusic.currentTime !== 0)) {
+            stopBackgroundMusic(true);
+        } else {
+            backgroundMusicPlayRequested = false;
+            backgroundMusicWasPlaying = false;
+        }
+        return;
+    }
+
     if (gameState === "start" || gameState === "expResult") {
         // 홈 화면과 EXP 결과 화면에서는 음악을 재생하지 않습니다.
         // EXP 화면에서는 재생 위치를 초기화하지 않습니다.
