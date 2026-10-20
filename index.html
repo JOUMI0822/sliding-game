@@ -1953,25 +1953,8 @@ function handleMultiplayerMessage(data) {
         return;
     }
     if (data.type === "matchStart") {
-        // 메시지를 받았다는 사실과 실제 게임 상태 전환을 분리해서 기록합니다.
-        logMultiplayerDebug("matchStartReceived", {
-            incomingRound: data.round,
-            incomingSeed: data.seed,
-            role: multiplayerRole,
-            matchType: multiplayerMatchType,
-            socketState: multiplayerSocket ? multiplayerSocket.readyState : null
-        });
-        if (multiplayerRole === "guest") {
-            multiplayerSend({
-                type: "matchStartAck",
-                round: Number(data.round) || 0,
-                phase: "received"
-            });
-        }
-        if (multiplayerRole !== "guest") {
-            logMultiplayerDebug("matchStartIgnoredWrongRole", { role: multiplayerRole, room: multiplayerRoomCode });
-            return;
-        }
+        logMultiplayerDebug("matchStartReceived", { incomingRound: data.round, incomingSeed: data.seed, isGuest: multiplayerRole === "guest" });
+        if (multiplayerRole !== "guest") return;
         multiplayerMatchActive = true;
         multiplayerResult = null;
         multiplayerResultSoundPlayed = false;
@@ -2003,18 +1986,17 @@ function handleMultiplayerMessage(data) {
             flash.alpha = 0;
         }
 
+        // 게스트가 시작 메시지를 받은 경우 게임 상태를 먼저 확정하고,
+        // 라운드 데이터 반영과 UI 갱신이 끝난 뒤 상태를 다시 기록합니다.
         gameState = "playing";
+        multiplayerOpen = false;
+        settingsOpen = false;
         logMultiplayerDebug("guestGameStatePlayingEntered", {
             round: multiplayerRound,
             gameState,
             matchActive: multiplayerMatchActive,
             matchType: multiplayerMatchType,
             role: multiplayerRole
-        });
-        multiplayerSend({
-            type: "matchStartAck",
-            round: multiplayerRound,
-            phase: "playing"
         });
         onDailyQuestMultiplayerRoundStart();
         remainingTime = getStageTimeLimit() + activeTimeBonus;
@@ -2034,6 +2016,16 @@ function handleMultiplayerMessage(data) {
         sendMultiplayerPosition(true);
         setMessage(multiplayerRound === 1 ? "경기 시작!" : `다음 맵 · ${multiplayerRound}라운드`);
         updateUI();
+        logMultiplayerDebug("guestGameStatePlayingRendered", {
+            gameState,
+            matchActive: multiplayerMatchActive,
+            multiplayerOpen,
+            settingsOpen,
+            round: multiplayerRound,
+            hasGoal: !!goal,
+            canvasWidth: canvas ? canvas.width : null,
+            canvasHeight: canvas ? canvas.height : null
+        });
         return;
     }
     if (data.type === "roundWon") {
