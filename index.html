@@ -1580,6 +1580,7 @@ let multiplayerFinalScores = null;               // 경기 종료 시 최종 점
 let multiplayerStatus = "서버 연결 중...";
 let multiplayerSendAccumulator = 0;
 let multiplayerEliminatedSent = false;
+let multiplayerSelfDead = false;   // 내 목숨이 0이 되어 결과 대기 중인지
 let multiplayerMatchmaking = false;
 let multiplayerRound = 0;
 let multiplayerRoundTransition = false;
@@ -1662,6 +1663,7 @@ function closeMultiplayerSocket() {
     multiplayerPeerJoined = false;
     multiplayerMatchActive = false;
     multiplayerEliminatedSent = false;
+    multiplayerSelfDead = false;
     multiplayerMatchmaking = false;
     multiplayerRound = 0;
     multiplayerRoundTransition = false;
@@ -1681,7 +1683,7 @@ function resetOpponent() {
 }
 
 function sendMultiplayerPosition(force = false) {
-    if (!multiplayerMatchActive) return;
+    if (!multiplayerMatchActive || multiplayerSelfDead) return;
     if (!force && multiplayerSendAccumulator < 0.08) return;
     multiplayerSendAccumulator = 0;
     multiplayerSend({
@@ -1958,6 +1960,12 @@ function handleMultiplayerMessage(data) {
     if (data.type === "matchStart") {
         logMultiplayerDebug("matchStartReceived", { incomingRound: data.round, incomingSeed: data.seed, isGuest: multiplayerRole === "guest" });
         if (multiplayerRole !== "guest") return;
+        // 죽은 참가자는 다음 라운드가 시작돼도 다시 플레이 상태로 돌아가지 않습니다.
+        if (multiplayerSelfDead && Number(data.round) > 1) {
+            multiplayerRound = Number(data.round) || (multiplayerRound + 1);
+            multiplayerRoundTransition = false;
+            return;
+        }
         multiplayerMatchActive = true;
         multiplayerResult = null;
         multiplayerResultSoundPlayed = false;
@@ -1974,6 +1982,7 @@ function handleMultiplayerMessage(data) {
 
         const firstRound = multiplayerRound === 1;
         if (firstRound) {
+            multiplayerSelfDead = false;
             onDailyQuestMultiplayerMatchStart(multiplayerMatchType || "quick");
             onDailyQuestGameStart();
             lives = MAX_LIVES;
@@ -2035,6 +2044,18 @@ function handleMultiplayerMessage(data) {
         if (!multiplayerMatchActive) return;
         if (Number(data.round) !== multiplayerRound) return;
         if (multiplayerRoundTransition) return;
+
+        // 죽은 상태: 점수/연속 기록은 건드리지 않고, 방장이면 다음 라운드 진행만 담당
+        if (multiplayerSelfDead) {
+            if (multiplayerRole === "host") {
+                startNextMultiplayerRound(
+                    data.nextStart && Number.isFinite(Number(data.nextStart.c)) && Number.isFinite(Number(data.nextStart.r))
+                        ? { c: Number(data.nextStart.c), r: Number(data.nextStart.r) }
+                        : { c: player.c, r: player.r }
+                );
+            }
+            return;
+        }
 
         multiplayerRoundTransition = true;
         const winner = data.winner || "draw";
@@ -2125,6 +2146,7 @@ function startMultiplayerMatch() {
     multiplayerResultSoundPlayed = false;
     resetOneShotEffects();
     multiplayerEliminatedSent = false;
+    multiplayerSelfDead = false;
     multiplayerRoundTransition = false;
     multiplayerOpen = false;
     startNewGame();
@@ -2158,13 +2180,23 @@ function startNextMultiplayerRound(nextStart = { c: player.c, r: player.r }) {
     clearTimeout(roundTimer);
     multiplayerRound++;
     multiplayerSeed = generateMatchSeed();
-    multiplayerEliminatedSent = false;
-    multiplayerRoundTransition = false;
-    multiplayerPlayerVisible = true;
     stageStart = {
         c: Number(nextStart.c),
         r: Number(nextStart.r)
     };
+
+    // 죽은 방장은 직접 플레이하지 않고, 상대에게 다음 라운드만 알립니다.
+    if (multiplayerSelfDead) {
+        multiplayerSend({
+            type: "matchStart", round: multiplayerRound, seed: multiplayerSeed,
+            startPosition: { c: stageStart.c, r: stageStart.r }
+        });
+        return;
+    }
+
+    multiplayerEliminatedSent = false;
+    multiplayerRoundTransition = false;
+    multiplayerPlayerVisible = true;
 
     startRound();
     onDailyQuestMultiplayerRoundStart();
@@ -2195,10 +2227,11 @@ function sendMultiplayerEliminated() {
     });
 
     if (lives <= 0) {
+        multiplayerSelfDead = true;
         onDailyQuestMultiplayerElimination();
         multiplayerRoundTransition = false;
         gameState = "multiplayerWaitingResult";
-        setMessage("목숨을 모두 잃었습니다. 경기 결과를 기다리는 중...");
+        setMessage("목숨을 모두 잃었습니다. 상대의 경기가 끝나기를 기다리는 중...");
     } else {
         gameState = "multiplayerWaitingRound";
         setMessage(`목숨을 잃었습니다. ${lives}개 남음 · 다음 맵을 기다리는 중...`);
@@ -10329,7 +10362,7 @@ function getMultiplayerScorePair(scores = multiplayerScores) {
 function drawMultiplayerScoreHUD() {
     if (!multiplayerMatchActive) return;
     const pair = getMultiplayerScorePair();
-    const text = `나 ${pair.mine} : ${pair.theirs} 상대`;
+    const text = `나 ${pair.mine} : ${pair.theirs} 상대 · 5000점 승리`;
     ctx.save();
     ctx.font = "700 13px Pretendard, Noto Sans KR, sans-serif";
     ctx.textAlign = "center";
@@ -12606,14 +12639,14 @@ function drawMultiplayerResultScreen() {
     ctx.fillText(gameState === "multiplayerWaitingResult" ? "상대 플레이어의 결과를 기다리고 있습니다." : "2인용 경쟁 경기가 종료되었습니다.", WIDTH / 2, 270);
     ctx.fillStyle = "#7ddcff";
     ctx.font = "600 16px Pretendard, Noto Sans KR, sans-serif";
-    if (gameState === "multiplayerResult" && multiplayerFinalScores) {
-        const pair = getMultiplayerScorePair(multiplayerFinalScores);
+    if ((gameState === "multiplayerResult" && multiplayerFinalScores) || gameState === "multiplayerWaitingResult") {
+        const pair = getMultiplayerScorePair(multiplayerFinalScores || multiplayerScores);
         ctx.fillStyle = "#ffd76a";
         ctx.font = "bold 26px Pretendard, Noto Sans KR, sans-serif";
         ctx.fillText(`내 점수 ${pair.mine.toLocaleString("ko-KR")}  :  ${pair.theirs.toLocaleString("ko-KR")} 상대 점수`, WIDTH / 2, 325);
         ctx.fillStyle = "#8d98a6";
         ctx.font = "14px Pretendard, Noto Sans KR, sans-serif";
-        ctx.fillText("점수가 더 높은 플레이어가 승리합니다.", WIDTH / 2, 362);
+        ctx.fillText("둘 다 목숨을 잃으면 점수가 더 높은 플레이어가, 5000점에 먼저 도달하면 그 플레이어가 승리합니다.", WIDTH / 2, 362);
     }
     if (multiplayerRoomCode) {
         ctx.fillStyle = "#7ddcff";
@@ -12872,4 +12905,3 @@ requestAnimationFrame(
 
 </body>
     </html>
-    
