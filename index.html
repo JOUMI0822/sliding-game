@@ -911,11 +911,12 @@ const TIME_LIMIT = 20;
    20~24회: 12초 / 25~29회: 10초 / 30회 이상: 7초
 */
 function getStageTimeLimit() {
-    if (clearCount >= 30) return 7;
-    if (clearCount >= 25) return 10;
-    if (clearCount >= 20) return 12;
-    if (clearCount >= 10) return 15;
-    if (clearCount >= 5) return 17;
+    const progress = multiplayerMatchActive ? Math.max(0, multiplayerRound - 1) : clearCount;
+    if (progress >= 30) return 7;
+    if (progress >= 25) return 10;
+    if (progress >= 20) return 12;
+    if (progress >= 10) return 15;
+    if (progress >= 5) return 17;
     return 20;
 }
 
@@ -1584,6 +1585,7 @@ let multiplayerMatchType = null;
 let multiplayerPlayerVisible = true;
 let multiplayerPeerLeftDeadline = 0;
 let multiplayerPeerLeftTimer = null;
+let opponentEliminatedRound = 0;
 let opponent = {
     x: 0, y: 0,
     targetX: 0, targetY: 0,
@@ -1682,6 +1684,7 @@ function sendMultiplayerPosition(force = false) {
     multiplayerSendAccumulator = 0;
     multiplayerSend({
         type: "position",
+        round: multiplayerRound,
         c: player.c,
         r: player.r,
         x: player.x,
@@ -1764,15 +1767,18 @@ function connectMultiplayerSocket(onConnected) {
         if (multiplayerSocket !== socket) return;
         multiplayerConnected = false;
         multiplayerPeerJoined = false;
-        if (multiplayerMatchActive) {
-            // 연결이 잠깐 끊어져도 홈 화면으로 보내면 한쪽만 경기에서
-            // 이탈한 것처럼 보입니다. 결과 대기 화면을 유지합니다.
+        if (multiplayerMatchActive ||
+            gameState === "multiplayerWaitingResult" ||
+            gameState === "multiplayerWaitingRound") {
             multiplayerMatchActive = false;
-            gameState = "multiplayerWaitingResult";
+            multiplayerResult = "draw";                 // EXP 0, 결과 화면에서 나갈 수 있음
+            gameState = "multiplayerResult";
             multiplayerOpen = false;
             movement = null;
             opponent.visible = false;
-            setMessage("서버 연결이 끊어졌습니다. 상대 연결 및 경기 결과를 확인해 주세요.");
+            pendingExpAward = 0;
+            pendingExpReason = "multiplayer_disconnect";
+            setMessage("서버 연결이 끊어졌습니다.");
         } else if (multiplayerMatchmaking) {
             multiplayerStatus = "매칭 서버 연결이 종료되었습니다.";
             multiplayerMatchmaking = false;
@@ -1827,6 +1833,7 @@ function handleMultiplayerMessage(data) {
     }
     if (data.type === "quickMatchTimeout") {
         logMultiplayerDebug("quickMatchTimeoutReceived");
+        closeMultiplayerSocket();
         multiplayerMatchmaking = false;
         multiplayerMatchActive = false;
         multiplayerPeerJoined = false;
@@ -1878,28 +1885,22 @@ function handleMultiplayerMessage(data) {
     }
     if (data.type === "peerLeft") {
         multiplayerPeerJoined = false;
-        multiplayerPeerLeftDeadline = Date.now() + 10000;
-        if (multiplayerPeerLeftTimer) clearInterval(multiplayerPeerLeftTimer);
-
-        const updatePeerLeftCountdown = () => {
-            if (multiplayerPeerLeftDeadline <= 0) return;
-            const remain = Math.max(0, (multiplayerPeerLeftDeadline - Date.now()) / 1000);
-            if (remain <= 0) {
-                clearInterval(multiplayerPeerLeftTimer);
-                multiplayerPeerLeftTimer = null;
-                return;
-            }
-            const text = `상대 플레이어가 나갔습니다. ${Math.ceil(remain)}초 동안 재접속을 기다립니다...`;
-            multiplayerStatus = text;
-            setMessage(text);
-            updateUI();
-        };
-
-        updatePeerLeftCountdown();
-        multiplayerPeerLeftTimer = setInterval(updatePeerLeftCountdown, 100);
+        if (data.roomClosed) {
+            closeMultiplayerSocket();
+            multiplayerRole = null;
+            multiplayerRoomCode = "";
+            multiplayerOpen = true;
+            multiplayerStatus = "방장이 나가서 방이 닫혔습니다.";
+        } else {
+            multiplayerStatus = "상대 플레이어가 나갔습니다. 다시 기다리는 중...";
+        }
+        updateUI();
         return;
     }
     if (data.type === "playerLeftTimeout") {
+        if (!multiplayerMatchActive &&
+            gameState !== "multiplayerWaitingResult" &&
+            gameState !== "multiplayerWaitingRound") return;
         multiplayerPeerLeftDeadline = 0;
         if (multiplayerPeerLeftTimer) {
             clearInterval(multiplayerPeerLeftTimer);
@@ -1932,6 +1933,7 @@ function handleMultiplayerMessage(data) {
     }
     if (data.type === "position") {
         if (!multiplayerMatchActive) return;
+        if (data.round !== undefined && Number(data.round) !== multiplayerRound) return;
         if (opponentEliminatedRound === multiplayerRound) return;
         const x = Number(data.x), y = Number(data.y);
         if (!Number.isFinite(x) || !Number.isFinite(y)) return;
@@ -1972,6 +1974,8 @@ function handleMultiplayerMessage(data) {
             clearCount = 0;
             clearStreak = 0;
             maxClearStreak = 0;
+            lifeLossCount = 0;
+            mapSkipCount = 0;
             mapSkips = MAX_MAP_SKIPS;
             stageStart = { c: START.c, r: START.r };
             recordSavedForRun = false;
@@ -2101,6 +2105,7 @@ function startMultiplayerMatch() {
     multiplayerRound = 1;
     multiplayerMatchActive = true;
     logMultiplayerDebug("hostGameStarting", { round: multiplayerRound, seed: multiplayerSeed });
+    opponentEliminatedRound = 0;
     multiplayerResult = null;
     multiplayerResultSoundPlayed = false;
     resetOneShotEffects();
@@ -2199,6 +2204,11 @@ function generateMatchSeed() {
     return Math.floor(Math.random() * 900000) + 100000;
 }
 
+function isMultiplayerPending() {
+    return multiplayerOpen || multiplayerMatchmaking ||
+        (!!multiplayerRole && !!multiplayerSocket && !multiplayerMatchActive && gameState === "start");
+}
+
 function openMultiplayerMenu() {
     multiplayerOpen = true;
     multiplayerMatchType = null;
@@ -2214,11 +2224,13 @@ function closeMultiplayerMenu() {
 }
 
 function createMultiplayerRoom() {
-    multiplayerMatchType = "friend";
     multiplayerRole = "host";
     multiplayerRoomCode = generateRoomCode();
     multiplayerSeed = generateMatchSeed();
-    connectMultiplayerSocket(() => multiplayerSend({ type: "create", room: multiplayerRoomCode }));
+    connectMultiplayerSocket(() => {
+        multiplayerMatchType = "friend";
+        multiplayerSend({ type: "create", room: multiplayerRoomCode });
+    });
 }
 
 function joinMultiplayerRoom() {
@@ -2231,11 +2243,13 @@ function joinMultiplayerRoom() {
         return;
     }
 
-    multiplayerMatchType = "friend";
     multiplayerRole = "guest";
     multiplayerRoomCode = normalized;
     multiplayerSeed = 0;
-    connectMultiplayerSocket(() => multiplayerSend({ type: "join", room: multiplayerRoomCode }));
+    connectMultiplayerSocket(() => {
+        multiplayerMatchType = "friend";
+        multiplayerSend({ type: "join", room: multiplayerRoomCode });
+    });
 }
 
 async function copyMultiplayerRoomCode() {
@@ -6945,6 +6959,7 @@ function updateMovement(
             0.10
         );
 
+        sendMultiplayerPosition(true);
         checkTile();
     }
 }
@@ -7142,6 +7157,7 @@ function dieGame() {
     }
 
     lives--;
+    lifeLossCount++;
     onDailyQuestDeath();
 
     if (tryAutoFirstAid()) {
@@ -7612,6 +7628,7 @@ window.addEventListener(
                 gameState === "start"
             ) {
 
+                if (isMultiplayerPending()) return;
                 startNewGame();
 
             } else if (
@@ -7668,6 +7685,8 @@ window.addEventListener(
             ) {
                 return;
             }
+
+            if (isMultiplayerPending()) return;
 
             startNewGame();
 
@@ -7915,6 +7934,8 @@ gameWrapper.addEventListener(
 
                 return;
             }
+
+            if (isMultiplayerPending()) { lastTapTime = 0; return; }
 
             const now =
                 performance.now();
@@ -11962,7 +11983,10 @@ function handleSettingsTap(x, y) {
                 multiplayerRoomCode = generateRoomCode();
                 multiplayerSeed = generateMatchSeed();
                 multiplayerPeerJoined = false;
-                connectMultiplayerSocket(() => multiplayerSend({ type: "create", room: multiplayerRoomCode }));
+                connectMultiplayerSocket(() => {
+                    multiplayerMatchType = "friend";
+                    multiplayerSend({ type: "create", room: multiplayerRoomCode });
+                });
                 return true;
             }
             if (isInsideRect(x, y, { x: 205, y: 430, w: 390, h: 42 })) {
@@ -12524,7 +12548,7 @@ function drawMultiplayerResultScreen() {
     ctx.fillText(gameState === "multiplayerWaitingResult" ? "상대 플레이어의 결과를 기다리고 있습니다." : "2인용 경쟁 경기가 종료되었습니다.", WIDTH / 2, 270);
     ctx.fillStyle = "#7ddcff";
     ctx.font = "600 16px Pretendard, Noto Sans KR, sans-serif";
-    ctx.fillText(`방 코드 ${multiplayerRoomCode}`, WIDTH / 2, 325);
+    if (multiplayerRoomCode) ctx.fillText(`방 코드 ${multiplayerRoomCode}`, WIDTH / 2, 325);
     ctx.fillStyle = "#ffffff";
     ctx.font = "bold 18px Pretendard, Noto Sans KR, sans-serif";
     ctx.fillText("Space 또는 화면 터치로 시작 화면으로", WIDTH / 2, 470);
