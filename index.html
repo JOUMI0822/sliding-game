@@ -1008,54 +1008,61 @@ canvas {
 .profile-nick-note.error { color:#ff8f9b; }
 .profile-nick-note.success { color:#7dff9d; }
 
-/* ---------- 모바일 가로 모드: 높이 기준으로 4:3 유지 ---------- */
-@media (orientation: landscape) and (max-height: 520px) {
-    body {
-        align-items: center;
-    }
+/* ---------- 모바일 가로 모드: 게임 전체(상단바+캔버스+오버레이)를 통째로 축소 ---------- */
+/* html.fit-scale 클래스는 JS(fitGameToViewport)가 화면이 낮을 때만 붙입니다. */
+html.fit-scale body {
+    align-items: center;
+    overflow: hidden;
+}
 
-    #gameWrapper {
-        width: auto;
-        max-width: 100vw;
-        min-height: 0;
-        padding-bottom: 0;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        height: 100dvh;
-        justify-content: center;
-    }
+html.fit-scale #gameWrapper {
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    width: 800px;
+    max-width: none;
+    height: 644px;          /* 상단바 44 + 캔버스 600 */
+    min-height: 0;
+    padding: 0;
+    transform: translate(-50%, -50%) scale(var(--fit-scale, 1));
+    transform-origin: center center;
+}
 
-    /* 상단 바(약 36px)를 뺀 나머지 높이에 4:3 캔버스를 맞춤 */
-    .topbar {
-        width: calc((100dvh - 36px) * 4 / 3);
-        max-width: 100vw;
-        min-height: 36px;
-        padding: 4px 6px;
-        font-size: 10px;
-    }
+html.fit-scale #gameWrapper[hidden] {
+    display: none;
+}
 
-    #equippedItemBox {
-        height: 26px;
-        width: 22vw;
-        min-width: 90px;
-        max-width: 150px;
-    }
+html.fit-scale .topbar {
+    width: 800px;
+    max-width: none;
+    min-height: 44px;
+    padding: 7px 10px;
+    gap: 8px;
+    font-size: 14px;
+}
 
-    #canvasStage {
-        width: calc((100dvh - 36px) * 4 / 3);
-        max-width: 100vw;
-        height: calc(100dvh - 36px);
-        aspect-ratio: 4 / 3;
-    }
+html.fit-scale #equippedItemBox {
+    width: 185px;
+    min-width: 185px;
+    max-width: none;
+    height: 30px;
+}
 
-    #canvasStage > canvas,
-    canvas {
-        width: 100%;
-        height: 100%;
-        max-width: none;
-        aspect-ratio: 4 / 3;
-    }
+html.fit-scale #itemInfo { font-size: 11px; }
+html.fit-scale #itemWarning { font-size: 8px; }
+
+html.fit-scale #canvasStage {
+    width: 800px;
+    max-width: none;
+    height: 600px;
+    aspect-ratio: auto;
+}
+
+html.fit-scale #canvasStage > canvas,
+html.fit-scale canvas {
+    width: 800px;
+    height: 600px;
+    max-width: none;
 }
 </style>
 </head>
@@ -14350,6 +14357,34 @@ entryGateObserver.observe(document.documentElement, {
     attributes: true,
     attributeFilter: ["style", "class"]
 });
+
+
+/* =========================================================
+   화면 맞춤 (모바일 가로 모드 등 화면 높이가 낮을 때)
+   - 게임 전체를 800x644 기준으로 두고 화면에 맞게 통째로 축소합니다.
+   - 터치 좌표는 getBoundingClientRect 기반이라 그대로 정확합니다.
+========================================================= */
+function fitGameToViewport() {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    const NEED_W = 800;
+    const NEED_H = 644;
+    const needsFit = w < NEED_W || h < NEED_H;
+    const scale = Math.min(w / NEED_W, h / NEED_H, 1);
+    const root = document.documentElement;
+
+    // 세로 모드의 폰은 기존 반응형 CSS가 이미 잘 맞으므로 가로(또는 낮은 화면)일 때만 적용합니다.
+    const useFit = needsFit && w > h;
+    root.classList.toggle("fit-scale", useFit);
+    root.style.setProperty("--fit-scale", String(scale));
+
+    if (typeof positionVolumeTouchArea === "function") positionVolumeTouchArea();
+}
+
+window.addEventListener("resize", fitGameToViewport);
+window.addEventListener("orientationchange", () => setTimeout(fitGameToViewport, 200));
+if (window.visualViewport) window.visualViewport.addEventListener("resize", fitGameToViewport);
+fitGameToViewport();
 
 restoreSavedSession();
 
