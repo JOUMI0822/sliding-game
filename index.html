@@ -753,6 +753,79 @@ canvas {
     border-color: #d15a67;
 }
 
+
+/* 튜토리얼 버튼 / 확인창 줄바꿈 / 레벨 보상 모달 */
+#logoutConfirmDialogMessage { white-space: pre-line; }
+
+.start-menu-tutorial {
+    position: absolute;
+    right: 12px;
+    bottom: 12px;
+    pointer-events: auto;
+}
+
+@media (max-width: 520px) {
+    .start-menu-tutorial { right: 8px; bottom: 8px; }
+}
+
+#levelRewardOverlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10001;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(0,0,0,0.68);
+    touch-action: none;
+}
+
+#levelRewardOverlay.visible { display: flex; }
+
+#levelRewardDialog {
+    width: min(380px, calc(100vw - 40px));
+    max-height: 86vh;
+    overflow: auto;
+    padding: 24px 22px 20px;
+    border: 1px solid #4b596b;
+    border-radius: 18px;
+    background: #171c25;
+    box-shadow: 0 18px 50px rgba(0,0,0,0.5);
+    text-align: center;
+}
+
+#levelRewardTitle { margin: 0 0 6px; color: #ffd76a; font-size: 22px; font-weight: 800; }
+#levelRewardSubtitle { margin: 0 0 14px; color: #aeb8c5; font-size: 14px; line-height: 1.5; }
+
+#levelRewardList {
+    display: grid;
+    gap: 8px;
+    margin-bottom: 18px;
+}
+
+.level-reward-row {
+    padding: 10px 12px;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 10px;
+    background: rgba(255,255,255,0.045);
+    color: #f1f4f7;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.level-reward-row.special { border-color: rgba(255,215,106,0.55); color: #ffd76a; }
+
+#levelRewardOkButton {
+    width: 100%;
+    min-height: 44px;
+    border: 1px solid rgba(99,184,255,0.75);
+    border-radius: 10px;
+    background: #236ea8;
+    color: #fff;
+    font: 700 15px Pretendard, Noto Sans KR, sans-serif;
+    cursor: pointer;
+    touch-action: manipulation;
+}
 </style>
 </head>
 
@@ -768,6 +841,15 @@ canvas {
             <button id="logoutCancelButton" type="button">취소</button>
             <button id="logoutConfirmButton" type="button">로그아웃</button>
         </div>
+    </div>
+</div>
+
+<div id="levelRewardOverlay" aria-hidden="true">
+    <div id="levelRewardDialog" role="dialog" aria-modal="true" aria-labelledby="levelRewardTitle">
+        <h2 id="levelRewardTitle">🎁 레벨 보상</h2>
+        <p id="levelRewardSubtitle"></p>
+        <div id="levelRewardList"></div>
+        <button id="levelRewardOkButton" type="button">확인</button>
     </div>
 </div>
 
@@ -835,6 +917,7 @@ canvas {
                 </div>
             </div>
             <div class="start-menu-competitive"><button id="startMultiplayerButton" class="start-menu-button" type="button">⚔ 2인 대전</button></div>
+            <div class="start-menu-tutorial"><button id="startTutorialButton" class="start-menu-button" type="button">📖 튜토리얼</button></div>
             <div class="start-menu-ranking">
                 <button id="startRankingButton" class="start-menu-button" type="button">🏆 랭킹</button>
             </div>
@@ -960,6 +1043,7 @@ let rankingLoading = false;
 ========================================================= */
 const DEFAULT_LEVEL = 1;
 const DEFAULT_EXP = 0;
+const MAX_LEVEL = 100;
 let playerLevel = DEFAULT_LEVEL;
 let playerExp = DEFAULT_EXP;
 let pendingExpAward = 0;
@@ -975,7 +1059,8 @@ function getLevelRequiredExp(level) {
 function normalizeProgress(level, exp) {
     let lv = Math.max(1, Math.floor(Number(level) || 1));
     let xp = Math.max(0, Math.floor(Number(exp) || 0));
-    while (xp >= getLevelRequiredExp(lv)) { xp -= getLevelRequiredExp(lv); lv++; }
+    while (lv < MAX_LEVEL && xp >= getLevelRequiredExp(lv)) { xp -= getLevelRequiredExp(lv); lv++; }
+    if (lv >= MAX_LEVEL) { lv = MAX_LEVEL; xp = 0; }
     return { level: lv, exp: xp };
 }
 function setPlayerProgress(level, exp) {
@@ -992,8 +1077,8 @@ function calculateMultiplayerExperience() {
 }
 function buildLocalProgressAfterAward(amount) {
     let lv=playerLevel, xp=playerExp, remaining=Math.max(0,Math.floor(amount));
-    while (remaining>0) { const need=getLevelRequiredExp(lv); const add=Math.min(remaining,need-xp); xp+=add; remaining-=add; if(xp>=need){lv++;xp=0;} }
-    return {level:lv,exp:xp};
+    while (remaining>0 && lv<MAX_LEVEL) { const need=getLevelRequiredExp(lv); const add=Math.min(remaining,need-xp); xp+=add; remaining-=add; if(xp>=need){lv++;xp=0;} }
+    return normalizeProgress(lv,xp);
 }
 function formatExp(value) { return Math.max(0,Math.floor(Number(value)||0)).toLocaleString("ko-KR"); }
 async function refreshPlayerProgress() {
@@ -1100,8 +1185,8 @@ function updateStartMenuOverlay() {
 
     if (currentAccount) {
         const need=getLevelRequiredExp(playerLevel);
-        const ratio=Math.max(0,Math.min(1,playerExp/need));
-        accountLabel.innerHTML=`<div class="start-account-main"><span class="start-account-level">Lv. ${playerLevel}</span><span class="start-account-name">👤 ${escapeHTML(currentAccount.nickname || currentAccount.id || "회원")}</span></div><div class="start-account-exp"><div class="start-account-exp-fill" style="width:${ratio*100}%"></div></div><div class="start-account-exp-text">EXP ${formatExp(playerExp)} / ${formatExp(need)}</div>`;
+        const ratio=playerLevel>=MAX_LEVEL?1:Math.max(0,Math.min(1,playerExp/need));
+        accountLabel.innerHTML=`<div class="start-account-main"><span class="start-account-level">Lv. ${playerLevel}</span><span class="start-account-name">👤 ${escapeHTML(currentAccount.nickname || currentAccount.id || "회원")}</span></div><div class="start-account-exp"><div class="start-account-exp-fill" style="width:${ratio*100}%"></div></div><div class="start-account-exp-text">${playerLevel>=MAX_LEVEL?"MAX LEVEL":`EXP ${formatExp(playerExp)} / ${formatExp(need)}`}</div>`;
     } else {
         accountLabel.innerHTML=`<div class="start-account-main"><span class="start-account-level">Lv. -</span><span class="start-account-name">👤 게스트 모드</span></div><div class="start-account-exp"><div class="start-account-exp-fill" style="width:0%"></div></div><div class="start-account-exp-text">EXP · 랭킹/레벨 저장 제외</div>`;
     }
@@ -1256,7 +1341,7 @@ function closeLogoutConfirm() {
     logoutConfirmOpen = false;
 }
 
-function openLogoutConfirm() {
+function openLogoutConfirm(options = {}) {
     const overlay = document.getElementById("logoutConfirmOverlay");
     if (!overlay || logoutConfirmOpen) return;
 
@@ -1266,6 +1351,16 @@ function openLogoutConfirm() {
 
     const cancelButton = document.getElementById("logoutCancelButton");
     const confirmButton = document.getElementById("logoutConfirmButton");
+    const dialogTitle = document.getElementById("logoutConfirmDialogTitle");
+    const dialogMessage = document.getElementById("logoutConfirmDialogMessage");
+    if (dialogTitle) dialogTitle.textContent = options.title || "로그아웃";
+    if (dialogMessage) dialogMessage.textContent = options.message || "로그아웃하시겠습니까?";
+    if (confirmButton) {
+        const neutral = options.danger === false;
+        confirmButton.textContent = options.confirmLabel || "로그아웃";
+        confirmButton.style.background = neutral ? "#236ea8" : "";
+        confirmButton.style.borderColor = neutral ? "rgba(99,184,255,0.75)" : "";
+    }
     if (cancelButton) cancelButton.focus();
 
     return new Promise(resolve => {
@@ -2747,11 +2842,11 @@ function playGameStartSoundAndThenStart() {
 ========================================================= */
 
 const ITEM_PRICES = {
-    timeClock: 2,
-    energyShield: 5,
-    pathGuide: 10,
-    firstAid: 7,
-    energyRecovery: 3
+    timeClock: 5,
+    energyShield: 15,
+    pathGuide: 30,
+    firstAid: 20,
+    energyRecovery: 10
 };
 
 const ITEM_DATA = {
@@ -3064,7 +3159,7 @@ function isGameplayMusicWanted() {
     // 실제 플레이 중이고, 사이트 탭/창이 활성화되어 있을 때만 BGM을 재생합니다.
     // 다른 탭으로 이동하거나 브라우저 창에서 벗어나면 재생을 멈춥니다.
     const pageIsActive = !document.hidden && (typeof document.hasFocus !== "function" || document.hasFocus());
-    return pageIsActive && gameAccessGranted && !["start", "gameover", "expResult", "multiplayerResult"].includes(gameState) && musicVolume > 0;
+    return pageIsActive && gameAccessGranted && !["start", "gameover", "expResult", "multiplayerResult", "tutorial"].includes(gameState) && musicVolume > 0;
 }
 
 function startBackgroundMusic() {
@@ -5783,9 +5878,7 @@ function updateMapTransition(
             false;
 
         gameState =
-            (multiplayerSelfDead && multiplayerMatchActive)
-                ? "multiplayerWaitingResult"
-                : "playing";
+            tutorialActive ? "tutorial" : (multiplayerSelfDead && multiplayerMatchActive) ? "multiplayerWaitingResult" : "playing";
     }
 }
 
@@ -6754,6 +6847,12 @@ function startRound() {
 
 function skipMap() {
 
+    // 튜토리얼 중에는 실제 게임 상태를 건드리지 않고 튜토리얼 전용 동작만 실행합니다.
+    if (tutorialActive) {
+        tutorialSkipAction();
+        return;
+    }
+
     // 2인용 대전 중에는 맵 넘기기를 사용할 수 없습니다.
     if (multiplayerMatchActive) {
         return;
@@ -6843,7 +6942,12 @@ function startMove(
     dr
 ) {
 
-    if (
+    if (gameState === "tutorial") {
+        const tutorialStepData = TUTORIAL_STEPS[tutorialStep];
+        if (tutorialLocked || !tutorialStepData || tutorialStepData.type === "info") {
+            return;
+        }
+    } else if (
         gameState !== "playing"
     ) {
         return;
@@ -7054,6 +7158,11 @@ function updateMovement(
 ========================================================= */
 
 function checkTile() {
+
+    if (tutorialActive) {
+        tutorialCheckTile();
+        return;
+    }
 
     const current =
         keyOf(
@@ -7655,13 +7764,14 @@ function startExperienceResult() {
     expAnimation={start:performance.now(),duration:1800,done:false};
     gameState="expResult"; updateStartMenuOverlay();
     const stats=pendingExpReason==="solo"?{mode:"solo",clears:clearCount,maxStreak:maxClearStreak}:{mode:"multiplayer",result:multiplayerResult,role:multiplayerRole,clears:clearCount,maxStreak:maxClearStreak,livesRemaining:lives};
-    submitExperienceAward(amount,pendingExpReason,stats).then(data=>{ if(!expResultData)return; expResultData.saved=data?.saved!==false; expResultData.targetLevel=Number(data?.level??expResultData.targetLevel); expResultData.targetExp=Number(data?.exp??expResultData.targetExp); });
+    lastExpAwardPromise=submitExperienceAward(amount,pendingExpReason,stats).then(data=>{ if(!expResultData)return; expResultData.saved=data?.saved!==false; expResultData.targetLevel=Number(data?.level??expResultData.targetLevel); expResultData.targetExp=Number(data?.exp??expResultData.targetExp); });
 }
 function finishExperienceResult() {
     if(!expResultData || !expAnimation?.done) return;
     setPlayerProgress(expResultData.targetLevel,expResultData.targetExp);
     closeMultiplayerSocket(); multiplayerOpen=false; multiplayerRole=null; multiplayerResult=null;
     pendingExpAward=0; pendingExpReason=""; expResultData=null; expAnimation=null; gameState="start"; setMessage(""); updateStartMenuOverlay(); updateUI();
+    Promise.resolve(lastExpAwardPromise).then(()=>claimLevelRewards());
 }
 function updateExpAnimation(now) {
     if(gameState!=="expResult"||!expResultData||!expAnimation)return;
@@ -7671,8 +7781,8 @@ function updateExpAnimation(now) {
     let lv=start, xp=total; while(lv<target&&xp>=getLevelRequiredExp(lv)){xp-=getLevelRequiredExp(lv);lv++;}
     expResultData.displayLevel=lv; expResultData.displayExp=Math.max(0,xp); if(t>=1){expResultData.displayLevel=target;expResultData.displayExp=expResultData.targetExp;expAnimation.done=true;setPlayerProgress(target,expResultData.targetExp);}
 }
-function drawExpProgressBar(x,y,w,h,level,exp){const ratio=Math.max(0,Math.min(1,exp/getLevelRequiredExp(level)));ctx.fillStyle="rgba(255,255,255,.09)";ctx.beginPath();ctx.roundRect(x,y,w,h,h/2);ctx.fill();ctx.fillStyle="#63b8ff";ctx.beginPath();ctx.roundRect(x,y,w*ratio,h,h/2);ctx.fill();}
-function drawExperienceResultScreen(now=performance.now()) { updateExpAnimation(now); ctx.fillStyle="#090b10";ctx.fillRect(0,0,WIDTH,HEIGHT);ctx.save();ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillStyle=expResultData?.targetLevel>expResultData?.beforeLevel?"#ffd76a":"#f3f5f7";ctx.font="bold 46px Pretendard,Noto Sans KR,sans-serif";ctx.fillText(expResultData?.targetLevel>expResultData?.beforeLevel?"LEVEL UP!":"EXP 획득",WIDTH/2,140);ctx.fillStyle="#7ddcff";ctx.font="bold 30px Pretendard,Noto Sans KR,sans-serif";ctx.fillText(`+${formatExp(expResultData?.amount||0)} EXP`,WIDTH/2,215);const lv=expResultData?.displayLevel||playerLevel,xp=expResultData?.displayExp||0;ctx.fillStyle="#fff";ctx.font="bold 30px Pretendard,Noto Sans KR,sans-serif";ctx.fillText(`Lv. ${lv}`,WIDTH/2,285);drawExpProgressBar(170,330,460,22,lv,xp);ctx.fillStyle="#aeb8c4";ctx.font="600 15px Pretendard,Noto Sans KR,sans-serif";ctx.fillText(`EXP ${formatExp(xp)} / ${formatExp(getLevelRequiredExp(lv))}`,WIDTH/2,375);ctx.fillStyle="#8d98a6";ctx.font="14px Pretendard,Noto Sans KR,sans-serif";ctx.fillText(expAnimation?.done?"R / SPACE 또는 화면 터치 : 홈으로":"EXP가 올라가는 중...",WIDTH/2,490);ctx.restore(); }
+function drawExpProgressBar(x,y,w,h,level,exp){const ratio=level>=MAX_LEVEL?1:Math.max(0,Math.min(1,exp/getLevelRequiredExp(level)));ctx.fillStyle="rgba(255,255,255,.09)";ctx.beginPath();ctx.roundRect(x,y,w,h,h/2);ctx.fill();ctx.fillStyle="#63b8ff";ctx.beginPath();ctx.roundRect(x,y,w*ratio,h,h/2);ctx.fill();}
+function drawExperienceResultScreen(now=performance.now()) { updateExpAnimation(now); ctx.fillStyle="#090b10";ctx.fillRect(0,0,WIDTH,HEIGHT);ctx.save();ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillStyle=expResultData?.targetLevel>expResultData?.beforeLevel?"#ffd76a":"#f3f5f7";ctx.font="bold 46px Pretendard,Noto Sans KR,sans-serif";ctx.fillText(expResultData?.targetLevel>expResultData?.beforeLevel?"LEVEL UP!":"EXP 획득",WIDTH/2,140);ctx.fillStyle="#7ddcff";ctx.font="bold 30px Pretendard,Noto Sans KR,sans-serif";ctx.fillText(`+${formatExp(expResultData?.amount||0)} EXP`,WIDTH/2,215);const lv=expResultData?.displayLevel||playerLevel,xp=expResultData?.displayExp||0;ctx.fillStyle="#fff";ctx.font="bold 30px Pretendard,Noto Sans KR,sans-serif";ctx.fillText(`Lv. ${lv}`,WIDTH/2,285);drawExpProgressBar(170,330,460,22,lv,xp);ctx.fillStyle="#aeb8c4";ctx.font="600 15px Pretendard,Noto Sans KR,sans-serif";ctx.fillText(lv>=MAX_LEVEL?"MAX LEVEL":`EXP ${formatExp(xp)} / ${formatExp(getLevelRequiredExp(lv))}`,WIDTH/2,375);ctx.fillStyle="#8d98a6";ctx.font="14px Pretendard,Noto Sans KR,sans-serif";ctx.fillText(expAnimation?.done?"R / SPACE 또는 화면 터치 : 홈으로":"EXP가 올라가는 중...",WIDTH/2,490);ctx.restore(); }
 
 /* =========================================================
    PC 키보드
@@ -8205,6 +8315,504 @@ gameWrapper.addEventListener(
 
 
 
+/* =========================================================
+   레벨 보상 수령 (서버가 보상표/수령 여부를 관리)
+========================================================= */
+let lastExpAwardPromise = null;
+let levelRewardClaiming = false;
+
+function showLevelRewardModal(entries, coinsGained, itemsGained) {
+    const overlay = document.getElementById("levelRewardOverlay");
+    if (!overlay) return;
+
+    const first = entries[0].level;
+    const last = entries[entries.length - 1].level;
+    document.getElementById("levelRewardSubtitle").textContent =
+        first === last ? `Lv.${last} 달성 보상이 지급되었습니다!` : `Lv.${first} ~ Lv.${last} 달성 보상이 지급되었습니다!`;
+
+    const rows = [];
+    if (last >= MAX_LEVEL) rows.push(`<div class="level-reward-row special">🏆 최고 레벨 달성을 축하합니다!</div>`);
+    if (coinsGained > 0) rows.push(`<div class="level-reward-row">🪙 코인 +${coinsGained.toLocaleString("ko-KR")}</div>`);
+    Object.keys(ITEM_DATA).forEach(type => {
+        const amount = itemsGained[type] || 0;
+        if (amount > 0) rows.push(`<div class="level-reward-row">${ITEM_DATA[type].icon} ${escapeHTML(ITEM_DATA[type].name)} ×${amount}</div>`);
+    });
+    document.getElementById("levelRewardList").innerHTML = rows.join("");
+
+    overlay.classList.add("visible");
+    overlay.setAttribute("aria-hidden", "false");
+}
+
+function closeLevelRewardModal() {
+    const overlay = document.getElementById("levelRewardOverlay");
+    if (!overlay) return;
+    overlay.classList.remove("visible");
+    overlay.setAttribute("aria-hidden", "true");
+}
+
+document.getElementById("levelRewardOkButton")?.addEventListener("click", () => {
+    playUIClickSound();
+    closeLevelRewardModal();
+});
+
+async function claimLevelRewards() {
+    if (!currentAccount || guestMode || !gameAccessGranted || levelRewardClaiming) return;
+    levelRewardClaiming = true;
+
+    try {
+        const data = await apiJSON("/api/progress/claim-rewards", { method: "POST", body: "{}" });
+        const entries = Array.isArray(data?.entries) ? data.entries : [];
+        if (!entries.length) return;
+
+        let coinsGained = 0;
+        const itemsGained = {};
+
+        for (const entry of entries) {
+            coinsGained += Math.max(0, Math.floor(Number(entry.coins) || 0));
+            for (const [type, count] of Object.entries(entry.items || {})) {
+                if (!Object.prototype.hasOwnProperty.call(itemInventory, type)) continue;
+                const amount = Math.max(0, Math.floor(Number(count) || 0));
+                itemInventory[type] += amount;
+                itemsGained[type] = (itemsGained[type] || 0) + amount;
+            }
+        }
+
+        coins += coinsGained;
+        saveCoins();
+        saveItemInventory();
+        updateUI();
+        showLevelRewardModal(entries, coinsGained, itemsGained);
+    } catch (error) {
+        console.warn("레벨 보상 수령 실패", error);
+    } finally {
+        levelRewardClaiming = false;
+    }
+}
+
+// 로그인/자동 로그인 직후에도 아직 받지 않은 레벨 보상이 있으면 지급합니다.
+const refreshPlayerProgressBase = refreshPlayerProgress;
+refreshPlayerProgress = async function () {
+    await refreshPlayerProgressBase();
+    await claimLevelRewards();
+};
+
+/* =========================================================
+   튜토리얼
+   - 코인, 점수, 일일 퀘스트, 랭킹, 아이템에 어떤 기록도 남기지 않습니다.
+   - gameState "tutorial" 전용 상태에서만 동작합니다.
+========================================================= */
+const TUTORIAL_MAP_ROWS = [
+"####################",
+"#S.X..X##..#######.#",
+"#...##.##.##....##.#",
+"###.##..#.##.#.###.#",
+"###.##X..X###.####.#",
+"###.G###......####.#",
+"#.##.###.#######.#.#",
+"#...##...##...####.#",
+"####..#..#.#####.#.#",
+"##################.#",
+"######.#########.#.#",
+"##..#.....######.#.#",
+"##..##.....#######.#",
+"#..................#",
+"####################"
+];
+
+const TUTORIAL_STEPS = [
+    { type: "info", title: "슬라이딩 튜토리얼", lines: [
+        "초록 블록을 움직여 목표에 도착하는 게임이에요.",
+        "기본 조작과 규칙을 직접 해보며 알려드릴게요.",
+        "튜토리얼은 코인 · 점수 · 퀘스트 · 랭킹에",
+        "아무 영향도 주지 않아요. 부담 없이 해보세요!"
+    ] },
+    { type: "move", title: "이동하기", need: 3,
+      text: "WASD 또는 스와이프로 3번 이동해 보세요! (벽에 닿을 때까지 미끄러져요)" },
+    { type: "danger", title: "위험 블록",
+      text: "빨간 위험 블록에 멈춰 보세요! (튜토리얼에서는 안전해요)" },
+    { type: "goal", title: "목표 도달",
+      text: "위험 블록을 피해 파란 목표 블록에 멈추면 클리어!" },
+    { type: "skip", title: "맵 넘기기",
+      text: "막힐 땐 G키 또는 화면 더블 터치로 맵을 넘겨 보세요!" },
+    { type: "info", title: "시간 · 목숨 · 점수", lines: [
+        "맵마다 제한 시간이 있고, 0초가 되면 목숨을 잃어요.",
+        "목숨은 3개! 모두 잃으면 게임 오버예요.",
+        "클리어할 때마다 코인 1개를 얻어요.",
+        "연속 클리어는 점수 보너스! 맵 넘기기 · 목숨 손실은 감점이에요.",
+        "클리어가 쌓일수록 제한 시간이 점점 줄어들어요."
+    ] },
+    { type: "info", title: "아이템 · 코인 · 레벨", lines: [
+        "코인으로 🛒 상점에서 아이템을 사고, 🎒 인벤토리에서 장착해요.",
+        "시계 · 보호막 · 경로 안내 · 응급 처치 · 에너지 복구가 있어요.",
+        "📜 일일 퀘스트를 완료하면 코인 보상을 받아요.",
+        "게임이 끝나면 EXP를 얻고, 레벨업하면 보상을 받아요! (최고 Lv.100)",
+        "⚔ 2인 대전에서 친구와 실력을 겨뤄 보세요!"
+    ] },
+    { type: "info", title: "튜토리얼 완료!", last: true, lines: [
+        "이제 준비됐어요!",
+        "홈에서 더블 터치 또는 키 입력으로 게임을 시작해 보세요.",
+        "행운을 빌어요!"
+    ] }
+];
+
+let tutorialActive = false;
+let tutorialStep = 0;
+let tutorialMoves = 0;
+let tutorialLocked = false;
+let tutorialNotice = "";
+let tutorialNoticeUntil = 0;
+let tutorialAdvanceTimer = null;
+let tutorialExitConfirming = false;
+let tutorialMapData = null;
+let lastTutorialTapTime = 0;
+let tutorialPointerDown = { x: 0, y: 0 };
+const TUTORIAL_EXIT_BUTTON = { x: 696, y: 6, w: 92, h: 28 };
+const TUTORIAL_NEXT_BUTTON = { x: 300, y: 392, w: 200, h: 46 };
+
+function parseTutorialMap() {
+    if (tutorialMapData) return tutorialMapData;
+    const wallSet = new Set();
+    const dangerSet = new Set();
+    let goalCell = null;
+
+    TUTORIAL_MAP_ROWS.forEach((row, r) => {
+        for (let c = 0; c < COLS; c++) {
+            const ch = row[c];
+            if (ch === "#") wallSet.add(keyOf(c, r));
+            else if (ch === "G") goalCell = { c, r };
+            else if (ch === "X") dangerSet.add(keyOf(c, r));
+        }
+    });
+
+    tutorialMapData = { walls: wallSet, dangers: dangerSet, goal: goalCell };
+    return tutorialMapData;
+}
+
+function setTutorialNotice(text, ms = 2200) {
+    tutorialNotice = text;
+    tutorialNoticeUntil = performance.now() + ms;
+}
+
+function setupTutorialStep(index) {
+    clearTimeout(tutorialAdvanceTimer);
+    tutorialStep = index;
+    tutorialMoves = 0;
+    tutorialLocked = false;
+    tutorialNotice = "";
+    tutorialNoticeUntil = 0;
+
+    const step = TUTORIAL_STEPS[index];
+    const data = parseTutorialMap();
+    stageStart = { c: START.c, r: START.r };
+    movement = null;
+
+    if (step.type === "move") {
+        dangers = new Set();
+        goal = null;
+        resetPlayer();
+    } else if (step.type === "danger") {
+        dangers = new Set(data.dangers);
+        goal = null;
+        resetPlayer();
+    } else if (step.type === "goal" || step.type === "skip") {
+        dangers = new Set(data.dangers);
+        goal = { c: data.goal.c, r: data.goal.r };
+        resetPlayer();
+    }
+}
+
+function startTutorial() {
+    if (!gameAccessGranted || gameState !== "start" || tutorialActive) return;
+
+    const data = parseTutorialMap();
+    tutorialActive = true;
+    clearTimeout(roundTimer);
+    settingsOpen = false;
+    questOpen = false;
+    shopOpen = false;
+    inventoryOpen = false;
+    skinOpen = false;
+
+    const oldWalls = new Set(walls);
+    walls = new Set(data.walls);
+    beginMapTransition(oldWalls, walls);
+    gameState = "tutorial";
+
+    resetRecoil();
+    flash.alpha = 0;
+    trail = [];
+    setMessage("");
+    setupTutorialStep(0);
+    updateStartMenuOverlay();
+    updateUI();
+}
+
+function exitTutorial() {
+    clearTimeout(tutorialAdvanceTimer);
+    tutorialActive = false;
+    tutorialLocked = false;
+    movement = null;
+    trail = [];
+    mapTransition.active = false;
+    dangers = new Set();
+    goal = null;
+    stageStart = { c: START.c, r: START.r };
+    resetPlayer();
+    setMessage("");
+    flash.alpha = 0;
+    resetRecoil();
+    shake.power = 0;
+    shake.time = 0;
+    gameState = "start";
+    updateStartMenuOverlay();
+    updateUI();
+}
+
+function tutorialAdvance() {
+    if (!tutorialActive) return;
+    if (tutorialStep >= TUTORIAL_STEPS.length - 1) {
+        exitTutorial();
+        return;
+    }
+    setupTutorialStep(tutorialStep + 1);
+}
+
+function tutorialComplete(message) {
+    tutorialLocked = true;
+    movement = null;
+    setTutorialNotice(message, 1700);
+    clearTimeout(tutorialAdvanceTimer);
+    tutorialAdvanceTimer = setTimeout(() => {
+        if (tutorialActive) tutorialAdvance();
+    }, 1800);
+}
+
+function tutorialCheckTile() {
+    const step = TUTORIAL_STEPS[tutorialStep];
+    if (!step || tutorialLocked) return;
+
+    if (step.type === "move") {
+        tutorialMoves++;
+        if (tutorialMoves >= step.need) {
+            tutorialComplete("좋아요! 이동을 익혔어요.");
+        } else {
+            setTutorialNotice(`이동 ${tutorialMoves}/${step.need}`, 1500);
+        }
+        return;
+    }
+
+    if (dangers.has(keyOf(player.c, player.r))) {
+        applyImpactRecoil(190, 14, 0.40);
+        flash.color = "#ff3e4d";
+        flash.alpha = 0.32;
+
+        if (step.type === "danger") {
+            tutorialComplete("위험 블록! 실제 게임에서는 목숨이 1개 줄어요.");
+        } else {
+            setTutorialNotice("위험 블록! 처음 위치로 돌아갑니다.", 1800);
+            resetPlayer();
+        }
+        return;
+    }
+
+    if (step.type === "goal" && goal && player.c === goal.c && player.r === goal.r) {
+        playEffectSound("goal");
+        applyImpactRecoil(150, 12, 0.32);
+        flash.color = "#63ff91";
+        flash.alpha = 0.25;
+        tutorialComplete("클리어! 실제 게임에서는 코인 1개를 얻어요.");
+    }
+}
+
+function tutorialSkipAction() {
+    const step = TUTORIAL_STEPS[tutorialStep];
+    if (!tutorialActive || !step || step.type === "info" || tutorialLocked) return;
+
+    if (step.type !== "skip") {
+        setTutorialNotice("맵 넘기기는 뒤에서 해 볼 거예요.", 1600);
+        return;
+    }
+
+    // 실제 맵 생성기를 사용하되, 최근 맵 기록에는 남기지 않습니다.
+    const layoutCount = previousLayouts.length;
+    movement = null;
+    stageStart = { c: START.c, r: START.r };
+    resetPlayer();
+    createMapWithSeed(20260101);
+    previousLayouts.length = layoutCount;
+    gameState = "tutorial";
+
+    applyImpactRecoil(90, 5, 0.18);
+    flash.color = "#b995ff";
+    flash.alpha = 0.12;
+    tutorialComplete("맵이 바뀌었어요! 한 게임에 5번까지 넘길 수 있어요.");
+}
+
+async function requestTutorialExit() {
+    if (tutorialExitConfirming || !tutorialActive) return;
+    tutorialExitConfirming = true;
+    try {
+        const ok = await openLogoutConfirm({
+            title: "튜토리얼 종료",
+            message: "튜토리얼을 종료하고 홈으로 돌아갈까요?",
+            confirmLabel: "종료"
+        });
+        if (ok && tutorialActive) exitTutorial();
+    } finally {
+        tutorialExitConfirming = false;
+    }
+}
+
+function handleTutorialTap(x, y) {
+    if (!tutorialActive || gameState !== "tutorial") return false;
+
+    if (isInsideRect(x, y, TUTORIAL_EXIT_BUTTON)) {
+        playUIClickSound();
+        requestTutorialExit();
+        return true;
+    }
+
+    const step = TUTORIAL_STEPS[tutorialStep];
+    if (step && step.type === "info" && isInsideRect(x, y, TUTORIAL_NEXT_BUTTON)) {
+        playUIClickSound();
+        tutorialAdvance();
+        return true;
+    }
+
+    return false;
+}
+
+function drawTutorialOverlay() {
+    const step = TUTORIAL_STEPS[tutorialStep];
+    if (!step) return;
+
+    const now = performance.now();
+    const isInfo = step.type === "info";
+
+    ctx.save();
+    ctx.textBaseline = "middle";
+
+    if (isInfo) {
+        ctx.fillStyle = "rgba(0,0,0,0.76)";
+        ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+        const card = { x: 90, y: 90, w: 620, h: 380 };
+        ctx.fillStyle = "#171c25";
+        ctx.strokeStyle = "#394352";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.roundRect(card.x, card.y, card.w, card.h, 20);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.textAlign = "center";
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 28px Pretendard, Noto Sans KR, sans-serif";
+        ctx.fillText(step.title, WIDTH / 2, 145);
+
+        ctx.fillStyle = "#c5ced8";
+        ctx.font = "17px Pretendard, Noto Sans KR, sans-serif";
+        step.lines.forEach((line, i) => {
+            ctx.fillText(line, WIDTH / 2, 208 + i * 33);
+        });
+
+        drawSettingsButton(
+            TUTORIAL_NEXT_BUTTON.x, TUTORIAL_NEXT_BUTTON.y,
+            TUTORIAL_NEXT_BUTTON.w, TUTORIAL_NEXT_BUTTON.h,
+            step.last ? "홈으로" : "다음 ▶"
+        );
+    }
+
+    // 상단 바 (맵의 바깥 벽 줄 위에 표시)
+    ctx.fillStyle = "rgba(9,12,17,0.94)";
+    ctx.fillRect(0, 0, WIDTH, 40);
+    ctx.textAlign = "left";
+    ctx.fillStyle = "#7ddcff";
+    ctx.font = "700 15px Pretendard, Noto Sans KR, sans-serif";
+    ctx.fillText(`📖 튜토리얼 ${tutorialStep + 1}/${TUTORIAL_STEPS.length} · ${step.title}`, 14, 20);
+    drawSettingsButton(
+        TUTORIAL_EXIT_BUTTON.x, TUTORIAL_EXIT_BUTTON.y,
+        TUTORIAL_EXIT_BUTTON.w, TUTORIAL_EXIT_BUTTON.h, "종료"
+    );
+
+    // 하단 안내 (맵의 바깥 벽 줄 위에 표시)
+    if (!isInfo) {
+        const showingNotice = now < tutorialNoticeUntil && tutorialNotice;
+        ctx.fillStyle = "rgba(9,12,17,0.94)";
+        ctx.fillRect(0, HEIGHT - 40, WIDTH, 40);
+        ctx.textAlign = "center";
+        ctx.fillStyle = showingNotice ? "#9dffb4" : "#f3f5f7";
+        ctx.font = "600 15px Pretendard, Noto Sans KR, sans-serif";
+        ctx.fillText(showingNotice ? tutorialNotice : step.text, WIDTH / 2, HEIGHT - 20);
+    }
+
+    ctx.restore();
+}
+
+document.getElementById("startTutorialButton")?.addEventListener("click", async event => {
+    event.preventDefault();
+    event.stopPropagation();
+    playUIClickSound();
+    const ok = await openLogoutConfirm({
+        title: "튜토리얼",
+        message: "튜토리얼을 시작하시겠습니까?\n(코인 · 점수 · 랭킹에 영향을 주지 않습니다)",
+        confirmLabel: "시작",
+        danger: false
+    });
+    if (ok && gameState === "start") startTutorial();
+});
+
+canvas.addEventListener("pointerdown", event => {
+    tutorialPointerDown = { x: event.clientX, y: event.clientY };
+}, { passive: true });
+
+canvas.addEventListener("pointerup", event => {
+    if (gameState !== "tutorial") return;
+    if (Math.hypot(event.clientX - tutorialPointerDown.x, event.clientY - tutorialPointerDown.y) > 12) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = (event.clientX - rect.left) * (WIDTH / rect.width);
+    const y = (event.clientY - rect.top) * (HEIGHT / rect.height);
+    if (handleTutorialTap(x, y)) lastTutorialTapTime = performance.now();
+});
+
+gameWrapper.addEventListener("touchend", event => {
+    if (gameState !== "tutorial" || event.changedTouches.length !== 1) return;
+
+    const touch = event.changedTouches[0];
+    const dx = touch.clientX - touchStartX;
+    const dy = touch.clientY - touchStartY;
+    const distance = Math.hypot(dx, dy);
+    const duration = performance.now() - touchStartTime;
+
+    if (distance < SWIPE_MIN_DISTANCE) {
+        if (duration > TAP_MAX_DURATION) return;
+        if (performance.now() - lastTutorialTapTime < 450) return;
+        const rect = canvas.getBoundingClientRect();
+        const x = (touch.clientX - rect.left) * (WIDTH / rect.width);
+        const y = (touch.clientY - rect.top) * (HEIGHT / rect.height);
+        if (handleTutorialTap(x, y)) lastTutorialTapTime = performance.now();
+        return;
+    }
+
+    if (Math.abs(dx) > Math.abs(dy)) startMove(dx > 0 ? 1 : -1, 0);
+    else startMove(0, dy > 0 ? 1 : -1);
+}, { passive: true });
+
+window.addEventListener("keydown", event => {
+    if (!gameAccessGranted || gameState !== "tutorial" || event.repeat) return;
+    const key = event.key.toLowerCase();
+    const step = TUTORIAL_STEPS[tutorialStep];
+
+    if (key === "escape") {
+        requestTutorialExit();
+        return;
+    }
+    if (step && step.type === "info" && (key === "enter" || event.code === "Space")) {
+        event.preventDefault();
+        tutorialAdvance();
+    }
+});
+
 let volumeSliderDragging = false;
 
 let lastSettingsPointerTime = 0;
@@ -8277,6 +8885,7 @@ canvas.addEventListener(
 
 let gameplayUIAccumulator = 0;
 function update(delta) {
+    if (gameState === "tutorial") updateMovement(delta);
     refreshDailyQuestIfNeeded();
 
     if (multiplayerMatchActive) {
@@ -12825,7 +13434,8 @@ function draw(now = performance.now()) {
     }
 
     drawGame();
-    drawEnergyRecoveryChoice();
+    if (gameState === "tutorial") drawTutorialOverlay();
+    else drawEnergyRecoveryChoice();
 }
 
 
