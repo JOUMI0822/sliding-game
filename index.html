@@ -963,6 +963,50 @@ canvas {
 }
 .reward-list-row.start .reward-list-level { color: #9eabb9; }
 .reward-list-row.start .reward-list-items { color: #9eabb9; font-weight: 500; }
+
+/* ---------- 프로필 창: 탭 / 내 정보 / 닉네임 변경 ---------- */
+.profile-tabs { display:flex; gap:8px; margin-bottom:12px; }
+.profile-tab {
+    flex:1; height:38px; border:1px solid #46515f; border-radius:9px;
+    background:#10151c; color:#aeb8c5;
+    font:700 13px Pretendard, "Noto Sans KR", Arial, sans-serif;
+    cursor:pointer; touch-action:manipulation;
+}
+.profile-tab.active { border-color:rgba(99,184,255,0.75); background:rgba(99,184,255,0.16); color:#eaf6ff; }
+.profile-section-title { margin:2px 2px 8px; color:#ffd76a; font-size:13px; font-weight:800; }
+.profile-stat-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:16px; }
+.profile-stat {
+    display:flex; flex-direction:column; gap:4px; padding:10px 12px;
+    border:1px solid rgba(255,255,255,0.12); border-radius:10px; background:rgba(255,255,255,0.045);
+}
+.profile-stat span { color:#9eabb9; font-size:11px; }
+.profile-stat b { color:#f1f4f7; font-size:17px; }
+.profile-stat.wide { grid-column:1 / -1; }
+.profile-stat.win b { color:#7dff9d; }
+.profile-stat.loss b { color:#ff8f9b; }
+.profile-stat.rate b { color:#7ddcff; }
+.profile-nick-box {
+    display:grid; gap:8px; padding:12px;
+    border:1px solid rgba(255,255,255,0.12); border-radius:10px; background:rgba(255,255,255,0.045);
+}
+.profile-nick-current { color:#c5ced8; font-size:13px; }
+.profile-nick-current b { color:#fff; }
+.profile-nick-box input {
+    width:100%; height:42px; border:1px solid #46515f; border-radius:9px;
+    background:#10151c; color:#f3f5f7; padding:0 12px;
+    font:500 14px Pretendard, "Noto Sans KR", Arial, sans-serif; outline:none;
+}
+.profile-nick-box input:focus { border-color:#63b8ff; }
+.profile-nick-box input:disabled { opacity:0.5; }
+.profile-nick-box button {
+    height:42px; border:1px solid rgba(99,184,255,0.75); border-radius:9px;
+    background:#236ea8; color:#fff; font:700 14px Pretendard, "Noto Sans KR", Arial, sans-serif;
+    cursor:pointer; touch-action:manipulation;
+}
+.profile-nick-box button:disabled { opacity:0.45; cursor:default; }
+.profile-nick-note { min-height:18px; color:#9eabb9; font-size:12px; line-height:1.5; text-align:center; }
+.profile-nick-note.error { color:#ff8f9b; }
+.profile-nick-note.success { color:#7dff9d; }
 </style>
 </head>
 
@@ -983,7 +1027,11 @@ canvas {
 
 <div id="rewardListOverlay" aria-hidden="true">
     <div id="rewardListDialog" role="dialog" aria-modal="true" aria-labelledby="rewardListTitle">
-        <h2 id="rewardListTitle">🎁 레벨 보상표</h2>
+        <h2 id="rewardListTitle">👤 프로필</h2>
+        <div class="profile-tabs">
+            <button id="profileTabStats" class="profile-tab active" type="button">📊 내 정보</button>
+            <button id="profileTabRewards" class="profile-tab" type="button">🎁 레벨 보상표</button>
+        </div>
         <p id="rewardListSubtitle"></p>
         <div id="rewardListBody"></div>
         <button id="rewardListCloseButton" type="button">닫기</button>
@@ -1601,6 +1649,31 @@ async function submitV28Score() {
     }
 }
 
+/* 프로필 통계: 게임 1회가 끝날 때 한 번만 서버에 기록 */
+let playStatsSentFor = null;
+
+function getMultiplayerOutcome() {
+    if (multiplayerResult === multiplayerRole) return "win";
+    if (multiplayerResult === "draw" || !multiplayerResult) return "draw";
+    return "loss";
+}
+
+async function submitPlayStats(mode, result = null) {
+    if (!currentAccount || guestMode || !gameAccessGranted) return;
+    if (!runStartTime || playStatsSentFor === runStartTime) return;   // 같은 판 중복 방지
+    playStatsSentFor = runStartTime;
+
+    const seconds = Math.max(0, Math.min(21600, Math.round((Date.now() - runStartTime.getTime()) / 1000)));
+    try {
+        await apiJSON("/api/profile/record", {
+            method: "POST",
+            body: JSON.stringify({ mode, result, seconds })
+        });
+    } catch (error) {
+        console.warn("플레이 기록 저장 실패", error);
+    }
+}
+
 let rankingBodyOverflowBackup = null;
 
 function lockPageForRanking() {
@@ -2022,6 +2095,7 @@ function connectMultiplayerSocket(onConnected) {
             gameState === "multiplayerWaitingRound") {
             multiplayerMatchActive = false;
             multiplayerResult = "draw";                 // EXP 0, 결과 화면에서 나갈 수 있음
+            void submitPlayStats("multiplayer", "draw");
             gameState = "multiplayerResult";
             multiplayerOpen = false;
             movement = null;
@@ -2168,6 +2242,7 @@ function handleMultiplayerMessage(data) {
         pendingExpReason = multiplayerResult === multiplayerRole ? "multiplayer_win" : "multiplayer_loss";
         // 경기 종료 시에도 최종 기록을 한 번 더 저장합니다. (저장 실패/마지막 라운드 보완)
         void submitV28Score();
+        void submitPlayStats("multiplayer", getMultiplayerOutcome());
         setMessage(
             multiplayerResult === multiplayerRole ? "승리했습니다!" :
             multiplayerResult === "draw" ? "무승부입니다." : "패배했습니다."
@@ -2374,6 +2449,7 @@ function handleMultiplayerMessage(data) {
         // 기존에는 라운드 클리어 때만 저장되어, 목숨 소진으로 경기가 끝나면
         // 마지막 기록/랭킹 갱신 요청이 누락될 수 있었습니다.
         void submitV28Score();
+        void submitPlayStats("multiplayer", getMultiplayerOutcome());
         setMessage(
             multiplayerResult === multiplayerRole ? "승리했습니다!" :
             multiplayerResult === "draw" ? "무승부입니다." : "패배했습니다."
@@ -7727,6 +7803,7 @@ function finishGameOver() {
 
     saveRecentRecord();
     submitV28Score();
+    submitPlayStats("solo");
     pendingExpAward = calculateSoloExperience();
     pendingExpReason = "solo";
 
@@ -8663,33 +8740,194 @@ function renderRewardList(data) {
     requestAnimationFrame(layoutGauge);   // 폰트 로드 등으로 높이가 바뀌는 경우 한 번 더 맞춤
 }
 
+const NICKNAME_CHANGE_COST = 100;
+let profileTab = "stats";
+let rewardListData = null, rewardListError = "";
+let profileStatsData = null, profileStatsError = "";
+let profileLoading = false;
+let nicknameChanging = false;
+let nicknameNotice = null;   // { text, type }
+
+function formatPlayTime(totalSeconds) {
+    const sec = Math.max(0, Math.floor(Number(totalSeconds) || 0));
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = sec % 60;
+    if (h > 0) return `${h}시간 ${m}분`;
+    if (m > 0) return `${m}분 ${s}초`;
+    return `${s}초`;
+}
+
+function formatRemainKo(ms) {
+    const total = Math.max(1, Math.ceil(ms / 60000));
+    const h = Math.floor(total / 60);
+    const m = total % 60;
+    return h > 0 ? `${h}시간 ${m}분` : `${m}분`;
+}
+
+function renderProfileStats() {
+    const body = document.getElementById("rewardListBody");
+    const subtitle = document.getElementById("rewardListSubtitle");
+    if (!body) return;
+    if (subtitle) subtitle.textContent = "내 활동 기록";
+
+    if (profileLoading) {
+        body.innerHTML = `<div class="reward-list-message">불러오는 중...</div>`;
+        return;
+    }
+    const d = profileStatsData;
+    if (!d) {
+        body.innerHTML = `<div class="reward-list-message">${escapeHTML(profileStatsError || "내 정보를 불러오지 못했습니다.")}</div>`;
+        return;
+    }
+
+    const rate = d.winRate == null ? "-" : `${d.winRate}%`;
+    const nextMs = d.nextNicknameChangeAt ? new Date(d.nextNicknameChangeAt).getTime() - Date.now() : 0;
+    const cooling = nextMs > 0;
+
+    let note = nicknameNotice;
+    if (!note) {
+        note = cooling
+            ? { text: `다음 변경까지 ${formatRemainKo(nextMs)} 남았어요.`, type: "" }
+            : { text: `변경 후 24시간 동안은 다시 바꿀 수 없어요. · 보유 🪙 ${coins}`, type: "" };
+    }
+
+    body.innerHTML = `
+        <div class="profile-section-title">📊 플레이 기록</div>
+        <div class="profile-stat-grid">
+            <div class="profile-stat"><span>게임 도전 횟수</span><b>${d.playCount.toLocaleString("ko-KR")}회</b></div>
+            <div class="profile-stat"><span>총 플레이 시간</span><b>${escapeHTML(formatPlayTime(d.playSeconds))}</b></div>
+            <div class="profile-stat win"><span>2인 대전 승리</span><b>${d.mpWins.toLocaleString("ko-KR")}승</b></div>
+            <div class="profile-stat loss"><span>2인 대전 패배</span><b>${d.mpLosses.toLocaleString("ko-KR")}패</b></div>
+            <div class="profile-stat rate wide"><span>2인 대전 승률</span><b>${rate}</b></div>
+        </div>
+        <div class="profile-section-title">✏️ 닉네임 변경</div>
+        <div class="profile-nick-box">
+            <div class="profile-nick-current">현재 닉네임 <b>${escapeHTML(d.nickname)}</b></div>
+            <input id="profileNicknameInput" type="text" maxlength="16" placeholder="새 닉네임 (2~16자)" autocomplete="off" ${cooling ? "disabled" : ""}>
+            <button id="profileNicknameButton" type="button" ${cooling ? "disabled" : ""}>🪙 ${NICKNAME_CHANGE_COST} 코인으로 변경</button>
+            <div class="profile-nick-note ${note.type || ""}">${escapeHTML(note.text)}</div>
+        </div>`;
+
+    document.getElementById("profileNicknameButton")?.addEventListener("click", changeNickname);
+    document.getElementById("profileNicknameInput")?.addEventListener("keydown", event => {
+        if (event.key === "Enter") { event.preventDefault(); changeNickname(); }
+    });
+}
+
+async function changeNickname() {
+    if (nicknameChanging || !profileStatsData) return;
+
+    const input = document.getElementById("profileNicknameInput");
+    const nickname = (input?.value || "").trim();
+    const fail = text => {
+        nicknameNotice = { text, type: "error" };
+        playUIInvalidSound();
+        renderProfileStats();
+    };
+
+    if (nickname.length < 2 || nickname.length > 16) return fail("닉네임은 2~16자로 입력해주세요.");
+    if (nickname === profileStatsData.nickname) return fail("현재 닉네임과 같습니다.");
+    if (coins < NICKNAME_CHANGE_COST) return fail(`코인이 부족합니다. (필요 ${NICKNAME_CHANGE_COST} / 보유 ${coins})`);
+
+    if (!window.confirm(`🪙 ${NICKNAME_CHANGE_COST}코인을 사용해 닉네임을 "${nickname}"(으)로 변경할까요?\n변경 후 24시간 동안은 다시 바꿀 수 없습니다.`)) return;
+
+    nicknameChanging = true;
+    const button = document.getElementById("profileNicknameButton");
+    if (button) button.disabled = true;
+
+    try {
+        const data = await apiJSON("/api/profile/nickname", {
+            method: "POST",
+            body: JSON.stringify({ nickname })
+        });
+
+        // 서버에서 변경이 확정된 뒤에만 코인을 차감합니다.
+        coins = Math.max(0, coins - NICKNAME_CHANGE_COST);
+        saveCoins();
+
+        profileStatsData.nickname = data.nickname;
+        profileStatsData.nicknameChangedAt = data.nicknameChangedAt;
+        profileStatsData.nextNicknameChangeAt = data.nextNicknameChangeAt;
+        if (currentAccount) currentAccount.nickname = data.nickname;
+
+        nicknameNotice = { text: `닉네임이 "${data.nickname}"(으)로 변경되었습니다!`, type: "success" };
+        updateStartMenuOverlay();
+        updateUI();
+        if (profileTab === "stats" && rewardListOpen) renderProfileStats();
+    } catch (error) {
+        nicknameNotice = { text: error?.message || "닉네임을 변경하지 못했습니다.", type: "error" };
+        if (rewardListOpen) renderProfileStats();
+    } finally {
+        nicknameChanging = false;
+    }
+}
+
+function renderProfileTab() {
+    document.getElementById("profileTabStats")?.classList.toggle("active", profileTab === "stats");
+    document.getElementById("profileTabRewards")?.classList.toggle("active", profileTab === "rewards");
+
+    if (profileTab === "stats") {
+        renderProfileStats();
+        return;
+    }
+
+    const body = document.getElementById("rewardListBody");
+    const subtitle = document.getElementById("rewardListSubtitle");
+    if (profileLoading) {
+        if (subtitle) subtitle.textContent = "";
+        if (body) body.innerHTML = `<div class="reward-list-message">불러오는 중...</div>`;
+    } else if (rewardListData) {
+        renderRewardList(rewardListData);
+    } else {
+        if (subtitle) subtitle.textContent = "";
+        if (body) body.innerHTML = `<div class="reward-list-message">${escapeHTML(rewardListError || "레벨 보상표를 불러오지 못했습니다.")}</div>`;
+    }
+}
+
+function setProfileTab(tab) {
+    profileTab = tab === "rewards" ? "rewards" : "stats";
+    if (rewardListOpen) renderProfileTab();
+}
+
 async function openRewardList() {
     if (!currentAccount || guestMode) {
-        window.alert("게스트 모드에서는 레벨 보상표를 볼 수 없습니다. 회원으로 로그인해 주세요.");
+        window.alert("게스트 모드에서는 프로필을 볼 수 없습니다. 회원으로 로그인해 주세요.");
         return;
     }
     if (rewardListOpen) return;
 
     const overlay = document.getElementById("rewardListOverlay");
-    const body = document.getElementById("rewardListBody");
-    const subtitle = document.getElementById("rewardListSubtitle");
-    if (!overlay || !body) return;
+    if (!overlay) return;
 
     rewardListOpen = true;
-    if (subtitle) subtitle.textContent = "";
-    body.innerHTML = `<div class="reward-list-message">불러오는 중...</div>`;
+    profileLoading = true;
+    profileTab = "stats";
+    nicknameNotice = null;
+    rewardListData = null; rewardListError = "";
+    profileStatsData = null; profileStatsError = "";
+
     overlay.classList.add("visible");
     overlay.setAttribute("aria-hidden", "false");
+    renderProfileTab();
 
-    try {
-        const data = await apiJSON("/api/progress/rewards");
-        if (!rewardListOpen) return;   // 불러오는 사이에 닫은 경우
-        renderRewardList(data);
-    } catch (error) {
-        if (!rewardListOpen) return;
-        body.innerHTML = `<div class="reward-list-message">${escapeHTML(error?.message || "레벨 보상표를 불러오지 못했습니다.")}</div>`;
-    }
+    const [statsResult, rewardsResult] = await Promise.allSettled([
+        apiJSON("/api/profile/stats"),
+        apiJSON("/api/progress/rewards")
+    ]);
+    if (!rewardListOpen) return;   // 불러오는 사이에 닫은 경우
+
+    if (statsResult.status === "fulfilled") profileStatsData = statsResult.value;
+    else profileStatsError = statsResult.reason?.message || "";
+    if (rewardsResult.status === "fulfilled") rewardListData = rewardsResult.value;
+    else rewardListError = rewardsResult.reason?.message || "";
+
+    profileLoading = false;
+    renderProfileTab();
 }
+
+document.getElementById("profileTabStats")?.addEventListener("click", () => { playUIClickSound(); setProfileTab("stats"); });
+document.getElementById("profileTabRewards")?.addEventListener("click", () => { playUIClickSound(); setProfileTab("rewards"); });
 
 function closeRewardList() {
     const overlay = document.getElementById("rewardListOverlay");
