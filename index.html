@@ -911,6 +911,58 @@ canvas {
     cursor: pointer;
     touch-action: manipulation;
 }
+
+/* ---------- 레벨 보상표: 아래→위 상승 + 세로 레벨 게이지 ---------- */
+#rewardListBody { display: block; }
+.reward-track {
+    position: relative;
+    display: grid;
+    gap: 6px;
+    align-content: start;
+    padding-left: 38px;
+}
+.reward-gauge {
+    position: absolute;
+    left: 11px;
+    width: 10px;
+    border-radius: 6px;
+    background: rgba(255,255,255,0.12);
+    overflow: hidden;
+}
+.reward-gauge-fill {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-radius: 6px;
+    background: linear-gradient(0deg, #3b8fd9, #7ddcff);
+    transition: height .5s ease;
+}
+.reward-tick {
+    position: absolute;
+    left: 7px;
+    width: 18px;
+    height: 2px;
+    border-radius: 1px;
+    background: rgba(255,255,255,0.28);
+    transform: translateY(-1px);
+}
+.reward-tick.reached { background: #bfeeff; }
+.reward-tick.big { left: 4px; width: 24px; height: 3px; transform: translateY(-1.5px); }
+.reward-now {
+    position: absolute;
+    left: 6px;
+    width: 20px;
+    height: 20px;
+    margin-top: -10px;
+    border-radius: 50%;
+    background: #ffd76a;
+    box-shadow: 0 0 10px rgba(255,215,106,0.85);
+    border: 2px solid #171c25;
+    z-index: 2;
+}
+.reward-list-row.start .reward-list-level { color: #9eabb9; }
+.reward-list-row.start .reward-list-items { color: #9eabb9; font-weight: 500; }
 </style>
 </head>
 
@@ -8505,13 +8557,17 @@ function renderRewardList(data) {
     if (!body) return;
 
     const level = Math.max(1, Number(data?.level) || playerLevel || 1);
-    const rewards = Array.isArray(data?.rewards) ? data.rewards : [];
     const maxLevel = Number(data?.maxLevel) || MAX_LEVEL;
+    const rewards = Array.isArray(data?.rewards) ? data.rewards : [];
+
+    const need = level >= maxLevel ? 0 : (Number(data?.requiredExp) || getLevelRequiredExp(level));
+    const exp = level >= maxLevel ? 0 : Math.max(0, Math.min(need, Number(data?.exp ?? playerExp) || 0));
+    const frac = level >= maxLevel || need <= 0 ? 1 : Math.max(0, Math.min(1, exp / need));
 
     if (subtitle) {
         subtitle.textContent = level >= maxLevel
             ? "최고 레벨에 도달했습니다! 🏆"
-            : `현재 Lv.${level} · 다음 보상은 Lv.${level + 1}에서 받아요`;
+            : `Lv.${level} → Lv.${level + 1} · EXP ${formatExp(exp)} / ${formatExp(need)} (${Math.floor(frac * 100)}%)`;
     }
 
     if (!rewards.length) {
@@ -8519,33 +8575,92 @@ function renderRewardList(data) {
         return;
     }
 
-    body.innerHTML = rewards.map(entry => {
+    // 아래(Lv.1)에서 위(Lv.100)로 올라가도록 높은 레벨을 위쪽에 둡니다.
+    const entries = [{ level: 1, start: true }, ...rewards].sort((a, b) => b.level - a.level);
+
+    const rowsHTML = entries.map(entry => {
         const lv = Number(entry.level) || 0;
-        const coinsAmount = Math.max(0, Math.floor(Number(entry.coins) || 0));
-
-        const parts = [];
-        if (coinsAmount > 0) parts.push(`<span>🪙 +${coinsAmount.toLocaleString("ko-KR")}</span>`);
-        Object.keys(ITEM_DATA).forEach(type => {
-            const amount = Math.max(0, Math.floor(Number((entry.items || {})[type]) || 0));
-            if (amount > 0) parts.push(`<span>${ITEM_DATA[type].icon} ${escapeHTML(ITEM_DATA[type].name)} ×${amount}</span>`);
-        });
-        if (entry.special) parts.unshift(`<span>🏆 최고 레벨 보상</span>`);
-
         let cls = "reward-list-row";
         let state = "";
-        if (lv < level) { cls += " done"; state = "달성 ✓"; }
-        else if (lv === level) { cls += " done current"; state = "현재 레벨"; }
-        else if (lv === level + 1) { cls += " next"; state = "다음 보상"; }
-        if (entry.special) cls += " special";
+        let inner = "";
 
-        return `<div class="${cls}" data-level="${lv}"><span class="reward-list-level">Lv.${lv}</span><span class="reward-list-items">${parts.join("")}</span><span class="reward-list-state">${state}</span></div>`;
+        if (entry.start) {
+            cls += " start done";
+            state = lv === level ? "현재 레벨" : "시작";
+            inner = `<span>여기서 시작해요</span>`;
+        } else {
+            const coinsAmount = Math.max(0, Math.floor(Number(entry.coins) || 0));
+            const parts = [];
+            if (coinsAmount > 0) parts.push(`<span>🪙 +${coinsAmount.toLocaleString("ko-KR")}</span>`);
+            Object.keys(ITEM_DATA).forEach(type => {
+                const amount = Math.max(0, Math.floor(Number((entry.items || {})[type]) || 0));
+                if (amount > 0) parts.push(`<span>${ITEM_DATA[type].icon} ${escapeHTML(ITEM_DATA[type].name)} ×${amount}</span>`);
+            });
+            if (entry.special) { parts.unshift(`<span>🏆 최고 레벨 보상</span>`); cls += " special"; }
+            inner = parts.join("");
+
+            if (lv < level) { cls += " done"; state = "달성 ✓"; }
+            else if (lv === level) { cls += " done current"; state = "현재 레벨"; }
+            else if (lv === level + 1) { cls += " next"; state = "다음 보상"; }
+        }
+        if (entry.start && lv === level) cls += " current";
+
+        return `<div class="${cls}" data-level="${lv}"><span class="reward-list-level">Lv.${lv}</span><span class="reward-list-items">${inner}</span><span class="reward-list-state">${state}</span></div>`;
     }).join("");
 
-    // 다음에 받을 보상(현재 레벨 바로 위)이 중앙에 오도록 스크롤합니다.
-    const target = body.querySelector(".next") || body.querySelector(".current") || body.lastElementChild;
-    if (target) {
-        body.scrollTop = Math.max(0, target.offsetTop - body.clientHeight / 2 + target.offsetHeight / 2);
-    }
+    body.innerHTML = `<div class="reward-track" id="rewardTrack">${rowsHTML}</div>`;
+
+    const track = document.getElementById("rewardTrack");
+    const layoutGauge = () => {
+        const rows = Array.from(track.querySelectorAll(".reward-list-row"));
+        if (rows.length < 2) return;
+
+        const centerOf = row => row.offsetTop + row.offsetHeight / 2;
+        const centers = new Map(rows.map(row => [Number(row.dataset.level), centerOf(row)]));
+        const yTop = centers.get(entries[0].level);                 // 가장 높은 레벨(위쪽)
+        const yBottom = centers.get(1);                             // Lv.1(아래쪽)
+
+        track.querySelectorAll(".reward-gauge,.reward-tick,.reward-now").forEach(el => el.remove());
+
+        const gauge = document.createElement("div");
+        gauge.className = "reward-gauge";
+        gauge.style.top = `${yTop}px`;
+        gauge.style.height = `${yBottom - yTop}px`;
+
+        // 현재 레벨 위치에서 다음 레벨 위치까지 EXP 비율만큼 채웁니다.
+        const yCurrent = centers.get(level);
+        const yNext = centers.has(level + 1) ? centers.get(level + 1) : yCurrent;
+        const yFill = yCurrent - (yCurrent - yNext) * frac;
+
+        const fill = document.createElement("div");
+        fill.className = "reward-gauge-fill";
+        fill.style.height = `${Math.max(0, yBottom - yFill)}px`;
+        gauge.appendChild(fill);
+        track.appendChild(gauge);
+
+        // 레벨 선: 모든 레벨 위치에 눈금, 5레벨마다 굵은 눈금
+        centers.forEach((y, lv) => {
+            const tick = document.createElement("div");
+            tick.className = "reward-tick" + (lv <= level ? " reached" : "") + (lv % 5 === 0 ? " big" : "");
+            tick.style.top = `${y}px`;
+            track.appendChild(tick);
+        });
+
+        // 현재 EXP 위치 표시
+        const now = document.createElement("div");
+        now.className = "reward-now";
+        now.style.top = `${yFill}px`;
+        track.appendChild(now);
+
+        // 다음 레벨(진행 중인 구간)이 화면 중앙에 오도록 스크롤
+        const focus = track.querySelector(`.reward-list-row[data-level="${level >= maxLevel ? level : level + 1}"]`);
+        if (focus) {
+            body.scrollTop = Math.max(0, focus.offsetTop - body.clientHeight / 2 + focus.offsetHeight / 2);
+        }
+    };
+
+    layoutGauge();
+    requestAnimationFrame(layoutGauge);   // 폰트 로드 등으로 높이가 바뀌는 경우 한 번 더 맞춤
 }
 
 async function openRewardList() {
@@ -13958,3 +14073,4 @@ requestAnimationFrame(
 
 </body>
     </html>
+    
