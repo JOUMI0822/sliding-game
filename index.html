@@ -826,6 +826,91 @@ canvas {
     cursor: pointer;
     touch-action: manipulation;
 }
+
+/* ---------- 프로필 박스 클릭 가능 + 레벨 보상표 ---------- */
+.start-menu-account {
+    pointer-events: auto;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+}
+.start-menu-account:active { background: rgba(30,40,55,0.85); }
+.start-account-chevron { flex:0 0 auto; margin-left:auto; color:#7f8b99; font-size:13px; line-height:1; }
+
+#rewardListOverlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(0,0,0,0.68);
+    touch-action: none;
+}
+#rewardListOverlay.visible { display: flex; }
+
+#rewardListDialog {
+    width: min(420px, calc(100vw - 32px));
+    max-height: 86vh;
+    display: flex;
+    flex-direction: column;
+    padding: 20px 18px 16px;
+    border: 1px solid #4b596b;
+    border-radius: 18px;
+    background: #171c25;
+    box-shadow: 0 18px 50px rgba(0,0,0,0.5);
+}
+#rewardListTitle { margin: 0 0 4px; color: #ffd76a; font-size: 21px; font-weight: 800; text-align: center; }
+#rewardListSubtitle { margin: 0 0 12px; color: #aeb8c5; font-size: 13px; text-align: center; line-height: 1.5; }
+
+#rewardListBody {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 120px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
+    display: grid;
+    gap: 6px;
+    align-content: start;
+    margin-bottom: 14px;
+    padding-right: 2px;
+}
+.reward-list-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 10px;
+    background: rgba(255,255,255,0.045);
+    color: #f1f4f7;
+    font-size: 14px;
+}
+.reward-list-level { flex: 0 0 62px; font-weight: 800; color: #7ddcff; }
+.reward-list-items { flex: 1 1 auto; display: flex; flex-wrap: wrap; gap: 4px 10px; font-weight: 600; }
+.reward-list-state { flex: 0 0 auto; font-size: 11px; color: #7f8b99; }
+.reward-list-row.done { opacity: 0.42; }
+.reward-list-row.done .reward-list-state { color: #7dff9d; }
+.reward-list-row.current { border-color: rgba(99,184,255,0.85); background: rgba(99,184,255,0.14); }
+.reward-list-row.next { border-color: rgba(255,215,106,0.65); background: rgba(255,215,106,0.08); }
+.reward-list-row.next .reward-list-state { color: #ffd76a; }
+.reward-list-row.special .reward-list-level { color: #ffd76a; }
+.reward-list-message { padding: 24px 8px; text-align: center; color: #aeb8c5; font-size: 14px; }
+
+#rewardListCloseButton {
+    width: 100%;
+    min-height: 44px;
+    border: 1px solid rgba(99,184,255,0.75);
+    border-radius: 10px;
+    background: #236ea8;
+    color: #fff;
+    font: 700 15px Pretendard, Noto Sans KR, sans-serif;
+    cursor: pointer;
+    touch-action: manipulation;
+}
 </style>
 </head>
 
@@ -841,6 +926,15 @@ canvas {
             <button id="logoutCancelButton" type="button">취소</button>
             <button id="logoutConfirmButton" type="button">로그아웃</button>
         </div>
+    </div>
+</div>
+
+<div id="rewardListOverlay" aria-hidden="true">
+    <div id="rewardListDialog" role="dialog" aria-modal="true" aria-labelledby="rewardListTitle">
+        <h2 id="rewardListTitle">🎁 레벨 보상표</h2>
+        <p id="rewardListSubtitle"></p>
+        <div id="rewardListBody"></div>
+        <button id="rewardListCloseButton" type="button">닫기</button>
     </div>
 </div>
 
@@ -1183,12 +1277,17 @@ function updateStartMenuOverlay() {
     overlay.classList.toggle("visible", visible);
     overlay.setAttribute("aria-hidden", visible ? "false" : "true");
 
+    let accountHTML;
     if (currentAccount) {
         const need=getLevelRequiredExp(playerLevel);
         const ratio=playerLevel>=MAX_LEVEL?1:Math.max(0,Math.min(1,playerExp/need));
-        accountLabel.innerHTML=`<div class="start-account-main"><span class="start-account-level">Lv. ${playerLevel}</span><span class="start-account-name">👤 ${escapeHTML(currentAccount.nickname || currentAccount.id || "회원")}</span></div><div class="start-account-exp"><div class="start-account-exp-fill" style="width:${ratio*100}%"></div></div><div class="start-account-exp-text">${playerLevel>=MAX_LEVEL?"MAX LEVEL":`EXP ${formatExp(playerExp)} / ${formatExp(need)}`}</div>`;
+        accountHTML=`<div class="start-account-main"><span class="start-account-level">Lv. ${playerLevel}</span><span class="start-account-name">👤 ${escapeHTML(currentAccount.nickname || currentAccount.id || "회원")}</span><span class="start-account-chevron">›</span></div><div class="start-account-exp"><div class="start-account-exp-fill" style="width:${ratio*100}%"></div></div><div class="start-account-exp-text">${playerLevel>=MAX_LEVEL?"MAX LEVEL":`EXP ${formatExp(playerExp)} / ${formatExp(need)}`}</div>`;
     } else {
-        accountLabel.innerHTML=`<div class="start-account-main"><span class="start-account-level">Lv. -</span><span class="start-account-name">👤 게스트 모드</span></div><div class="start-account-exp"><div class="start-account-exp-fill" style="width:0%"></div></div><div class="start-account-exp-text">EXP · 랭킹/레벨 저장 제외</div>`;
+        accountHTML=`<div class="start-account-main"><span class="start-account-level">Lv. -</span><span class="start-account-name">👤 게스트 모드</span></div><div class="start-account-exp"><div class="start-account-exp-fill" style="width:0%"></div></div><div class="start-account-exp-text">EXP · 랭킹/레벨 저장 제외</div>`;
+    }
+    if (accountLabel.dataset.html !== accountHTML) {
+        accountLabel.dataset.html = accountHTML;
+        accountLabel.innerHTML = accountHTML;
     }
 }
 
@@ -7796,6 +7895,11 @@ window.addEventListener(
             return;
         }
 
+        if (rewardListOpen) {
+            if (event.key === "Escape") closeRewardList();
+            return;
+        }
+
         const key =
             event.key.toLowerCase();
 
@@ -8388,6 +8492,123 @@ async function claimLevelRewards() {
         levelRewardClaiming = false;
     }
 }
+
+/* =========================================================
+   레벨 보상표 (프로필 박스 클릭)
+   - 서버 GET /api/progress/rewards 로 Lv.2~100 보상을 받아 표시합니다.
+========================================================= */
+let rewardListOpen = false;
+
+function renderRewardList(data) {
+    const body = document.getElementById("rewardListBody");
+    const subtitle = document.getElementById("rewardListSubtitle");
+    if (!body) return;
+
+    const level = Math.max(1, Number(data?.level) || playerLevel || 1);
+    const rewards = Array.isArray(data?.rewards) ? data.rewards : [];
+    const maxLevel = Number(data?.maxLevel) || MAX_LEVEL;
+
+    if (subtitle) {
+        subtitle.textContent = level >= maxLevel
+            ? "최고 레벨에 도달했습니다! 🏆"
+            : `현재 Lv.${level} · 다음 보상은 Lv.${level + 1}에서 받아요`;
+    }
+
+    if (!rewards.length) {
+        body.innerHTML = `<div class="reward-list-message">표시할 보상이 없습니다.</div>`;
+        return;
+    }
+
+    body.innerHTML = rewards.map(entry => {
+        const lv = Number(entry.level) || 0;
+        const coinsAmount = Math.max(0, Math.floor(Number(entry.coins) || 0));
+
+        const parts = [];
+        if (coinsAmount > 0) parts.push(`<span>🪙 +${coinsAmount.toLocaleString("ko-KR")}</span>`);
+        Object.keys(ITEM_DATA).forEach(type => {
+            const amount = Math.max(0, Math.floor(Number((entry.items || {})[type]) || 0));
+            if (amount > 0) parts.push(`<span>${ITEM_DATA[type].icon} ${escapeHTML(ITEM_DATA[type].name)} ×${amount}</span>`);
+        });
+        if (entry.special) parts.unshift(`<span>🏆 최고 레벨 보상</span>`);
+
+        let cls = "reward-list-row";
+        let state = "";
+        if (lv < level) { cls += " done"; state = "달성 ✓"; }
+        else if (lv === level) { cls += " done current"; state = "현재 레벨"; }
+        else if (lv === level + 1) { cls += " next"; state = "다음 보상"; }
+        if (entry.special) cls += " special";
+
+        return `<div class="${cls}" data-level="${lv}"><span class="reward-list-level">Lv.${lv}</span><span class="reward-list-items">${parts.join("")}</span><span class="reward-list-state">${state}</span></div>`;
+    }).join("");
+
+    // 다음에 받을 보상(현재 레벨 바로 위)이 중앙에 오도록 스크롤합니다.
+    const target = body.querySelector(".next") || body.querySelector(".current") || body.lastElementChild;
+    if (target) {
+        body.scrollTop = Math.max(0, target.offsetTop - body.clientHeight / 2 + target.offsetHeight / 2);
+    }
+}
+
+async function openRewardList() {
+    if (!currentAccount || guestMode) {
+        window.alert("게스트 모드에서는 레벨 보상표를 볼 수 없습니다. 회원으로 로그인해 주세요.");
+        return;
+    }
+    if (rewardListOpen) return;
+
+    const overlay = document.getElementById("rewardListOverlay");
+    const body = document.getElementById("rewardListBody");
+    const subtitle = document.getElementById("rewardListSubtitle");
+    if (!overlay || !body) return;
+
+    rewardListOpen = true;
+    if (subtitle) subtitle.textContent = "";
+    body.innerHTML = `<div class="reward-list-message">불러오는 중...</div>`;
+    overlay.classList.add("visible");
+    overlay.setAttribute("aria-hidden", "false");
+
+    try {
+        const data = await apiJSON("/api/progress/rewards");
+        if (!rewardListOpen) return;   // 불러오는 사이에 닫은 경우
+        renderRewardList(data);
+    } catch (error) {
+        if (!rewardListOpen) return;
+        body.innerHTML = `<div class="reward-list-message">${escapeHTML(error?.message || "레벨 보상표를 불러오지 못했습니다.")}</div>`;
+    }
+}
+
+function closeRewardList() {
+    const overlay = document.getElementById("rewardListOverlay");
+    rewardListOpen = false;
+    if (!overlay) return;
+    overlay.classList.remove("visible");
+    overlay.setAttribute("aria-hidden", "true");
+}
+
+(function bindRewardListUI() {
+    const box = document.getElementById("startMenuAccount");
+    if (box) {
+        // 시작 화면의 더블 터치/스와이프 처리로 이벤트가 넘어가지 않게 막습니다.
+        ["pointerdown", "pointerup", "touchstart", "touchend"].forEach(type => {
+            box.addEventListener(type, event => event.stopPropagation(), { passive: true });
+        });
+        box.addEventListener("click", event => {
+            event.preventDefault();
+            event.stopPropagation();
+            playUIClickSound();
+            openRewardList();
+        });
+    }
+
+    document.getElementById("rewardListCloseButton")?.addEventListener("click", () => {
+        playUIClickSound();
+        closeRewardList();
+    });
+
+    const overlay = document.getElementById("rewardListOverlay");
+    overlay?.addEventListener("click", event => {
+        if (event.target === overlay) closeRewardList();
+    });
+})();
 
 // 로그인/자동 로그인 직후에도 아직 받지 않은 레벨 보상이 있으면 지급합니다.
 const refreshPlayerProgressBase = refreshPlayerProgress;
@@ -13737,4 +13958,3 @@ requestAnimationFrame(
 
 </body>
     </html>
-    
