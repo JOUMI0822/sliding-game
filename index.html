@@ -8426,14 +8426,14 @@ const TUTORIAL_STEPS = [
         "튜토리얼은 코인 · 점수 · 퀘스트 · 랭킹에",
         "아무 영향도 주지 않아요. 부담 없이 해보세요!"
     ] },
-    { type: "move", title: "이동하기", need: 3,
-      text: "WASD 또는 스와이프로 3번 이동해 보세요! (벽에 닿을 때까지 미끄러져요)" },
+    { type: "move", title: "이동하기", need: 5,
+      text: "WASD 또는 스와이프로 5번 이동해 보세요! (벽에 닿을 때까지 미끄러져요)" },
     { type: "danger", title: "위험 블록",
-      text: "빨간 위험 블록에 멈춰 보세요! (튜토리얼에서는 안전해요)" },
+      text: "빨간 위험 블록에 부딪혀 보세요! 닿으면 목숨이 1개 줄어요. (튜토리얼이라 게임 오버는 없어요)" },
     { type: "goal", title: "목표 도달",
-      text: "위험 블록을 피해 파란 목표 블록에 멈추면 클리어!" },
+      text: "위험 블록을 피해 파란 목표 블록에 멈추면 클리어! 위험 블록에 닿으면 목숨이 줄고 처음 위치로 돌아가요." },
     { type: "skip", title: "맵 넘기기",
-      text: "막힐 땐 G키 또는 화면 더블 터치로 맵을 넘겨 보세요!" },
+      text: "막힐 땐 G키 또는 화면 더블 터치로 맵을 넘겨 보세요! 넘길 때마다 맵 넘기기 횟수가 1개 줄어요." },
     { type: "info", title: "시간 · 목숨 · 점수", lines: [
         "맵마다 제한 시간이 있고, 0초가 되면 목숨을 잃어요.",
         "목숨은 3개! 모두 잃으면 게임 오버예요.",
@@ -8466,6 +8466,10 @@ let tutorialExitConfirming = false;
 let tutorialMapData = null;
 let lastTutorialTapTime = 0;
 let tutorialStepStartedAt = 0;
+let tutorialAwaitingNext = false;   // 미션 완료 후 "터치하면 다음으로" 대기 중
+let tutorialCompletedAt = 0;
+let tutorialSavedLives = null;
+let tutorialSavedSkips = null;
 const TUTORIAL_INFO_DELAY_MS = 3000;
 let tutorialPointerDown = { x: 0, y: 0 };
 const TUTORIAL_EXIT_BUTTON = { x: 696, y: 6, w: 92, h: 28 };
@@ -8521,6 +8525,7 @@ function setupTutorialStep(index) {
     tutorialStep = index;
     tutorialMoves = 0;
     tutorialLocked = false;
+    tutorialAwaitingNext = false;
     tutorialNotice = "";
     tutorialNoticeUntil = 0;
 
@@ -8550,6 +8555,10 @@ function startTutorial() {
 
     const data = parseTutorialMap();
     tutorialActive = true;
+    tutorialSavedLives = lives;
+    tutorialSavedSkips = mapSkips;
+    lives = MAX_LIVES;
+    mapSkips = MAX_MAP_SKIPS;
     clearTimeout(roundTimer);
     settingsOpen = false;
     questOpen = false;
@@ -8575,6 +8584,11 @@ function exitTutorial() {
     clearTimeout(tutorialAdvanceTimer);
     tutorialActive = false;
     tutorialLocked = false;
+    tutorialAwaitingNext = false;
+    if (tutorialSavedLives !== null) lives = tutorialSavedLives;
+    if (tutorialSavedSkips !== null) mapSkips = tutorialSavedSkips;
+    tutorialSavedLives = null;
+    tutorialSavedSkips = null;
     movement = null;
     trail = [];
     mapTransition.active = false;
@@ -8601,14 +8615,27 @@ function tutorialAdvance() {
     setupTutorialStep(tutorialStep + 1);
 }
 
+// 미션 완료: 자동으로 넘어가지 않고, 터치(클릭/Space/Enter)하면 다음 단계로 넘어갑니다.
 function tutorialComplete(message) {
     tutorialLocked = true;
+    tutorialAwaitingNext = true;
+    tutorialCompletedAt = performance.now();
     movement = null;
-    setTutorialNotice(message, 1700);
+    tutorialNotice = message;
+    tutorialNoticeUntil = Infinity;
     clearTimeout(tutorialAdvanceTimer);
-    tutorialAdvanceTimer = setTimeout(() => {
-        if (tutorialActive) tutorialAdvance();
-    }, 1800);
+}
+
+// 튜토리얼 전용 목숨 감소 (목숨이 0이 되면 다시 채워서 게임 오버가 없게 함)
+function tutorialLoseLife() {
+    lives--;
+    let refilled = false;
+    if (lives <= 0) {
+        lives = MAX_LIVES;
+        refilled = true;
+    }
+    updateUI();
+    return refilled;
 }
 
 function tutorialCheckTile() {
@@ -8630,10 +8657,17 @@ function tutorialCheckTile() {
         flash.color = "#ff3e4d";
         flash.alpha = 0.32;
 
+        const refilled = tutorialLoseLife();
+
         if (step.type === "danger") {
-            tutorialComplete("위험 블록! 실제 게임에서는 목숨이 1개 줄어요.");
+            tutorialComplete(`위험 블록에 닿았어요! 목숨이 1개 줄었어요. (남은 목숨 ${lives}개)`);
         } else {
-            setTutorialNotice("위험 블록! 처음 위치로 돌아갑니다.", 1800);
+            setTutorialNotice(
+                refilled
+                    ? "목숨이 모두 사라졌지만 튜토리얼이라 다시 채워졌어요. 처음 위치로 돌아갑니다."
+                    : `위험 블록! 목숨이 1개 줄었어요. (남은 목숨 ${lives}개) 처음 위치로 돌아갑니다.`,
+                2800
+            );
             resetPlayer();
         }
         return;
@@ -8652,10 +8686,21 @@ function tutorialSkipAction() {
     const step = TUTORIAL_STEPS[tutorialStep];
     if (!tutorialActive || !step || step.type === "info" || tutorialLocked) return;
 
+    // 단계 시작 직후의 연타(더블 터치)는 무시합니다.
+    if (performance.now() - tutorialStepStartedAt < 600) return;
+
     if (step.type !== "skip") {
         setTutorialNotice("맵 넘기기는 뒤에서 해 볼 거예요.", 1600);
         return;
     }
+
+    if (mapSkips <= 0) {
+        setTutorialNotice("맵 넘기기 횟수가 없어요.", 1600);
+        return;
+    }
+
+    mapSkips--;
+    updateUI();
 
     // 실제 맵 생성기를 사용하되, 최근 맵 기록에는 남기지 않습니다.
     const layoutCount = previousLayouts.length;
@@ -8669,7 +8714,7 @@ function tutorialSkipAction() {
     applyImpactRecoil(90, 5, 0.18);
     flash.color = "#b995ff";
     flash.alpha = 0.12;
-    tutorialComplete("맵이 바뀌었어요! 한 게임에 5번까지 넘길 수 있어요.");
+    tutorialComplete(`맵이 바뀌었어요! 맵 넘기기 횟수가 1개 줄었어요. (남은 횟수 ${mapSkips}회)`);
 }
 
 async function requestTutorialExit() {
@@ -8693,6 +8738,14 @@ function handleTutorialTap(x, y) {
     if (isInsideRect(x, y, TUTORIAL_EXIT_BUTTON)) {
         playUIClickSound();
         requestTutorialExit();
+        return true;
+    }
+
+    if (tutorialAwaitingNext) {
+        // 완료 직후 같은 터치로 바로 넘어가는 것을 방지
+        if (performance.now() - tutorialCompletedAt < 500) return true;
+        playUIClickSound();
+        tutorialAdvance();
         return true;
     }
 
@@ -8769,7 +8822,7 @@ function drawTutorialOverlay() {
 
     // 오른쪽 가운데의 반투명 퀘스트 창
     if (!isInfo) {
-        const panel = { x: WIDTH - 262, y: 175, w: 250, h: 250 };
+        const panel = { x: WIDTH - 262, y: 130, w: 250, h: 345 };
         const innerX = panel.x + 16;
         const innerW = panel.w - 32;
 
@@ -8810,7 +8863,7 @@ function drawTutorialOverlay() {
         }
 
         if (statusText) {
-            const box = { x: innerX, y: panel.y + panel.h - 62, w: innerW, h: 48 };
+            const box = { x: innerX, y: panel.y + 188, w: innerW, h: 58 };
             ctx.fillStyle = "rgba(255,255,255,0.06)";
             ctx.beginPath();
             ctx.roundRect(box.x, box.y, box.w, box.h, 9);
@@ -8818,11 +8871,32 @@ function drawTutorialOverlay() {
 
             ctx.fillStyle = statusColor;
             ctx.font = "600 13px Pretendard, Noto Sans KR, sans-serif";
-            const statusLines = wrapTutorialText(statusText, box.w - 16).slice(0, 2);
+            const statusLines = wrapTutorialText(statusText, box.w - 16).slice(0, 3);
             const startY = box.y + box.h / 2 - (statusLines.length - 1) * 9;
             statusLines.forEach((line, i) => {
                 ctx.fillText(line, box.x + 8, startY + i * 18);
             });
+        }
+
+        // 미션 완료 후: 터치하면 다음으로 안내
+        if (tutorialAwaitingNext) {
+            const hintBox = { x: innerX, y: panel.y + 262, w: innerW, h: 56 };
+            const blink = 0.65 + 0.35 * Math.sin(now * 0.006);
+            ctx.fillStyle = `rgba(255,215,106,${0.10 + 0.08 * blink})`;
+            ctx.strokeStyle = `rgba(255,215,106,${0.55 * blink + 0.2})`;
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.roundRect(hintBox.x, hintBox.y, hintBox.w, hintBox.h, 9);
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.textAlign = "center";
+            ctx.fillStyle = "#ffd76a";
+            ctx.font = "700 15px Pretendard, Noto Sans KR, sans-serif";
+            ctx.fillText("👆 터치하면 다음으로 ▶", hintBox.x + hintBox.w / 2, hintBox.y + 20);
+            ctx.fillStyle = "#9eabb9";
+            ctx.font = "11px Pretendard, Noto Sans KR, sans-serif";
+            ctx.fillText("(PC : 클릭 / Space / Enter)", hintBox.x + hintBox.w / 2, hintBox.y + 40);
         }
     }
 
@@ -8885,6 +8959,12 @@ window.addEventListener("keydown", event => {
 
     if (key === "escape") {
         requestTutorialExit();
+        return;
+    }
+    if (tutorialAwaitingNext && (key === "enter" || event.code === "Space")) {
+        event.preventDefault();
+        if (performance.now() - tutorialCompletedAt < 500) return;
+        tutorialAdvance();
         return;
     }
     if (step && step.type === "info" && (key === "enter" || event.code === "Space")) {
