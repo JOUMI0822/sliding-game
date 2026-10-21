@@ -8465,6 +8465,8 @@ let tutorialAdvanceTimer = null;
 let tutorialExitConfirming = false;
 let tutorialMapData = null;
 let lastTutorialTapTime = 0;
+let tutorialStepStartedAt = 0;
+const TUTORIAL_INFO_DELAY_MS = 3000;
 let tutorialPointerDown = { x: 0, y: 0 };
 const TUTORIAL_EXIT_BUTTON = { x: 696, y: 6, w: 92, h: 28 };
 const TUTORIAL_NEXT_BUTTON = { x: 300, y: 392, w: 200, h: 46 };
@@ -8488,6 +8490,27 @@ function parseTutorialMap() {
     return tutorialMapData;
 }
 
+// 설명 창은 3초가 지나야 넘길 수 있습니다. (남은 시간을 ms로 반환)
+function tutorialNextWaitMs() {
+    return Math.max(0, TUTORIAL_INFO_DELAY_MS - (performance.now() - tutorialStepStartedAt));
+}
+
+function wrapTutorialText(text, maxWidth) {
+    const lines = [];
+    let line = "";
+    for (const ch of String(text)) {
+        const candidate = line + ch;
+        if (ctx.measureText(candidate).width > maxWidth && line) {
+            lines.push(line.trimEnd());
+            line = ch === " " ? "" : ch;
+        } else {
+            line = candidate;
+        }
+    }
+    if (line) lines.push(line);
+    return lines;
+}
+
 function setTutorialNotice(text, ms = 2200) {
     tutorialNotice = text;
     tutorialNoticeUntil = performance.now() + ms;
@@ -8501,6 +8524,7 @@ function setupTutorialStep(index) {
     tutorialNotice = "";
     tutorialNoticeUntil = 0;
 
+    tutorialStepStartedAt = performance.now();
     const step = TUTORIAL_STEPS[index];
     const data = parseTutorialMap();
     stageStart = { c: START.c, r: START.r };
@@ -8674,6 +8698,10 @@ function handleTutorialTap(x, y) {
 
     const step = TUTORIAL_STEPS[tutorialStep];
     if (step && step.type === "info" && isInsideRect(x, y, TUTORIAL_NEXT_BUTTON)) {
+        if (tutorialNextWaitMs() > 0) {
+            playUIInvalidSound();
+            return true;
+        }
         playUIClickSound();
         tutorialAdvance();
         return true;
@@ -8716,11 +8744,15 @@ function drawTutorialOverlay() {
             ctx.fillText(line, WIDTH / 2, 208 + i * 33);
         });
 
+        const waitMs = tutorialNextWaitMs();
+        const baseLabel = step.last ? "홈으로" : "다음 ▶";
+        ctx.globalAlpha = waitMs > 0 ? 0.45 : 1;
         drawSettingsButton(
             TUTORIAL_NEXT_BUTTON.x, TUTORIAL_NEXT_BUTTON.y,
             TUTORIAL_NEXT_BUTTON.w, TUTORIAL_NEXT_BUTTON.h,
-            step.last ? "홈으로" : "다음 ▶"
+            waitMs > 0 ? `${baseLabel}  (${Math.ceil(waitMs / 1000)}초)` : baseLabel
         );
+        ctx.globalAlpha = 1;
     }
 
     // 상단 바 (맵의 바깥 벽 줄 위에 표시)
@@ -8735,15 +8767,63 @@ function drawTutorialOverlay() {
         TUTORIAL_EXIT_BUTTON.w, TUTORIAL_EXIT_BUTTON.h, "종료"
     );
 
-    // 하단 안내 (맵의 바깥 벽 줄 위에 표시)
+    // 오른쪽 가운데의 반투명 퀘스트 창
     if (!isInfo) {
-        const showingNotice = now < tutorialNoticeUntil && tutorialNotice;
-        ctx.fillStyle = "rgba(9,12,17,0.94)";
-        ctx.fillRect(0, HEIGHT - 40, WIDTH, 40);
-        ctx.textAlign = "center";
-        ctx.fillStyle = showingNotice ? "#9dffb4" : "#f3f5f7";
-        ctx.font = "600 15px Pretendard, Noto Sans KR, sans-serif";
-        ctx.fillText(showingNotice ? tutorialNotice : step.text, WIDTH / 2, HEIGHT - 20);
+        const panel = { x: WIDTH - 262, y: 175, w: 250, h: 250 };
+        const innerX = panel.x + 16;
+        const innerW = panel.w - 32;
+
+        ctx.fillStyle = "rgba(15,20,28,0.80)";
+        ctx.strokeStyle = "rgba(255,215,106,0.55)";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.roundRect(panel.x, panel.y, panel.w, panel.h, 14);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.textAlign = "left";
+        ctx.fillStyle = "#ffd76a";
+        ctx.font = "700 12px Pretendard, Noto Sans KR, sans-serif";
+        ctx.fillText("📜 튜토리얼 미션", innerX, panel.y + 22);
+
+        ctx.fillStyle = "rgba(255,255,255,0.14)";
+        ctx.fillRect(innerX, panel.y + 36, innerW, 1);
+
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 17px Pretendard, Noto Sans KR, sans-serif";
+        ctx.fillText(step.title, innerX, panel.y + 58);
+
+        ctx.fillStyle = "#dfe5ea";
+        ctx.font = "600 14px Pretendard, Noto Sans KR, sans-serif";
+        wrapTutorialText(step.text, innerW).slice(0, 5).forEach((line, i) => {
+            ctx.fillText(line, innerX, panel.y + 86 + i * 22);
+        });
+
+        // 진행 상황 / 결과 안내
+        let statusText = "";
+        let statusColor = "#9dffb4";
+        if (now < tutorialNoticeUntil && tutorialNotice) {
+            statusText = tutorialNotice;
+        } else if (step.type === "move") {
+            statusText = `이동 ${Math.min(tutorialMoves, step.need)}/${step.need}`;
+            statusColor = "#9eabb9";
+        }
+
+        if (statusText) {
+            const box = { x: innerX, y: panel.y + panel.h - 62, w: innerW, h: 48 };
+            ctx.fillStyle = "rgba(255,255,255,0.06)";
+            ctx.beginPath();
+            ctx.roundRect(box.x, box.y, box.w, box.h, 9);
+            ctx.fill();
+
+            ctx.fillStyle = statusColor;
+            ctx.font = "600 13px Pretendard, Noto Sans KR, sans-serif";
+            const statusLines = wrapTutorialText(statusText, box.w - 16).slice(0, 2);
+            const startY = box.y + box.h / 2 - (statusLines.length - 1) * 9;
+            statusLines.forEach((line, i) => {
+                ctx.fillText(line, box.x + 8, startY + i * 18);
+            });
+        }
     }
 
     ctx.restore();
@@ -8809,6 +8889,7 @@ window.addEventListener("keydown", event => {
     }
     if (step && step.type === "info" && (key === "enter" || event.code === "Space")) {
         event.preventDefault();
+        if (tutorialNextWaitMs() > 0) return;
         tutorialAdvance();
     }
 });
