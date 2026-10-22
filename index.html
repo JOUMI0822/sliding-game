@@ -3018,21 +3018,23 @@ function drawMultiplayerMenu() {
 ========================================================= */
 
 const WALL_COLORS = [
-    { name: "어두운 회색", value: "#252d38" },
-    { name: "밝은 회색", value: "#3f4b5a" },
-    { name: "푸른 회색", value: "#34495e" },
-    { name: "보라", value: "#4a3f5c" },
-    { name: "청록", value: "#31545a" },
-    { name: "갈색", value: "#59483d" }
+    { name: "슬레이트", value: "#2b3441" },
+    { name: "강철", value: "#46515f" },
+    { name: "심해", value: "#1f4a6e" },
+    { name: "자수정", value: "#4b3a6b" },
+    { name: "이끼", value: "#2f5a47" },
+    { name: "구리", value: "#6b4a35" },
+    { name: "로즈", value: "#6b3a4a" }
 ];
 
 const BACKGROUND_COLORS = [
     { name: "기본", value: "#0d1117" },
-    { name: "짙은 파랑", value: "#0b1424" },
-    { name: "보라", value: "#171022" },
-    { name: "청록", value: "#0b1b1d" },
-    { name: "갈색", value: "#1c1510" },
-    { name: "검정", value: "#080a0e" }
+    { name: "자정", value: "#0a1226" },
+    { name: "보랏빛 밤", value: "#150f24" },
+    { name: "숲", value: "#0a1a14" },
+    { name: "와인", value: "#1c0e14" },
+    { name: "모래빛 밤", value: "#1a1610" },
+    { name: "순흑", value: "#05070a" }
 ];
 
 /* 기존 색상 목록의 마지막에 "사용자 지정"을 추가 */
@@ -3054,54 +3056,26 @@ BACKGROUND_COLORS.push({
 ========================================================= */
 
 const DANGER_SKINS = [
-    {
-        name: "기본",
-        value: "solid"
-    },
-    {
-        name: "X 경고",
-        value: "x"
-    },
-    {
-        name: "경고",
-        value: "warning"
-    },
-    {
-        name: "위험",
-        value: "hazard"
-    },
-    {
-        name: "화염",
-        value: "fire"
-    },
-    {
-        name: "해골",
-        value: "skull"
-    },
-    {
-        name: "네온",
-        value: "neon"
-    },
-    {
-        name: "위험선",
-        value: "stripe"
-    },
-    {
-        name: "글리치",
-        value: "glitch"
-    }
+    { name: "기본", value: "solid" },
+    { name: "가시", value: "spike" },
+    { name: "레이저", value: "laser" },
+    { name: "용암", value: "lava" },
+    { name: "폭탄", value: "bomb" },
+    { name: "전기", value: "electric" },
+    { name: "독", value: "toxic" },
+    { name: "심연", value: "void" }
 ];
 
 
 const STREAK_EFFECTS = [
     { name: "없음", value: "none" },
-    { name: "무지개", value: "rainbow" },
-    { name: "네온", value: "neon" },
-    { name: "화염", value: "fire" },
-    { name: "빙결", value: "ice" },
-    { name: "파동", value: "wave" },
-    { name: "별빛", value: "stars" },
-    { name: "글리치", value: "glitch" }
+    { name: "오로라", value: "aurora" },
+    { name: "불씨", value: "ember" },
+    { name: "번개", value: "lightning" },
+    { name: "꽃잎", value: "petals" },
+    { name: "맥동", value: "pulse" },
+    { name: "혜성", value: "comet" },
+    { name: "프리즘", value: "prism" }
 ];
 
 
@@ -3131,15 +3105,142 @@ const PLAYER_TRAILS = [
     { name: "글리치", value: "glitch" }
 ];
 
+const GOAL_SKINS = [
+    { name: "기본", value: "classic" },
+    { name: "포털", value: "portal" },
+    { name: "깃발", value: "flag" },
+    { name: "별", value: "star" },
+    { name: "수정", value: "crystal" },
+    { name: "신호탑", value: "beacon" },
+    { name: "보물상자", value: "chest" },
+    { name: "레이더", value: "radar" }
+];
+
+function getGoalSkinValue() {
+    return (GOAL_SKINS[visualSettings.goalSkin] || GOAL_SKINS[0]).value;
+}
+
+/* x, y = 그려질 정사각형의 왼쪽 위, size = 한 변 (게임에서는 CELL - 10 = 30) */
+function drawGoalSkin(skin, x, y, size = CELL - 10) {
+    const t = performance.now() * 0.001;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(size / 30, size / 30);
+    switch (skin) {
+        case "portal": {
+            ctx.fillStyle = "rgba(15,20,60,0.9)";
+            ctx.beginPath(); ctx.arc(15, 15, 14, 0, Math.PI * 2); ctx.fill();
+            for (let i = 0; i < 3; i++) {
+                ctx.strokeStyle = `hsla(${190 + i * 50},100%,68%,0.95)`;
+                ctx.lineWidth = 2.4; ctx.shadowBlur = 7; ctx.shadowColor = ctx.strokeStyle;
+                const a0 = t * (i % 2 ? 2.4 : -2.9) + i * 2;
+                ctx.beginPath(); ctx.arc(15, 15, 12.5 - i * 3.8, a0, a0 + Math.PI * 1.35); ctx.stroke();
+            }
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = `rgba(255,255,255,${0.6 + Math.sin(t * 5) * 0.3})`;
+            ctx.beginPath(); ctx.arc(15, 15, 2.4, 0, Math.PI * 2); ctx.fill();
+            break;
+        }
+        case "flag": {
+            ctx.fillStyle = "#5d6877"; ctx.beginPath(); ctx.ellipse(11, 28, 9, 2.4, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = "#e8edf2"; ctx.fillRect(9, 2, 2.4, 26);
+            ctx.fillStyle = "#ffd76a"; ctx.beginPath(); ctx.arc(10.2, 2.5, 2.2, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.moveTo(11.4, 4);
+            for (let i = 0; i <= 10; i++) ctx.lineTo(11.4 + i * 1.75, 4 + Math.sin(t * 6 - i * 0.7) * 1.6 * (i / 10));
+            for (let i = 10; i >= 0; i--) ctx.lineTo(11.4 + i * 1.75, 15 + Math.sin(t * 6 - i * 0.7) * 1.6 * (i / 10));
+            ctx.closePath();
+            const g = ctx.createLinearGradient(11, 0, 29, 0); g.addColorStop(0, "#ff5d6e"); g.addColorStop(1, "#ff9d5c");
+            ctx.fillStyle = g; ctx.fill();
+            break;
+        }
+        case "star": {
+            const pulse = 1 + Math.sin(t * 4) * 0.08;
+            ctx.translate(15, 15.5); ctx.scale(pulse, pulse); ctx.rotate(Math.sin(t * 1.6) * 0.15);
+            ctx.shadowBlur = 10; ctx.shadowColor = "rgba(255,215,106,0.9)";
+            const g = ctx.createRadialGradient(0, -2, 1, 0, 0, 15); g.addColorStop(0, "#fff3b0"); g.addColorStop(1, "#ffb81c");
+            ctx.fillStyle = g; ctx.beginPath();
+            for (let i = 0; i < 10; i++) {
+                const r = i % 2 === 0 ? 14.5 : 6.4, a = -Math.PI / 2 + i * Math.PI / 5;
+                i ? ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r) : ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+            }
+            ctx.closePath(); ctx.fill();
+            break;
+        }
+        case "crystal": {
+            const bob = Math.sin(t * 2.5) * 1.2;
+            ctx.translate(0, bob);
+            ctx.shadowBlur = 9; ctx.shadowColor = "rgba(120,220,255,0.8)";
+            const pts = [[15, 1], [26, 9], [26, 21], [15, 29], [4, 21], [4, 9]];
+            const g = ctx.createLinearGradient(4, 0, 26, 30); g.addColorStop(0, "#d4f7ff"); g.addColorStop(1, "#2f86e0");
+            ctx.fillStyle = g; ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.closePath(); ctx.fill();
+            ctx.shadowBlur = 0; ctx.strokeStyle = "rgba(255,255,255,0.6)"; ctx.lineWidth = 1.2; ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(4, 9); ctx.lineTo(15, 15); ctx.lineTo(26, 9); ctx.moveTo(15, 15); ctx.lineTo(15, 29); ctx.stroke();
+            ctx.fillStyle = `rgba(255,255,255,${0.4 + (Math.sin(t * 5) + 1) * 0.25})`;
+            ctx.beginPath(); ctx.arc(10, 8, 1.8, 0, Math.PI * 2); ctx.fill();
+            break;
+        }
+        case "beacon": {
+            ctx.fillStyle = "#2b3441"; ctx.beginPath(); ctx.ellipse(15, 26, 12, 3.5, 0, 0, Math.PI * 2); ctx.fill();
+            const g = ctx.createLinearGradient(0, 26, 0, 0); g.addColorStop(0, "rgba(120,230,255,0.85)"); g.addColorStop(1, "rgba(120,230,255,0)");
+            ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(8, 26); ctx.lineTo(22, 26); ctx.lineTo(19, 0); ctx.lineTo(11, 0); ctx.closePath(); ctx.fill();
+            for (let i = 0; i < 2; i++) {
+                const p = (t * 0.9 + i * 0.5) % 1;
+                ctx.strokeStyle = `rgba(160,240,255,${1 - p})`; ctx.lineWidth = 1.6;
+                ctx.beginPath(); ctx.ellipse(15, 26, 4 + p * 10, 1.4 + p * 3, 0, 0, Math.PI * 2); ctx.stroke();
+            }
+            ctx.fillStyle = "#e9fbff"; ctx.beginPath(); ctx.ellipse(15, 26, 4, 1.5, 0, 0, Math.PI * 2); ctx.fill();
+            break;
+        }
+        case "chest": {
+            const tw = (Math.sin(t * 4) + 1) / 2;
+            ctx.shadowBlur = 6 + tw * 6; ctx.shadowColor = "rgba(255,210,90,0.8)";
+            ctx.fillStyle = "#8a5a2b"; ctx.beginPath(); ctx.roundRect(2, 12, 26, 16, 3); ctx.fill();
+            ctx.fillStyle = "#a86d35"; ctx.beginPath(); ctx.roundRect(2, 3, 26, 11, 5); ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = "#f5c232"; ctx.fillRect(12.5, 3, 5, 25);
+            ctx.fillStyle = "#fff0b3"; ctx.fillRect(12, 13, 6, 6);
+            ctx.strokeStyle = "#4a2d12"; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.roundRect(2, 3, 26, 25, 4); ctx.stroke();
+            ctx.fillStyle = `rgba(255,255,255,${0.3 + tw * 0.6})`; ctx.beginPath(); ctx.arc(23, 7, 1.2 + tw, 0, Math.PI * 2); ctx.fill();
+            break;
+        }
+        case "radar": {
+            ctx.fillStyle = "#08180f"; ctx.beginPath(); ctx.arc(15, 15, 14.5, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = "rgba(90,255,150,0.55)"; ctx.lineWidth = 1;
+            [14, 9.5, 5].forEach(r => { ctx.beginPath(); ctx.arc(15, 15, r, 0, Math.PI * 2); ctx.stroke(); });
+            ctx.beginPath(); ctx.moveTo(0.5, 15); ctx.lineTo(29.5, 15); ctx.moveTo(15, 0.5); ctx.lineTo(15, 29.5); ctx.stroke();
+            const a = t * 3;
+            for (let i = 0; i < 14; i++) {
+                ctx.fillStyle = `rgba(90,255,150,${0.34 - i * 0.024})`;
+                ctx.beginPath(); ctx.moveTo(15, 15); ctx.arc(15, 15, 14, a - (i + 1) * 0.07, a - i * 0.07); ctx.closePath(); ctx.fill();
+            }
+            ctx.fillStyle = `rgba(220,255,230,${0.6 + Math.sin(t * 6) * 0.4})`;
+            ctx.beginPath(); ctx.arc(15, 15, 2.4, 0, Math.PI * 2); ctx.fill();
+            break;
+        }
+        case "classic":
+        default: {
+            const p = (t % 1.3) / 1.3;
+            ctx.strokeStyle = `rgba(120,200,255,${(1 - p) * 0.8})`; ctx.lineWidth = 2;
+            ctx.strokeRect(-p * 5, -p * 5, 30 + p * 10, 30 + p * 10);
+            const g = ctx.createLinearGradient(0, 0, 30, 30); g.addColorStop(0, "#6cc0ff"); g.addColorStop(1, "#2a7fd6");
+            ctx.fillStyle = g; ctx.beginPath(); ctx.roundRect(0, 0, 30, 30, 6); ctx.fill();
+            ctx.fillStyle = "rgba(255,255,255,0.25)"; ctx.beginPath(); ctx.roundRect(5, 5, 20, 20, 4); ctx.fill();
+            ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(15, 15, 3, 0, Math.PI * 2); ctx.fill();
+        }
+    }
+    ctx.restore();
+}
+
 // 스킨 화면의 행 구성 (그리기와 터치 판정이 같은 값을 사용합니다)
 const SKIN_PANEL = { x: 70, y: 20, w: 660, h: 560 };
 const SKIN_ROWS = [
-    { key: "wall",         label: "벽 색상",          list: WALL_COLORS,       centerY: 130 },
-    { key: "background",   label: "배경 색상",        list: BACKGROUND_COLORS, centerY: 205 },
-    { key: "dangerSkin",   label: "위험 블록 스킨",   list: DANGER_SKINS,      centerY: 280 },
-    { key: "streakEffect", label: "연속 클리어 효과", list: STREAK_EFFECTS,    centerY: 355 },
-    { key: "playerSkin",   label: "플레이어 스킨",    list: PLAYER_SKINS,      centerY: 430 },
-    { key: "playerTrail",  label: "플레이어 잔상",    list: PLAYER_TRAILS,     centerY: 505 }
+    { key: "wall",         label: "벽 색상",          list: WALL_COLORS,       centerY: 116 },
+    { key: "background",   label: "배경 색상",        list: BACKGROUND_COLORS, centerY: 183 },
+    { key: "dangerSkin",   label: "위험 블록 스킨",   list: DANGER_SKINS,      centerY: 250 },
+    { key: "streakEffect", label: "연속 클리어 효과", list: STREAK_EFFECTS,    centerY: 317 },
+    { key: "playerSkin",   label: "플레이어 스킨",    list: PLAYER_SKINS,      centerY: 384 },
+    { key: "playerTrail",  label: "플레이어 잔상",    list: PLAYER_TRAILS,     centerY: 451 },
+    { key: "goalSkin",     label: "도착 지점 스킨",   list: GOAL_SKINS,        centerY: 518 }
 ];
 
 function getPlayerSkinValue() {
@@ -3774,6 +3875,7 @@ let visualSettings = {
     streakEffect: 1,
     playerSkin: 0,
     playerTrail: 0,
+    goalSkin: 0,
     customWall: null,
     customBackground: null
 };
@@ -3904,6 +4006,11 @@ try {
                     ? savedVisualSettings.playerTrail
                     : 0,
 
+            goalSkin:
+                Number.isInteger(savedVisualSettings.goalSkin)
+                    ? savedVisualSettings.goalSkin
+                    : 0,
+
             customWall:
                 isValidHexColor(savedVisualSettings.customWall)
                     ? savedVisualSettings.customWall
@@ -3926,6 +4033,10 @@ if (isValidHexColor(visualSettings.customBackground)) {
     visualSettings.background = BACKGROUND_COLORS.length - 1;
 }
 
+
+[["wall", WALL_COLORS], ["background", BACKGROUND_COLORS], ["dangerSkin", DANGER_SKINS], ["streakEffect", STREAK_EFFECTS], ["goalSkin", GOAL_SKINS]].forEach(([k, l]) => {
+    if (!(visualSettings[k] >= 0 && visualSettings[k] < l.length)) visualSettings[k] = 0;
+});
 
 function saveVisualSettings() {
     localStorage.setItem(
@@ -10373,1961 +10484,233 @@ function getStreakStrength() {
 }
 
 
-function drawRainbowBorder(
-    strength
-) {
-
-    const time =
-        performance.now() *
-        0.001;
-
-    ctx.save();
-
-    ctx.globalCompositeOperation =
-        "screen";
-
-    const layers = 7;
-
-    for (
-        let i = 0;
-        i < layers;
-        i++
-    ) {
-
-        const hue =
-            (
-                time * 45 +
-                i * 52
-            ) % 360;
-
-        const pulse =
-            0.55 +
-            Math.sin(
-                time * 2.2
-            ) *
-            0.20;
-
-        const alpha =
-            (
-                0.012 +
-                strength * 0.038
-            ) *
-            pulse *
-            (
-                1 -
-                i * 0.06
-            );
-
-        const lineWidth =
-            26 +
-            strength * 35 -
-            i * 3;
-
-        ctx.strokeStyle =
-            `hsla(${hue},100%,62%,${alpha})`;
-
-        ctx.lineWidth =
-            lineWidth;
-
-        ctx.shadowBlur =
-            12 +
-            i * 3;
-
-        ctx.shadowColor =
-            `hsla(${hue},100%,62%,${alpha * 4})`;
-
-        ctx.strokeRect(
-            lineWidth / 2,
-            lineWidth / 2,
-            WIDTH - lineWidth,
-            HEIGHT - lineWidth
-        );
-    }
-
-    ctx.restore();
+/* 효과/위험 블록 공용 도우미 */
+function fxHash(n) { const v = Math.sin(n * 127.1 + 311.7) * 43758.5453; return v - Math.floor(v); }
+function fxPerim(p) {
+    const P = 2 * (WIDTH + HEIGHT);
+    let d = (((p % 1) + 1) % 1) * P;
+    if (d < WIDTH) return { x: d, y: 0, nx: 0, ny: 1 };
+    d -= WIDTH;
+    if (d < HEIGHT) return { x: WIDTH, y: d, nx: -1, ny: 0 };
+    d -= HEIGHT;
+    if (d < WIDTH) return { x: WIDTH - d, y: HEIGHT, nx: 0, ny: -1 };
+    d -= WIDTH;
+    return { x: 0, y: HEIGHT - d, nx: 1, ny: 0 };
 }
 
-
-function drawNeonBorder(
-    strength
-) {
-
-    const time =
-        performance.now() *
-        0.001;
-
-    const pulse =
-        0.55 +
-        Math.sin(
-            time * 3
-        ) *
-        0.18;
-
-    ctx.save();
-
-    ctx.globalCompositeOperation =
-        "screen";
-
-    for (
-        let i = 0;
-        i < 5;
-        i++
-    ) {
-
-        const alpha =
-            (
-                0.018 +
-                strength * 0.045
-            ) *
-            pulse *
-            (
-                1 -
-                i * 0.12
-            );
-
-        const width =
-            18 +
-            strength * 28 -
-            i * 3;
-
-        ctx.strokeStyle =
-            `hsla(${(
-                time * 70 +
-                285
-            ) % 360},100%,68%,${alpha})`;
-
-        ctx.lineWidth =
-            width;
-
-        ctx.shadowBlur =
-            16 +
-            i * 4;
-
-        ctx.shadowColor =
-            `hsla(${(
-                time * 70 +
-                285
-            ) % 360},100%,68%,${alpha * 5})`;
-
-        ctx.strokeRect(
-            width / 2,
-            width / 2,
-            WIDTH - width,
-            HEIGHT - width
-        );
-    }
-
-    ctx.restore();
-}
-
-
-function drawFireBorder(
-    strength
-) {
-
-    const time =
-        performance.now() *
-        0.001;
-
-    ctx.save();
-
-    ctx.globalCompositeOperation =
-        "screen";
-
-    for (
-        let i = 0;
-        i < 6;
-        i++
-    ) {
-
-        const alpha =
-            (
-                0.012 +
-                strength * 0.038
-            ) *
-            (
-                0.65 +
-                Math.sin(
-                    time * 5 + i
-                ) *
-                0.25
-            );
-
-        const width =
-            20 +
-            strength * 30 -
-            i * 3;
-
-        const hue =
-            8 +
-            Math.sin(
-                time * 2 + i
-            ) *
-            12;
-
-        ctx.strokeStyle =
-            `hsla(${hue},100%,58%,${alpha})`;
-
-        ctx.lineWidth =
-            width;
-
-        ctx.shadowBlur =
-            14 +
-            i * 3;
-
-        ctx.shadowColor =
-            `hsla(${hue},100%,55%,${alpha * 5})`;
-
-        ctx.strokeRect(
-            width / 2,
-            width / 2,
-            WIDTH - width,
-            HEIGHT - width
-        );
-    }
-
-    ctx.restore();
-}
-
-
-function drawIceBorder(
-    strength
-) {
-
-    const time =
-        performance.now() *
-        0.001;
-
-    ctx.save();
-
-    ctx.globalCompositeOperation =
-        "screen";
-
-    for (
-        let i = 0;
-        i < 6;
-        i++
-    ) {
-
-        const alpha =
-            (
-                0.014 +
-                strength * 0.04
-            ) *
-            (
-                0.7 +
-                Math.sin(
-                    time * 2.5 + i
-                ) *
-                0.2
-            );
-
-        const width =
-            20 +
-            strength * 30 -
-            i * 3;
-
-        const hue =
-            185 +
-            Math.sin(
-                time * 1.7 + i
-            ) *
-            20;
-
-        ctx.strokeStyle =
-            `hsla(${hue},100%,70%,${alpha})`;
-
-        ctx.lineWidth =
-            width;
-
-        ctx.shadowBlur =
-            14 +
-            i * 3;
-
-        ctx.shadowColor =
-            `hsla(${hue},100%,70%,${alpha * 5})`;
-
-        ctx.strokeRect(
-            width / 2,
-            width / 2,
-            WIDTH - width,
-            HEIGHT - width
-        );
-    }
-
-    ctx.restore();
-}
-
-
-function drawWaveBorder(
-    strength
-) {
-
-    const time =
-        performance.now() *
-        0.001;
-
-    ctx.save();
-
-    ctx.globalCompositeOperation =
-        "screen";
-
-    const gap = 7;
-    const step = 24;
-
-    const base =
-        1.5 +
-        strength * 1.2;
-
-    const maxBar =
-        4 +
-        strength * 8;
-
-    const alpha =
-        0.055 +
-        strength * 0.065;
-
-    const topCount =
-        Math.floor(
-            (
-                WIDTH -
-                gap * 2
-            ) /
-            step
-        );
-
-    for (
-        let i = 0;
-        i < topCount;
-        i++
-    ) {
-
-        const x =
-            gap +
-            i * step +
-            step / 2;
-
-        const beat =
-            (
-                Math.sin(
-                    time * 5.0 -
-                    i * 0.72
-                ) + 1
-            ) * 0.5;
-
-        const beat2 =
-            (
-                Math.sin(
-                    time * 8.0 +
-                    i * 1.15
-                ) + 1
-            ) * 0.5;
-
-        const h =
-            base +
-            maxBar *
-            (
-                beat * 0.65 +
-                beat2 * 0.35
-            );
-
-        const hue =
-            190 +
-            Math.sin(
-                i * 0.35 +
-                time * 0.8
-            ) *
-            18;
-
-        ctx.fillStyle =
-            `hsla(${hue},100%,68%,${alpha})`;
-
-        ctx.fillRect(
-            x - 1.5,
-            gap,
-            3,
-            h
-        );
-
-        ctx.fillRect(
-            x - 1.5,
-            HEIGHT - gap - h,
-            3,
-            h
-        );
-    }
-
-    const sideCount =
-        Math.floor(
-            (
-                HEIGHT -
-                gap * 2
-            ) /
-            step
-        );
-
-    for (
-        let i = 0;
-        i < sideCount;
-        i++
-    ) {
-
-        const y =
-            gap +
-            i * step +
-            step / 2;
-
-        const beat =
-            (
-                Math.sin(
-                    time * 5.0 -
-                    i * 0.72 +
-                    Math.PI * 0.5
-                ) + 1
-            ) * 0.5;
-
-        const beat2 =
-            (
-                Math.sin(
-                    time * 8.0 +
-                    i * 1.15 +
-                    Math.PI * 0.5
-                ) + 1
-            ) * 0.5;
-
-        const h =
-            base +
-            maxBar *
-            (
-                beat * 0.65 +
-                beat2 * 0.35
-            );
-
-        const hue =
-            195 +
-            Math.sin(
-                i * 0.42 +
-                time
-            ) *
-            18;
-
-        ctx.fillStyle =
-            `hsla(${hue},100%,68%,${alpha})`;
-
-        ctx.fillRect(
-            gap,
-            y - 1.5,
-            h,
-            3
-        );
-
-        ctx.fillRect(
-            WIDTH - gap - h,
-            y - 1.5,
-            h,
-            3
-        );
-    }
-
-    const pulse =
-        (
-            Math.sin(
-                time * 5.0
-            ) + 1
-        ) * 0.5;
-
-    ctx.lineWidth = 1;
-
-    ctx.strokeStyle =
-        `rgba(110,230,255,${
-            0.025 +
-            strength * 0.035 +
-            pulse * 0.02
-        })`;
-
-    const inset =
-        3 +
-        pulse * 3;
-
-    ctx.strokeRect(
-        inset,
-        inset,
-        WIDTH - inset * 2,
-        HEIGHT - inset * 2
-    );
-
-    ctx.restore();
-}
-
-
-function drawStarsBorder(
-    strength
-) {
-
-    const time =
-        performance.now() *
-        0.001;
-
-    ctx.save();
-
-    ctx.globalCompositeOperation =
-        "screen";
-
-    for (
-        let i = 0;
-        i < 28;
-        i++
-    ) {
-
-        const perimeter =
-            (
-                i / 28 +
-                time * 0.035
-            ) % 1;
-
-        const total =
-            WIDTH * 2 +
-            HEIGHT * 2;
-
-        let distance =
-            perimeter * total;
-
-        let x;
-        let y;
-
-        if (
-            distance < WIDTH
-        ) {
-
-            x = distance;
-            y = 0;
-
-        } else if (
-            distance <
-            WIDTH + HEIGHT
-        ) {
-
-            x = WIDTH;
-
-            y =
-                distance -
-                WIDTH;
-
-        } else if (
-            distance <
-            WIDTH * 2 +
-            HEIGHT
-        ) {
-
-            x =
-                WIDTH -
-                (
-                    distance -
-                    WIDTH -
-                    HEIGHT
-                );
-
-            y = HEIGHT;
-
-        } else {
-
-            x = 0;
-
-            y =
-                HEIGHT -
-                (
-                    distance -
-                    WIDTH * 2 -
-                    HEIGHT
-                );
+const STREAK_RENDERERS = {
+    aurora(s) {
+        const k = Math.min(1, s), t = performance.now() * 0.001;
+        ctx.save(); ctx.globalCompositeOperation = "screen";
+        for (let i = 0; i < 3; i++) {
+            const g = ctx.createLinearGradient(0, 0, WIDTH, HEIGHT);
+            for (let n = 0; n <= 4; n++) g.addColorStop(n / 4, `hsla(${(150 + i * 50 + n * 35 + Math.sin(t * 0.8 + i) * 40) % 360},90%,60%,${0.35 + 0.3 * Math.sin(t * 1.5 + n + i)})`);
+            const lw = 10 + 22 * k - i * 5;
+            ctx.strokeStyle = g; ctx.lineWidth = lw; ctx.globalAlpha = 0.10 + 0.22 * k;
+            ctx.shadowBlur = 20; ctx.shadowColor = "rgba(120,255,200,0.6)";
+            ctx.strokeRect(lw / 2, lw / 2, WIDTH - lw, HEIGHT - lw);
         }
-
-        const twinkle =
-            (
-                Math.sin(
-                    time * 6 +
-                    i * 2.7
-                ) + 1
-            ) / 2;
-
-        const alpha =
-            (
-                0.04 +
-                strength * 0.22
-            ) *
-            twinkle;
-
-        const radius =
-            1.2 +
-            strength *
-            2.8 *
-            twinkle;
-
-        ctx.fillStyle =
-            `rgba(255,255,255,${alpha})`;
-
-        ctx.shadowBlur =
-            8 +
-            strength * 12;
-
-        ctx.shadowColor =
-            `rgba(255,255,255,${alpha * 4})`;
-
-        ctx.beginPath();
-
-        ctx.arc(
-            x,
-            y,
-            radius,
-            0,
-            Math.PI * 2
-        );
-
-        ctx.fill();
-    }
-
-    ctx.restore();
-}
-
-
-/* =========================================================
-   강화된 글리치 효과
-========================================================= */
-
-function drawGlitchBorder(
-    strength
-) {
-
-    const time =
-        performance.now() *
-        0.001;
-
-    const pulse =
-        0.65 +
-        Math.sin(
-            time * 9
-        ) *
-        0.20;
-
-    const hardPulse =
-        (
-            Math.sin(
-                time * 18
-            ) + 1
-        ) * 0.5;
-
-    ctx.save();
-
-    const rgbLayers = [
-        {
-            color:
-                `rgba(255,25,65,${
-                    0.06 +
-                    strength * 0.13
-                })`,
-
-            ox:
-                -1.2 -
-                strength * 5,
-
-            oy:
-                Math.sin(
-                    time * 13
-                ) *
-                strength *
-                1.2
-        },
-
-        {
-            color:
-                `rgba(25,255,220,${
-                    0.055 +
-                    strength * 0.12
-                })`,
-
-            ox:
-                1.2 +
-                strength * 5,
-
-            oy:
-                Math.cos(
-                    time * 11
-                ) *
-                strength *
-                1.2
-        },
-
-        {
-            color:
-                `rgba(55,100,255,${
-                    0.045 +
-                    strength * 0.10
-                })`,
-
-            ox: 0,
-
-            oy:
-                -1 -
-                strength * 3
+        ctx.restore();
+    },
+    ember(s) {
+        const k = Math.min(1, s), t = performance.now() * 0.001;
+        ctx.save(); ctx.globalCompositeOperation = "screen";
+        for (let i = 0; i < 44; i++) {
+            const ph = (t * (0.25 + fxHash(i) * 0.35) + fxHash(i + 50)) % 1;
+            const p = fxPerim(fxHash(i + 9));
+            const d = ph * (24 + 40 * k), sway = Math.sin(t * 3 + i) * 5;
+            const px = p.x + p.nx * d + p.ny * sway, py = p.y + p.ny * d - p.nx * sway;
+            ctx.fillStyle = `hsla(${12 + ph * 34},100%,${55 + ph * 20}%,${(1 - ph) * (0.25 + 0.5 * k)})`;
+            ctx.shadowBlur = 8; ctx.shadowColor = "rgba(255,120,40,0.8)";
+            ctx.beginPath(); ctx.arc(px, py, (1 + fxHash(i + 3) * 2.2) * (0.6 + k * 0.6) * (1 - ph * 0.5), 0, Math.PI * 2); ctx.fill();
         }
-    ];
-
-    for (
-        const layer
-        of rgbLayers
-    ) {
-
-        ctx.strokeStyle =
-            layer.color;
-
-        ctx.lineWidth =
-            1.5 +
-            strength * 3;
-
-        ctx.shadowBlur =
-            5 +
-            strength * 8;
-
-        ctx.shadowColor =
-            layer.color;
-
-        ctx.strokeRect(
-            layer.ox + 2,
-            layer.oy + 2,
-            WIDTH - 4,
-            HEIGHT - 4
-        );
-    }
-
-
-    const pieces =
-        8 +
-        Math.floor(
-            strength * 14
-        );
-
-    for (
-        let i = 0;
-        i < pieces;
-        i++
-    ) {
-
-        const side =
-            Math.floor(
-                Math.random() * 4
-            );
-
-        const jitter =
-            (
-                Math.random() - 0.5
-            ) *
-            (
-                4 +
-                strength * 14
-            );
-
-        const len =
-            12 +
-            Math.random() *
-            (
-                18 +
-                strength * 45
-            );
-
-        const alpha =
-            (
-                0.07 +
-                strength * 0.18
-            ) *
-            pulse;
-
-        const colorIndex =
-            i % 3;
-
-        ctx.strokeStyle =
-            colorIndex === 0
-                ? `rgba(255,40,75,${alpha})`
-                : colorIndex === 1
-                    ? `rgba(35,255,220,${alpha})`
-                    : `rgba(70,120,255,${alpha})`;
-
-        ctx.lineWidth =
-            1 +
-            Math.random() *
-            (
-                1 +
-                strength * 2
-            );
-
-        ctx.beginPath();
-
-        if (
-            side === 0
-        ) {
-
-            const x =
-                Math.random() *
-                WIDTH;
-
-            ctx.moveTo(
-                x,
-                jitter
-            );
-
-            ctx.lineTo(
-                Math.min(
-                    WIDTH,
-                    x + len
-                ),
-                jitter
-            );
-
-        } else if (
-            side === 1
-        ) {
-
-            const y =
-                Math.random() *
-                HEIGHT;
-
-            ctx.moveTo(
-                WIDTH + jitter,
-                y
-            );
-
-            ctx.lineTo(
-                WIDTH + jitter,
-                Math.min(
-                    HEIGHT,
-                    y + len
-                )
-            );
-
-        } else if (
-            side === 2
-        ) {
-
-            const x =
-                Math.random() *
-                WIDTH;
-
-            ctx.moveTo(
-                x,
-                HEIGHT + jitter
-            );
-
-            ctx.lineTo(
-                Math.min(
-                    WIDTH,
-                    x + len
-                ),
-                HEIGHT + jitter
-            );
-
-        } else {
-
-            const y =
-                Math.random() *
-                HEIGHT;
-
-            ctx.moveTo(
-                jitter,
-                y
-            );
-
-            ctx.lineTo(
-                jitter,
-                Math.min(
-                    HEIGHT,
-                    y + len
-                )
-            );
-        }
-
-        ctx.stroke();
-    }
-
-
-    const bars =
-        3 +
-        Math.floor(
-            strength * 5
-        );
-
-    for (
-        let i = 0;
-        i < bars;
-        i++
-    ) {
-
-        const y =
-            Math.random() *
-            HEIGHT;
-
-        const offset =
-            (
-                Math.random() - 0.5
-            ) *
-            (
-                8 +
-                strength * 30
-            );
-
-        const width =
-            WIDTH *
-            (
-                0.04 +
-                Math.random() *
-                (
-                    0.08 +
-                    strength * 0.18
-                )
-            );
-
-        const height =
-            1 +
-            Math.random() *
-            (
-                1 +
-                strength * 3
-            );
-
-        const alpha =
-            0.04 +
-            strength * 0.12;
-
-        ctx.fillStyle =
-            `rgba(255,255,255,${alpha})`;
-
-        ctx.fillRect(
-            offset,
-            y,
-            width,
-            height
-        );
-
-        ctx.fillStyle =
-            `rgba(255,35,70,${alpha * 0.8})`;
-
-        ctx.fillRect(
-            offset -
-            3 -
-            strength * 4,
-            y + 1,
-            width * 0.45,
-            1
-        );
-
-        ctx.fillStyle =
-            `rgba(30,255,215,${alpha * 0.7})`;
-
-        ctx.fillRect(
-            offset +
-            4 +
-            strength * 4,
-            y - 1,
-            width * 0.45,
-            1
-        );
-    }
-
-
-    const scanAlpha =
-        0.012 +
-        strength * 0.028;
-
-    ctx.fillStyle =
-        `rgba(255,255,255,${scanAlpha})`;
-
-    for (
-        let y = 0;
-        y < HEIGHT;
-        y += 6
-    ) {
-
-        ctx.fillRect(
-            0,
-            y,
-            WIDTH,
-            1
-        );
-    }
-
-
-    if (
-        strength > 0.25
-    ) {
-
-        const glitchCount =
-            1 +
-            Math.floor(
-                strength * 3
-            );
-
-        for (
-            let i = 0;
-            i < glitchCount;
-            i++
-        ) {
-
-            const y =
-                Math.random() *
-                HEIGHT;
-
-            const h =
-                1 +
-                Math.random() *
-                (
-                    2 +
-                    strength * 4
-                );
-
-            const shift =
-                (
-                    Math.random() - 0.5
-                ) *
-                (
-                    10 +
-                    strength * 35
-                );
-
-            const width =
-                WIDTH *
-                (
-                    0.08 +
-                    Math.random() *
-                    0.30
-                );
-
-            ctx.globalCompositeOperation =
-                "screen";
-
-            ctx.fillStyle =
-                `rgba(255,35,75,${
-                    0.045 +
-                    strength * 0.08
-                })`;
-
-            ctx.fillRect(
-                shift - 3,
-                y,
-                width,
-                h
-            );
-
-            ctx.fillStyle =
-                `rgba(35,255,220,${
-                    0.035 +
-                    strength * 0.07
-                })`;
-
-            ctx.fillRect(
-                shift + 3,
-                y + h,
-                width,
-                h
-            );
-        }
-    }
-
-
-    if (
-        hardPulse > 0.88 &&
-        strength > 0.35
-    ) {
-
-        const y =
-            Math.random() *
-            HEIGHT;
-
-        const alpha =
-            0.06 +
-            strength * 0.10;
-
-        ctx.fillStyle =
-            `rgba(255,255,255,${alpha})`;
-
-        ctx.fillRect(
-            0,
-            y,
-            WIDTH,
-            1 +
-            Math.random() * 2
-        );
-    }
-
-
-    const inset =
-        4 +
-        strength * 5;
-
-    ctx.lineWidth =
-        1 +
-        strength * 1.5;
-
-    ctx.strokeStyle =
-        `rgba(255,40,75,${
-            0.035 +
-            strength * 0.08
-        })`;
-
-    ctx.strokeRect(
-        inset - strength * 2,
-        inset,
-        WIDTH -
-            inset * 2 +
-            strength * 4,
-        HEIGHT -
-            inset * 2
-    );
-
-    ctx.strokeStyle =
-        `rgba(35,255,220,${
-            0.03 +
-            strength * 0.07
-        })`;
-
-    ctx.strokeRect(
-        inset + strength * 2,
-        inset,
-        WIDTH -
-            inset * 2 -
-            strength * 4,
-        HEIGHT -
-            inset * 2
-    );
-
-
-    if (
-        strength > 0.55
-    ) {
-
-        const noiseCount =
-            12 +
-            Math.floor(
-                strength * 18
-            );
-
-        for (
-            let i = 0;
-            i < noiseCount;
-            i++
-        ) {
-
-            const edge =
-                Math.floor(
-                    Math.random() * 4
-                );
-
-            const size =
-                2 +
-                Math.random() *
-                (
-                    4 +
-                    strength * 8
-                );
-
-            let x;
-            let y;
-
-            if (
-                edge === 0
-            ) {
-
-                x =
-                    Math.random() *
-                    WIDTH;
-
-                y =
-                    Math.random() *
-                    (
-                        8 +
-                        strength * 18
-                    );
-
-            } else if (
-                edge === 1
-            ) {
-
-                x =
-                    WIDTH -
-                    Math.random() *
-                    (
-                        8 +
-                        strength * 18
-                    );
-
-                y =
-                    Math.random() *
-                    HEIGHT;
-
-            } else if (
-                edge === 2
-            ) {
-
-                x =
-                    Math.random() *
-                    WIDTH;
-
-                y =
-                    HEIGHT -
-                    Math.random() *
-                    (
-                        8 +
-                        strength * 18
-                    );
-
-            } else {
-
-                x =
-                    Math.random() *
-                    (
-                        8 +
-                        strength * 18
-                    );
-
-                y =
-                    Math.random() *
-                    HEIGHT;
+        const lw = 8 + 10 * k;
+        ctx.shadowBlur = 16; ctx.shadowColor = "rgba(255,90,30,0.7)";
+        ctx.strokeStyle = `rgba(255,90,30,${0.05 + 0.1 * k})`; ctx.lineWidth = lw;
+        ctx.strokeRect(lw / 2, lw / 2, WIDTH - lw, HEIGHT - lw);
+        ctx.restore();
+    },
+    lightning(s) {
+        const k = Math.min(1, s), t = performance.now() * 0.001;
+        ctx.save(); ctx.globalCompositeOperation = "screen";
+        const lw = 6 + 8 * k;
+        ctx.strokeStyle = `rgba(90,200,255,${0.07 + 0.13 * k})`; ctx.lineWidth = lw;
+        ctx.shadowBlur = 14; ctx.shadowColor = "#46d8ff";
+        ctx.strokeRect(lw / 2, lw / 2, WIDTH - lw, HEIGHT - lw);
+        const tick = Math.floor(t * 7);
+        for (let i = 0; i < 4; i++) {
+            const seed = tick * 7 + i * 13;
+            if (fxHash(seed) < 0.45) continue;
+            const p = fxPerim(fxHash(seed + 1));
+            let x = p.x, y = p.y;
+            ctx.beginPath(); ctx.moveTo(x, y);
+            for (let n = 1; n <= 5; n++) {
+                const step = (14 + 30 * k) / 5 * 1;
+                x += p.nx * step * 1.6 + p.ny * (fxHash(seed + n * 3) - 0.5) * 26;
+                y += p.ny * step * 1.6 - p.nx * (fxHash(seed + n * 3) - 0.5) * 26;
+                ctx.lineTo(x, y);
             }
-
-            const alpha =
-                0.04 +
-                strength * 0.12;
-
-            ctx.fillStyle =
-                i % 2 === 0
-                    ? `rgba(255,45,80,${alpha})`
-                    : `rgba(35,255,220,${alpha})`;
-
-            ctx.fillRect(
-                x,
-                y,
-                size,
-                size
-            );
+            ctx.strokeStyle = `rgba(235,250,255,${0.5 + 0.4 * k})`; ctx.lineWidth = 1.5 + k;
+            ctx.shadowBlur = 12; ctx.shadowColor = "#7fe3ff"; ctx.stroke();
         }
+        ctx.restore();
+    },
+    petals(s) {
+        const k = Math.min(1, s), t = performance.now() * 0.001;
+        ctx.save();
+        for (let i = 0; i < 26; i++) {
+            const p = fxPerim(fxHash(i) + t * (0.012 + fxHash(i + 4) * 0.015));
+            const d = (10 + fxHash(i + 8) * 30 * (0.5 + k)) + Math.sin(t * 1.6 + i) * 6;
+            const px = p.x + p.nx * d, py = p.y + p.ny * d;
+            ctx.translate(px, py); ctx.rotate(t * 1.3 + i);
+            ctx.fillStyle = `hsla(${335 + fxHash(i + 2) * 25},90%,${75 + fxHash(i) * 12}%,${0.22 + 0.45 * k})`;
+            ctx.beginPath(); ctx.ellipse(0, 0, 3 + 3.5 * k, 1.8 + 1.6 * k, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.setTransform(canvas.width / WIDTH * 0 + 1, 0, 0, 1, 0, 0);
+            ctx.restore(); ctx.save();
+        }
+        ctx.restore();
+    },
+    pulse(s) {
+        const k = Math.min(1, s), t = performance.now() * 0.001;
+        ctx.save(); ctx.globalCompositeOperation = "screen";
+        for (let i = 0; i < 3; i++) {
+            const ph = (t * 0.6 + i / 3) % 1, inset = ph * (26 + 34 * k);
+            ctx.strokeStyle = `hsla(${195 + i * 25},100%,68%,${(1 - ph) * (0.12 + 0.3 * k)})`;
+            ctx.lineWidth = 2 + 3 * k * (1 - ph);
+            ctx.shadowBlur = 12; ctx.shadowColor = ctx.strokeStyle;
+            ctx.beginPath(); ctx.roundRect(inset + 2, inset + 2, WIDTH - inset * 2 - 4, HEIGHT - inset * 2 - 4, 6 + ph * 14); ctx.stroke();
+        }
+        ctx.restore();
+    },
+    comet(s) {
+        const k = Math.min(1, s), t = performance.now() * 0.001;
+        ctx.save(); ctx.globalCompositeOperation = "screen";
+        const heads = 2 + Math.round(k * 2);
+        for (let c = 0; c < heads; c++) {
+            const head = t * 0.13 + c / heads;
+            for (let i = 0; i < 22; i++) {
+                const p = fxPerim(head - i * 0.0045), f = 1 - i / 22;
+                ctx.fillStyle = `hsla(${45 - i * 1.5},100%,${80 - i}%,${f * (0.3 + 0.6 * k)})`;
+                ctx.shadowBlur = 10; ctx.shadowColor = "rgba(255,230,150,0.9)";
+                ctx.beginPath(); ctx.arc(p.x + p.nx * 7, p.y + p.ny * 7, (1.4 + 4.2 * k) * f, 0, Math.PI * 2); ctx.fill();
+            }
+        }
+        ctx.restore();
+    },
+    prism(s) {
+        const k = Math.min(1, s), t = performance.now() * 0.001;
+        ctx.save(); ctx.globalCompositeOperation = "screen";
+        const N = 96;
+        for (let i = 0; i < N; i++) {
+            const p = fxPerim(i / N);
+            const wave = (Math.sin(t * 2.5 - i * 0.28) + 1) / 2;
+            ctx.fillStyle = `hsla(${(i * 3.75 + t * 70) % 360},100%,62%,${(0.10 + 0.35 * k) * (0.35 + 0.65 * wave)})`;
+            ctx.shadowBlur = 10; ctx.shadowColor = ctx.fillStyle;
+            ctx.beginPath(); ctx.arc(p.x + p.nx * 8, p.y + p.ny * 8, 2 + 4 * k * wave, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.restore();
     }
-
-    ctx.restore();
-}
-
+};
 
 function drawStreakEffect() {
-
-    const strength =
-        getStreakStrength();
-
-    const effect =
-        STREAK_EFFECTS[
-            visualSettings.streakEffect
-        ].value;
-
-    if (
-        strength <= 0 ||
-        effect === "none"
-    ) {
-        return;
-    }
-
-    switch (
-        effect
-    ) {
-
-        case "rainbow":
-            drawRainbowBorder(
-                strength
-            );
-            break;
-
-        case "neon":
-            drawNeonBorder(
-                strength
-            );
-            break;
-
-        case "fire":
-            drawFireBorder(
-                strength
-            );
-            break;
-
-        case "ice":
-            drawIceBorder(
-                strength
-            );
-            break;
-
-        case "wave":
-            drawWaveBorder(
-                strength
-            );
-            break;
-
-        case "stars":
-            drawStarsBorder(
-                strength
-            );
-            break;
-
-        case "glitch":
-            drawGlitchBorder(
-                strength
-            );
-            break;
-    }
+    const strength = getStreakStrength();
+    const effect = (STREAK_EFFECTS[visualSettings.streakEffect] || STREAK_EFFECTS[0]).value;
+    if (strength <= 0 || effect === "none") return;
+    const fn = STREAK_RENDERERS[effect];
+    if (fn) fn(strength);
 }
-
 
 /* =========================================================
    위험 블록 스킨
 ========================================================= */
-
-function drawDangerBlock(
-    c,
-    r,
-    skin
-) {
-
-    const x =
-        c * CELL;
-
-    const y =
-        r * CELL;
-
-    const time =
-        performance.now() *
-        0.001;
-
-
-    /* -----------------------------------------------------
-       기본
-    ----------------------------------------------------- */
-
-    if (
-        skin === "solid"
-    ) {
-
-        ctx.fillStyle =
-            "#d93445";
-
-        ctx.fillRect(
-            x + 4,
-            y + 4,
-            CELL - 8,
-            CELL - 8
-        );
-
-        ctx.fillStyle =
-            "rgba(255,255,255,0.18)";
-
-        ctx.fillRect(
-            x + 8,
-            y + 8,
-            CELL - 16,
-            4
-        );
-
-        return;
-    }
-
-
-    /* -----------------------------------------------------
-       X 경고
-    ----------------------------------------------------- */
-
-    if (
-        skin === "x"
-    ) {
-
-        ctx.strokeStyle =
-            "#ff4052";
-
-        ctx.lineWidth = 3;
-
-        ctx.strokeRect(
-            x + 5,
-            y + 5,
-            CELL - 10,
-            CELL - 10
-        );
-
-        ctx.strokeStyle =
-            "#ff4052";
-
-        ctx.lineWidth = 4;
-        ctx.lineCap = "square";
-
-        ctx.beginPath();
-
-        ctx.moveTo(
-            x + 11,
-            y + 11
-        );
-
-        ctx.lineTo(
-            x + CELL - 11,
-            y + CELL - 11
-        );
-
-        ctx.moveTo(
-            x + CELL - 11,
-            y + 11
-        );
-
-        ctx.lineTo(
-            x + 11,
-            y + CELL - 11
-        );
-
-        ctx.stroke();
-
-        ctx.strokeStyle =
-            "rgba(255,64,82,0.35)";
-
-        ctx.lineWidth = 2;
-
-        ctx.shadowBlur = 5;
-        ctx.shadowColor =
-            "#ff4052";
-
-        ctx.beginPath();
-
-        ctx.moveTo(
-            x + 11,
-            y + 11
-        );
-
-        ctx.lineTo(
-            x + CELL - 11,
-            y + CELL - 11
-        );
-
-        ctx.moveTo(
-            x + CELL - 11,
-            y + 11
-        );
-
-        ctx.lineTo(
-            x + 11,
-            y + CELL - 11
-        );
-
-        ctx.stroke();
-
-        ctx.shadowBlur = 0;
-        ctx.lineCap = "butt";
-
-        return;
-    }
-
-
-    /* -----------------------------------------------------
-       경고
-    ----------------------------------------------------- */
-
-    if (
-        skin === "warning"
-    ) {
-
-        ctx.fillStyle =
-            "rgba(255,143,40,0.16)";
-
-        ctx.fillRect(
-            x + 4,
-            y + 4,
-            CELL - 8,
-            CELL - 8
-        );
-
-        ctx.strokeStyle =
-            "#ff9d3b";
-
-        ctx.lineWidth = 3;
-
-        ctx.strokeRect(
-            x + 5,
-            y + 5,
-            CELL - 10,
-            CELL - 10
-        );
-
-        ctx.fillStyle =
-            "#ffb347";
-
-        ctx.font =
-            "bold 25px Arial";
-
-        ctx.textAlign =
-            "center";
-
-        ctx.textBaseline =
-            "middle";
-
-        ctx.fillText(
-            "!",
-            x + CELL / 2,
-            y + CELL / 2 + 1
-        );
-
-        return;
-    }
-
-
-    /* -----------------------------------------------------
-       위험 / 방사능
-    ----------------------------------------------------- */
-
-    if (
-        skin === "hazard"
-    ) {
-
-        ctx.fillStyle =
-            "#18140a";
-
-        ctx.fillRect(
-            x + 4,
-            y + 4,
-            CELL - 8,
-            CELL - 8
-        );
-
-        ctx.strokeStyle =
-            "#ffd83d";
-
-        ctx.lineWidth = 3;
-
-        ctx.strokeRect(
-            x + 4,
-            y + 4,
-            CELL - 8,
-            CELL - 8
-        );
-
-        ctx.fillStyle =
-            "#ffd83d";
-
-        ctx.font =
-            "bold 22px Arial";
-
-        ctx.textAlign =
-            "center";
-
-        ctx.textBaseline =
-            "middle";
-
-        ctx.fillText(
-            "☢",
-            x + CELL / 2,
-            y + CELL / 2 + 1
-        );
-
-        return;
-    }
-
-
-    /* -----------------------------------------------------
-       화염
-    ----------------------------------------------------- */
-
-    if (
-        skin === "fire"
-    ) {
-
-        const pulse =
-            0.7 +
-            Math.sin(
-                time * 7
-            ) *
-            0.25;
-
-        ctx.fillStyle =
-            `rgba(255,45,30,${
-                0.12 +
-                pulse * 0.12
-            })`;
-
-        ctx.fillRect(
-            x + 3,
-            y + 3,
-            CELL - 6,
-            CELL - 6
-        );
-
-        ctx.strokeStyle =
-            "#ff3b20";
-
-        ctx.lineWidth = 3;
-
-        ctx.shadowBlur = 8;
-        ctx.shadowColor =
-            "#ff3b20";
-
-        ctx.strokeRect(
-            x + 5,
-            y + 5,
-            CELL - 10,
-            CELL - 10
-        );
-
-        ctx.shadowBlur = 0;
-
-        ctx.fillStyle =
-            "#ffcf33";
-
-        ctx.font =
-            "bold 23px Arial";
-
-        ctx.textAlign =
-            "center";
-
-        ctx.textBaseline =
-            "middle";
-
-        ctx.fillText(
-            "🔥",
-            x + CELL / 2,
-            y + CELL / 2 + 1
-        );
-
-        return;
-    }
-
-
-    /* -----------------------------------------------------
-       해골
-    ----------------------------------------------------- */
-
-    if (
-        skin === "skull"
-    ) {
-
-        ctx.fillStyle =
-            "#17191c";
-
-        ctx.fillRect(
-            x + 4,
-            y + 4,
-            CELL - 8,
-            CELL - 8
-        );
-
-        ctx.strokeStyle =
-            "#e94b58";
-
-        ctx.lineWidth = 3;
-
-        ctx.strokeRect(
-            x + 5,
-            y + 5,
-            CELL - 10,
-            CELL - 10
-        );
-
-        ctx.fillStyle =
-            "#f0f0f0";
-
-        ctx.font =
-            "bold 22px Arial";
-
-        ctx.textAlign =
-            "center";
-
-        ctx.textBaseline =
-            "middle";
-
-        ctx.fillText(
-            "☠",
-            x + CELL / 2,
-            y + CELL / 2 + 1
-        );
-
-        return;
-    }
-
-
-    /* -----------------------------------------------------
-       네온
-    ----------------------------------------------------- */
-
-    if (
-        skin === "neon"
-    ) {
-
-        const pulse =
-            0.65 +
-            Math.sin(
-                time * 5
-            ) *
-            0.25;
-
-        ctx.fillStyle =
-            `rgba(255,20,80,${
-                0.035 +
-                pulse * 0.055
-            })`;
-
-        ctx.fillRect(
-            x + 3,
-            y + 3,
-            CELL - 6,
-            CELL - 6
-        );
-
-        ctx.strokeStyle =
-            `rgba(255,35,90,${
-                0.65 +
-                pulse * 0.25
-            })`;
-
-        ctx.lineWidth = 2;
-
-        ctx.shadowBlur = 9;
-
-        ctx.shadowColor =
-            "#ff2360";
-
-        ctx.strokeRect(
-            x + 5,
-            y + 5,
-            CELL - 10,
-            CELL - 10
-        );
-
-        ctx.strokeStyle =
-            "rgba(255,100,150,0.7)";
-
-        ctx.lineWidth = 1;
-
-        ctx.strokeRect(
-            x + 9,
-            y + 9,
-            CELL - 18,
-            CELL - 18
-        );
-
-        ctx.shadowBlur = 0;
-
-        return;
-    }
-
-
-    /* -----------------------------------------------------
-       위험선
-    ----------------------------------------------------- */
-
-    if (
-        skin === "stripe"
-    ) {
-
-        ctx.fillStyle =
-            "#15171b";
-
-        ctx.fillRect(
-            x + 3,
-            y + 3,
-            CELL - 6,
-            CELL - 6
-        );
-
-        ctx.save();
-
-        ctx.beginPath();
-
-        ctx.rect(
-            x + 4,
-            y + 4,
-            CELL - 8,
-            CELL - 8
-        );
-
-        ctx.clip();
-
-        ctx.strokeStyle =
-            "#e52e3e";
-
-        ctx.lineWidth = 5;
-
-        for (
-            let offset = -CELL;
-            offset < CELL * 2;
-            offset += 12
-        ) {
-
-            ctx.beginPath();
-
-            ctx.moveTo(
-                x + offset,
-                y + CELL
-            );
-
-            ctx.lineTo(
-                x + offset + CELL,
-                y
-            );
-
-            ctx.stroke();
+function drawDangerBlock(c, r, skin) {
+    const x = c * CELL, y = r * CELL, t = performance.now() * 0.001;
+    const cx = x + CELL / 2, cy = y + CELL / 2;
+    ctx.save();
+    switch (skin) {
+        case "spike": {
+            ctx.fillStyle = "rgba(255,60,80,0.12)"; ctx.fillRect(x + 3, y + 3, CELL - 6, CELL - 6);
+            const g = ctx.createRadialGradient(cx, cy, 2, cx, cy, 18); g.addColorStop(0, "#ff8a96"); g.addColorStop(1, "#c4202f");
+            ctx.fillStyle = g; ctx.beginPath();
+            for (let i = 0; i < 16; i++) {
+                const a = i * Math.PI / 8 + t * 0.6, rad = i % 2 === 0 ? 17.5 : 8.5;
+                i ? ctx.lineTo(cx + Math.cos(a) * rad, cy + Math.sin(a) * rad) : ctx.moveTo(cx + Math.cos(a) * rad, cy + Math.sin(a) * rad);
+            }
+            ctx.closePath(); ctx.fill(); ctx.strokeStyle = "#5a0d16"; ctx.lineWidth = 1.5; ctx.stroke();
+            ctx.fillStyle = "#2a0a10"; ctx.beginPath(); ctx.arc(cx, cy, 4, 0, Math.PI * 2); ctx.fill();
+            break;
         }
-
-        ctx.restore();
-
-        ctx.strokeStyle =
-            "#ff4052";
-
-        ctx.lineWidth = 2;
-
-        ctx.strokeRect(
-            x + 4,
-            y + 4,
-            CELL - 8,
-            CELL - 8
-        );
-
-        return;
-    }
-
-
-    /* -----------------------------------------------------
-       글리치
-    ----------------------------------------------------- */
-
-    if (
-        skin === "glitch"
-    ) {
-
-        const jitter =
-            Math.sin(time * 18) * 1.8;
-
-        ctx.save();
-
-        /* 기본 어두운 블록 */
-        ctx.fillStyle =
-            "#11151d";
-
-        ctx.fillRect(
-            x + 3,
-            y + 3,
-            CELL - 6,
-            CELL - 6
-        );
-
-        /* 청록 / 마젠타 색수차 */
-        ctx.globalAlpha = 0.9;
-        ctx.fillStyle =
-            "rgba(35,255,220,0.75)";
-
-        ctx.fillRect(
-            x + 7 + jitter,
-            y + 8,
-            CELL - 17,
-            5
-        );
-
-        ctx.fillStyle =
-            "rgba(255,45,100,0.78)";
-
-        ctx.fillRect(
-            x + 11 - jitter,
-            y + 15,
-            CELL - 15,
-            4
-        );
-
-        /* 잘린 디지털 조각 */
-        ctx.globalAlpha = 0.85;
-        ctx.fillStyle =
-            "#23ffdc";
-
-        ctx.fillRect(
-            x + 6,
-            y + 25 + Math.sin(time * 13) * 1.5,
-            12,
-            3
-        );
-
-        ctx.fillStyle =
-            "#ff2d64";
-
-        ctx.fillRect(
-            x + 22,
-            y + 29 + Math.cos(time * 16) * 1.5,
-            10,
-            3
-        );
-
-        /* 스캔라인 */
-        ctx.globalAlpha = 0.28;
-        ctx.fillStyle =
-            "#ffffff";
-
-        for (
-            let lineY = 7;
-            lineY < CELL - 5;
-            lineY += 6
-        ) {
-            ctx.fillRect(
-                x + 5,
-                y + lineY,
-                CELL - 10,
-                1
-            );
+        case "laser": {
+            ctx.fillStyle = "#140a10"; ctx.fillRect(x + 3, y + 3, CELL - 6, CELL - 6);
+            for (let i = 0; i < 3; i++) {
+                const pulse = (Math.sin(t * 6 + i * 1.7) + 1) / 2, yy = y + 10 + i * 10;
+                ctx.strokeStyle = `rgba(255,50,70,${0.45 + pulse * 0.55})`; ctx.lineWidth = 2;
+                ctx.shadowBlur = 8; ctx.shadowColor = "#ff2e46";
+                ctx.beginPath(); ctx.moveTo(x + 6, yy); ctx.lineTo(x + CELL - 6, yy); ctx.stroke();
+            }
+            ctx.shadowBlur = 0; ctx.fillStyle = "#6b7684";
+            for (let i = 0; i < 3; i++) { ctx.fillRect(x + 3, y + 8 + i * 10, 4, 4); ctx.fillRect(x + CELL - 7, y + 8 + i * 10, 4, 4); }
+            ctx.strokeStyle = "rgba(255,50,70,0.6)"; ctx.lineWidth = 1.5; ctx.strokeRect(x + 3.5, y + 3.5, CELL - 7, CELL - 7);
+            break;
         }
-
-        /* 테두리 */
-        ctx.globalAlpha = 1;
-        ctx.strokeStyle =
-            "#23ffdc";
-
-        ctx.lineWidth = 1.5;
-
-        ctx.strokeRect(
-            x + 4,
-            y + 4,
-            CELL - 8,
-            CELL - 8
-        );
-
-        ctx.strokeStyle =
-            "rgba(255,45,100,0.85)";
-
-        ctx.strokeRect(
-            x + 7 + jitter * 0.45,
-            y + 7,
-            CELL - 14,
-            CELL - 14
-        );
-
-        /* 짧은 노이즈 조각 */
-        for (
-            let i = 0;
-            i < 3;
-            i++
-        ) {
-            const noiseX =
-                x + 5 +
-                Math.random() * (CELL - 12);
-
-            const noiseY =
-                y + 5 +
-                Math.random() * (CELL - 12);
-
-            ctx.fillStyle =
-                i % 2 === 0
-                    ? "rgba(35,255,220,0.8)"
-                    : "rgba(255,45,100,0.8)";
-
-            ctx.fillRect(
-                noiseX,
-                noiseY,
-                3 + Math.random() * 5,
-                1 + Math.random() * 2
-            );
+        case "lava": {
+            const g = ctx.createLinearGradient(x, y, x, y + CELL); g.addColorStop(0, "#ff9a2a"); g.addColorStop(1, "#c4200f");
+            ctx.beginPath(); ctx.roundRect(x + 3, y + 3, CELL - 6, CELL - 6, 7); ctx.fillStyle = g; ctx.fill();
+            ctx.save(); ctx.clip();
+            for (let i = 0; i < 3; i++) {
+                ctx.fillStyle = "rgba(255,225,100,0.7)"; ctx.beginPath();
+                ctx.arc(cx + Math.sin(t * 1.7 + i * 2.1) * 9, cy + Math.cos(t * 1.3 + i * 1.6) * 9, 4 + i, 0, Math.PI * 2); ctx.fill();
+            }
+            ctx.restore();
+            ctx.strokeStyle = "#3a0d08"; ctx.lineWidth = 3; ctx.beginPath(); ctx.roundRect(x + 4.5, y + 4.5, CELL - 9, CELL - 9, 6); ctx.stroke();
+            break;
         }
-
-        ctx.restore();
-
-        return;
+        case "bomb": {
+            ctx.strokeStyle = "rgba(255,70,80,0.55)"; ctx.lineWidth = 2; ctx.strokeRect(x + 4, y + 4, CELL - 8, CELL - 8);
+            ctx.fillStyle = "#1b1f27"; ctx.beginPath(); ctx.arc(cx, cy + 3, 12, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = "rgba(255,255,255,0.22)"; ctx.beginPath(); ctx.arc(cx - 4, cy - 1, 3, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = "#b59a6b"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(cx + 5, cy - 7); ctx.quadraticCurveTo(cx + 12, cy - 9, cx + 10, cy - 15); ctx.stroke();
+            ctx.fillStyle = "#ffd24a"; ctx.shadowBlur = 8; ctx.shadowColor = "#ff9d2e";
+            ctx.beginPath(); ctx.arc(cx + 10, cy - 15, 2.5 + Math.sin(t * 20) * 1.2, 0, Math.PI * 2); ctx.fill();
+            break;
+        }
+        case "electric": {
+            ctx.fillStyle = "#0b1630"; ctx.fillRect(x + 3, y + 3, CELL - 6, CELL - 6);
+            const seed = Math.floor(t * 10) * 11 + c * 7 + r * 13;
+            ctx.beginPath(); ctx.moveTo(x + 9, y + 6);
+            for (let n = 1; n <= 5; n++) ctx.lineTo(x + 9 + (CELL - 18) * n / 5 + (fxHash(seed + n) - 0.5) * 10 * (n < 5 ? 1 : 0), y + 6 + (CELL - 12) * n / 5);
+            ctx.strokeStyle = "#fff176"; ctx.lineWidth = 2.4; ctx.lineJoin = "round"; ctx.shadowBlur = 9; ctx.shadowColor = "#46d8ff"; ctx.stroke();
+            ctx.shadowBlur = 0; ctx.strokeStyle = "rgba(70,216,255,0.85)"; ctx.lineWidth = 2; ctx.strokeRect(x + 4, y + 4, CELL - 8, CELL - 8);
+            break;
+        }
+        case "toxic": {
+            ctx.fillStyle = "#0f2a14"; ctx.beginPath(); ctx.roundRect(x + 3, y + 3, CELL - 6, CELL - 6, 6); ctx.fill();
+            ctx.strokeStyle = "#6bff6b"; ctx.lineWidth = 2; ctx.beginPath(); ctx.roundRect(x + 4, y + 4, CELL - 8, CELL - 8, 6); ctx.stroke();
+            for (let i = 0; i < 4; i++) {
+                const ph = (t * 0.55 + i * 0.27) % 1;
+                ctx.strokeStyle = `rgba(150,255,120,${1 - ph * 0.6})`; ctx.fillStyle = `rgba(90,220,90,${0.35 * (1 - ph)})`; ctx.lineWidth = 1.4;
+                const bx = x + 10 + i * 7 + Math.sin(t * 2 + i) * 2, by = y + CELL - 8 - ph * (CELL - 16);
+                ctx.beginPath(); ctx.arc(bx, by, 2.2 + fxHash(i + c) * 2, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+            }
+            break;
+        }
+        case "void": {
+            const g = ctx.createRadialGradient(cx, cy, 1, cx, cy, 18); g.addColorStop(0, "#000"); g.addColorStop(0.6, "#1a0b33"); g.addColorStop(1, "#6b2bd9");
+            ctx.fillStyle = g; ctx.beginPath(); ctx.roundRect(x + 3, y + 3, CELL - 6, CELL - 6, 9); ctx.fill();
+            ctx.lineWidth = 2; ctx.shadowBlur = 7; ctx.shadowColor = "#b98cff"; ctx.strokeStyle = "#b98cff";
+            ctx.setLineDash([5, 4]); ctx.lineDashOffset = -t * 20; ctx.beginPath(); ctx.arc(cx, cy, 13, 0, Math.PI * 2); ctx.stroke();
+            ctx.lineDashOffset = t * 24; ctx.strokeStyle = "#e0ccff"; ctx.beginPath(); ctx.arc(cx, cy, 7, 0, Math.PI * 2); ctx.stroke();
+            break;
+        }
+        case "solid":
+        default: {
+            const g = ctx.createLinearGradient(x, y, x, y + CELL); g.addColorStop(0, "#f0505f"); g.addColorStop(1, "#b0212f");
+            ctx.fillStyle = g; ctx.beginPath(); ctx.roundRect(x + 4, y + 4, CELL - 8, CELL - 8, 6); ctx.fill();
+            ctx.fillStyle = "rgba(255,255,255,0.22)"; ctx.beginPath(); ctx.roundRect(x + 8, y + 8, CELL - 16, 5, 2.5); ctx.fill();
+            ctx.strokeStyle = "#6a1420"; ctx.lineWidth = 2; ctx.beginPath(); ctx.roundRect(x + 4, y + 4, CELL - 8, CELL - 8, 6); ctx.stroke();
+        }
     }
+    ctx.restore();
 }
 
 
@@ -12471,31 +10854,15 @@ function drawGame() {
 
 
     /* =====================================================
-       목표 - 파란색
+       목표 (도착 지점 스킨 설정 적용)
     ===================================================== */
 
-    if (
-        goal
-    ) {
-
-        ctx.fillStyle =
-            "#4da3ff";
-
-        ctx.fillRect(
+    if (goal) {
+        drawGoalSkin(
+            getGoalSkinValue(),
             goal.c * CELL + 5,
             goal.r * CELL + 5,
-            CELL - 10,
             CELL - 10
-        );
-
-        ctx.fillStyle =
-            "rgba(255,255,255,0.22)";
-
-        ctx.fillRect(
-            goal.c * CELL + 10,
-            goal.r * CELL + 10,
-            CELL - 20,
-            CELL - 20
         );
     }
 
@@ -13413,7 +11780,7 @@ function drawSkinPanel() {
         ctx.font = "600 15px Pretendard, Noto Sans KR, sans-serif";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText(row.label, WIDTH / 2, centerY - 34);
+        ctx.fillText(row.label, WIDTH / 2, centerY - 32);
 
         drawSettingsButton(panel.x + 24, centerY - 21, 62, 42, "◀");
         drawSettingsButton(panel.x + panel.w - 86, centerY - 21, 62, 42, "▶");
@@ -13483,6 +11850,8 @@ function drawSkinPanel() {
             });
         } else if (row.key === "playerSkin") {
             drawPlayerSkin(selected.value, selectedBox.x + 15, selectedBox.y + 6, 30);
+        } else if (row.key === "goalSkin") {
+            drawGoalSkin(selected.value, selectedBox.x + 15, selectedBox.y + 6, 30);
         }
 
         ctx.fillStyle = "#f0f3f6";
@@ -13502,136 +11871,24 @@ function drawSkinPanel() {
    연속 효과 미리보기
 ========================================================= */
 
-function drawEffectPreviewInBox(
-    effect,
-    name,
-    box
-) {
-
-    // 기존 연속 효과 미리보기는 실제 게임 효과와 같은 렌더러를 사용합니다.
-    // 미리보기의 모양/강도/애니메이션은 변경하지 않습니다.
-    const previewStrength =
-        3.50;
-
-    if (
-        effect !== "none"
-    ) {
-
+function drawEffectPreviewInBox(effect, name, box) {
+    if (effect !== "none" && STREAK_RENDERERS[effect]) {
         ctx.save();
-
-        ctx.translate(
-            box.x,
-            box.y
-        );
-
-        ctx.scale(
-            box.w / WIDTH,
-            box.h / HEIGHT
-        );
-
-        const outerInset = 0;
-        const innerInset = 12;
-
+        ctx.translate(box.x, box.y);
+        ctx.scale(box.w / WIDTH, box.h / HEIGHT);
         ctx.beginPath();
-
-        ctx.rect(
-            outerInset,
-            outerInset,
-            WIDTH -
-            outerInset * 2,
-            HEIGHT -
-            outerInset * 2
-        );
-
-        ctx.rect(
-            innerInset,
-            innerInset,
-            WIDTH -
-            innerInset * 2,
-            HEIGHT -
-            innerInset * 2
-        );
-
-        ctx.clip(
-            "evenodd"
-        );
-
-        switch (
-            effect
-        ) {
-
-            case "rainbow":
-                drawRainbowBorder(
-                    previewStrength
-                );
-                break;
-
-            case "neon":
-                drawNeonBorder(
-                    previewStrength
-                );
-                break;
-
-            case "fire":
-                drawFireBorder(
-                    previewStrength
-                );
-                break;
-
-            case "ice":
-                drawIceBorder(
-                    previewStrength
-                );
-                break;
-
-            case "wave":
-                drawWaveBorder(
-                    previewStrength
-                );
-                break;
-
-            case "stars":
-                drawStarsBorder(
-                    previewStrength
-                );
-                break;
-
-            case "glitch":
-                drawGlitchBorder(
-                    previewStrength
-                );
-                break;
-        }
-
+        ctx.rect(0, 0, WIDTH, HEIGHT);
+        ctx.rect(12, 12, WIDTH - 24, HEIGHT - 24);
+        ctx.clip("evenodd");
+        STREAK_RENDERERS[effect](3.5);
         ctx.restore();
     }
-
-
     ctx.save();
-
-    ctx.textAlign =
-        "center";
-
-    ctx.textBaseline =
-        "middle";
-
-    ctx.fillStyle =
-        "rgba(255,255,255,0.94)";
-
-    ctx.font =
-        "600 15px Pretendard, Noto Sans KR, sans-serif";
-
-    ctx.fillText(
-        effect === "none"
-            ? "효과 없음"
-            : name,
-
-        WIDTH / 2,
-
-        box.y +
-        box.h / 2
-    );
-
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "rgba(255,255,255,0.94)";
+    ctx.font = "600 15px Pretendard, Noto Sans KR, sans-serif";
+    ctx.fillText(effect === "none" ? "효과 없음" : name, WIDTH / 2, box.y + box.h / 2);
     ctx.restore();
 }
 
