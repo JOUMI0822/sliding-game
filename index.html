@@ -1090,12 +1090,97 @@ html.fit-scale canvas {
 #guestNameError { min-height: 20px; margin: 8px 0 12px; color: #ff8f9b; font-size: 12px; }
 #guestNameDialog .logout-confirm-actions button { color: #fff; background: #222934; }
 #guestNameOk { background: #236ea8 !important; border-color: rgba(99,184,255,0.75) !important; }
+
+/* ---------- 로딩 화면 / 팁 ---------- */
+#loadingOverlay {
+    position: fixed; inset: 0; z-index: 10050;
+    display: none; align-items: center; justify-content: center;
+    padding: 24px;
+    background: radial-gradient(circle at 50% 28%, rgba(75,163,255,0.16), transparent 46%), #0b0e13;
+    touch-action: none; cursor: pointer;
+    user-select: none; -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+#loadingOverlay.visible { display: flex; }
+#loadingInner { width: min(520px, 100%); text-align: center; }
+#loadingTitle { color: #f3f5f7; font-size: 26px; font-weight: 800; margin-bottom: 26px; }
+#loadingTipCard {
+    min-height: 150px; padding: 24px 22px 20px;
+    border: 1px solid #394352; border-radius: 18px;
+    background: rgba(23,28,37,0.96);
+    box-shadow: 0 18px 60px rgba(0,0,0,0.45);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+}
+#loadingTipCard.swap { animation: loadingTipIn .28s ease; }
+@keyframes loadingTipIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+#loadingTipLabel { color: #ffd76a; font-size: 13px; font-weight: 800; letter-spacing: 1px; }
+#loadingTipText { color: #e7edf2; font-size: 18px; font-weight: 600; line-height: 1.6; word-break: keep-all; }
+#loadingTipCount { color: #697584; font-size: 12px; }
+#loadingHint { margin-top: 14px; color: #8f9aa8; font-size: 13px; }
+#loadingBar { margin: 22px auto 0; width: min(360px, 80%); height: 6px; border-radius: 999px; background: rgba(255,255,255,0.10); overflow: hidden; }
+#loadingBarFill { width: 0; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #63b8ff, #7ddcff); }
+@keyframes loadingFill { from { width: 0; } to { width: 100%; } }
+#loadingStatus { margin-top: 10px; color: #7f8b99; font-size: 12px; }
+
+/* ---------- 게임 종료 / 포기 확인 팝업 ---------- */
+#gamePopupOverlay {
+    position: fixed; inset: 0; z-index: 10020;
+    display: none; align-items: center; justify-content: center;
+    padding: 20px; background: rgba(0,0,0,0.55); touch-action: none;
+}
+#gamePopupOverlay.visible { display: flex; }
+#gamePopupDialog {
+    width: min(360px, calc(100vw - 40px));
+    padding: 24px 22px 20px;
+    border: 1px solid #394352; border-radius: 18px;
+    background: #171c25; box-shadow: 0 18px 50px rgba(0,0,0,0.45);
+    text-align: center;
+}
+#gamePopupTitle { margin: 0 0 10px; color: #fff; font-size: 21px; font-weight: 700; }
+#gamePopupMessage { margin: 0 0 8px; color: #aeb8c5; font-size: 15px; line-height: 1.5; }
+#gamePopupMessage:empty { display: none; }
+#gamePopupNote { margin: 0 0 18px; color: #8f9aa8; font-size: 12px; line-height: 1.5; }
+.game-popup-actions { display: flex; gap: 10px; }
+.game-popup-actions button {
+    flex: 1; min-height: 46px; border-radius: 10px;
+    font: 700 14px Pretendard, "Noto Sans KR", sans-serif;
+    color: #fff; cursor: pointer; touch-action: manipulation;
+}
+#gamePopupConfirm { background: #b83b49; border: 1px solid #d15a67; }
+#gamePopupConfirm:disabled { opacity: 0.45; cursor: default; }
+#gamePopupContinue { background: #236ea8; border: 1px solid rgba(99,184,255,0.75); }
 </style>
 </head>
 
 <body>
 
 
+
+<div id="loadingOverlay" aria-hidden="true">
+    <div id="loadingInner">
+        <div id="loadingTitle">로딩 중...</div>
+        <div id="loadingTipCard">
+            <div id="loadingTipLabel">💡 TIP</div>
+            <div id="loadingTipText"></div>
+            <div id="loadingTipCount"></div>
+        </div>
+        <div id="loadingHint">화면을 터치하면 다음 팁이 나와요</div>
+        <div id="loadingBar"><div id="loadingBarFill"></div></div>
+        <div id="loadingStatus"></div>
+    </div>
+</div>
+
+<div id="gamePopupOverlay" aria-hidden="true">
+    <div id="gamePopupDialog" role="dialog" aria-modal="true" aria-labelledby="gamePopupTitle">
+        <h2 id="gamePopupTitle"></h2>
+        <p id="gamePopupMessage"></p>
+        <p id="gamePopupNote"></p>
+        <div class="game-popup-actions">
+            <button id="gamePopupConfirm" type="button"></button>
+            <button id="gamePopupContinue" type="button">계속하기</button>
+        </div>
+    </div>
+</div>
 
 <div id="logoutConfirmOverlay" aria-hidden="true">
     <div id="logoutConfirmDialog" role="dialog" aria-modal="true" aria-labelledby="logoutConfirmDialogTitle">
@@ -1318,6 +1403,281 @@ const MAX_PREVIOUS_LAYOUTS = 180;
 ========================================================= */
 
 let gameState = "start";
+
+/* =========================================================
+   로딩 화면(팁) / 시작 카운트다운 / 종료·포기 확인 팝업
+========================================================= */
+const LOADING_MIN_MS = 3000;            // 로딩 화면 최소 표시 시간
+const COUNTDOWN_MS = 3000;              // 게임 시작 전 카운트다운
+const SOLO_END_CONFIRM_DELAY_MS = 2000; // 싱글 '끝내기' 버튼 조작 딜레이
+
+const LOADING_TIPS = [
+    "블록은 벽에 부딪힐 때까지 쭉 미끄러져요. 어디서 멈출지 미리 계산해 보세요!",
+    "빨간 위험 블록에 닿으면 목숨이 1개 줄어요. 목숨은 모두 3개예요.",
+    "맵 넘기기는 화면 더블 터치(PC는 G 키)! 한 게임에 5번까지 쓸 수 있고, 쓸 때마다 10점씩 감점돼요.",
+    "점수는 클리어 1회당 50점, 최고 연속 클리어 1회당 100점이에요. 연속 클리어가 핵심!",
+    "클리어를 많이 할수록 제한 시간이 줄어들어요. 5 · 10 · 20 · 25 · 30회에서 단계가 올라가요.",
+    "클리어할 때마다 코인 1개! 🛒 상점에서 아이템을 살 수 있어요.",
+    "🎒 인벤토리에서 아이템을 장착하면 게임을 시작할 때 사용돼요.",
+    "🧭 경로 안내 장치는 맵 시작 때 길을 보여주고, 더블 터치로 맵당 한 번 더 볼 수 있어요.",
+    "🔰 에너지 보호막은 위험 블록 충돌을 1회 막아주고, 2스테이지마다 다시 충전돼요.",
+    "🔋 에너지 복구 장치는 맵 넘기기를 모두 썼을 때 꺼내 쓸 수 있어요.",
+    "📜 일일 퀘스트를 완료하면 코인 보상을 받아요. 마음에 안 들면 다시 뽑을 수도 있어요!",
+    "게임이 끝나면 EXP를 얻어요. 레벨업하면 코인과 아이템 보상이 지급돼요! (최고 Lv.100)",
+    "⚔ 2인 대전은 같은 맵에서 겨루는 모드예요. 먼저 골인한 사람이 그 라운드의 승자!",
+    "2인 대전은 5000점에 먼저 도달하거나, 둘 다 목숨을 잃었을 때 점수가 더 높은 쪽이 이겨요.",
+    "🏆 랭킹은 매일, 매주 새로 시작해요. 하루 최고 점수로 순위를 올려 보세요.",
+    "👔 스킨 메뉴에서 벽 · 배경 · 캐릭터 · 잔상 · 도착 지점까지 꾸밀 수 있어요.",
+    "📖 튜토리얼은 코인 · 점수 · 랭킹에 영향이 없어요. 부담 없이 연습해 보세요!"
+];
+
+let loadingActive = false;
+let loadingShownAt = 0;
+let loadingTimer = null;
+let loadingToken = 0;
+let loadingTipIndex = 0;
+
+let countdownActive = false;
+let countdownEndAt = 0;
+
+let gamePopupOpen = false;
+let gamePopupMode = null;            // "solo" | "multi"
+let gamePopupDelayTimer = null;
+let gamePopupConfirmReadyAt = 0;
+let forfeitFallbackTimer = null;
+const GAME_POPUP_STATES = ["playing", "transition", "cleared", "dead", "timeout", "countdown", "multiplayerWaitingRound", "multiplayerWaitingResult"];
+
+function renderLoadingTip(animate) {
+    const text = document.getElementById("loadingTipText");
+    const count = document.getElementById("loadingTipCount");
+    const card = document.getElementById("loadingTipCard");
+    if (text) text.textContent = LOADING_TIPS[loadingTipIndex];
+    if (count) count.textContent = `${loadingTipIndex + 1} / ${LOADING_TIPS.length}`;
+    if (animate && card) {
+        card.classList.remove("swap");
+        void card.offsetWidth;
+        card.classList.add("swap");
+    }
+}
+
+function showLoadingScreen(minMs = LOADING_MIN_MS, status = "게임을 준비하는 중...") {
+    const overlay = document.getElementById("loadingOverlay");
+    if (!overlay) return;
+    loadingToken++;
+    clearTimeout(loadingTimer);
+    loadingTimer = null;
+    loadingActive = true;
+    loadingShownAt = performance.now();
+    loadingTipIndex = Math.floor(Math.random() * LOADING_TIPS.length);
+    renderLoadingTip(false);
+
+    const statusEl = document.getElementById("loadingStatus");
+    if (statusEl) statusEl.textContent = status;
+    const fill = document.getElementById("loadingBarFill");
+    if (fill) {
+        fill.style.animation = "none";
+        void fill.offsetWidth;
+        fill.style.animation = `loadingFill ${Math.max(300, minMs)}ms linear forwards`;
+    }
+    overlay.classList.add("visible");
+    overlay.setAttribute("aria-hidden", "false");
+}
+
+function hideLoadingScreen() {
+    if (!loadingActive) return;
+    loadingActive = false;
+    clearTimeout(loadingTimer);
+    loadingTimer = null;
+    const overlay = document.getElementById("loadingOverlay");
+    if (overlay) {
+        overlay.classList.remove("visible");
+        overlay.setAttribute("aria-hidden", "true");
+    }
+}
+
+// 로딩 화면을 최소 minMs 동안 보여준 뒤 callback 실행
+function runLoadingThen(callback, minMs = LOADING_MIN_MS, status) {
+    showLoadingScreen(minMs, status);
+    const token = loadingToken;
+    loadingTimer = setTimeout(() => {
+        loadingTimer = null;
+        if (!loadingActive || token !== loadingToken) return;
+        hideLoadingScreen();
+        callback();
+    }, minMs);
+}
+
+document.getElementById("loadingOverlay")?.addEventListener("click", event => {
+    event.preventDefault();
+    if (!loadingActive) return;
+    loadingTipIndex = (loadingTipIndex + 1) % LOADING_TIPS.length;
+    renderLoadingTip(true);
+    playUIClickSound();
+});
+
+/* ---------- 시작 전 3초 카운트다운 ---------- */
+function beginIntroCountdown() {
+    countdownActive = true;
+    countdownEndAt = performance.now() + COUNTDOWN_MS;
+    movement = null;
+    gameState = "countdown";
+}
+
+function finishIntroCountdown() {
+    countdownActive = false;
+    if (gameState === "countdown") gameState = "playing";
+    if (activeItem === "pathGuide" && pathGuideUses >= 1) showPathGuide();
+    if (multiplayerMatchActive) sendMultiplayerPosition(true);
+    updateUI();
+}
+
+function drawIntroCountdown(now) {
+    const remain = Math.max(0, countdownEndAt - now);
+    const num = Math.min(3, Math.max(1, Math.ceil(remain / 1000)));
+    const within = (remain % 1000) / 1000;          // 1 → 0 (각 숫자가 보이는 동안)
+    const scale = 1 + 0.4 * within;
+    const alpha = Math.min(1, within * 2.5 + 0.15);
+
+    ctx.save();
+    ctx.fillStyle = "rgba(0,0,0,0.38)";
+    ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+    ctx.translate(WIDTH / 2, HEIGHT / 2);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+
+    ctx.save();
+    ctx.scale(scale, scale);
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = "rgba(125,220,255,0.85)";
+    ctx.lineWidth = 6;
+    ctx.shadowBlur = 24;
+    ctx.shadowColor = "#55cfff";
+    ctx.beginPath();
+    ctx.arc(0, 0, 92, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 120px Pretendard, Noto Sans KR, sans-serif";
+    ctx.fillText(String(num), 0, 6);
+    ctx.restore();
+
+    ctx.fillStyle = "#dfe5ea";
+    ctx.font = "600 18px Pretendard, Noto Sans KR, sans-serif";
+    ctx.fillText("곧 게임이 시작됩니다", 0, 140);
+    ctx.restore();
+}
+
+/* ---------- 종료(싱글) / 포기(멀티) 확인 팝업 ---------- */
+function openGamePopup(mode) {
+    if (gamePopupOpen || loadingActive) return;
+    const overlay = document.getElementById("gamePopupOverlay");
+    const title = document.getElementById("gamePopupTitle");
+    const message = document.getElementById("gamePopupMessage");
+    const note = document.getElementById("gamePopupNote");
+    const confirmBtn = document.getElementById("gamePopupConfirm");
+    if (!overlay || !confirmBtn) return;
+
+    gamePopupOpen = true;
+    gamePopupMode = mode;
+    clearInterval(gamePopupDelayTimer);
+    gamePopupDelayTimer = null;
+
+    if (mode === "multi") {
+        title.textContent = "게임을 포기하시겠습니까?";
+        message.textContent = "";
+        note.textContent = "포기하면 패배 처리 됩니다.";
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = "포기하기";
+    } else {
+        title.textContent = "게임을 끝내시겠습니까?";
+        message.textContent = "지금까지의 기록으로 게임이 종료돼요.";
+        note.textContent = "이 창이 떠 있는 동안에도 제한 시간은 계속 흘러요.";
+        // 잘못 누르는 것을 막기 위해 '끝내기'에만 딜레이를 둡니다. ('계속하기'는 즉시 가능)
+        gamePopupConfirmReadyAt = performance.now() + SOLO_END_CONFIRM_DELAY_MS;
+        const tick = () => {
+            const left = gamePopupConfirmReadyAt - performance.now();
+            if (left > 0) {
+                confirmBtn.disabled = true;
+                confirmBtn.textContent = `끝내기 (${Math.ceil(left / 1000)})`;
+            } else {
+                confirmBtn.disabled = false;
+                confirmBtn.textContent = "끝내기";
+                clearInterval(gamePopupDelayTimer);
+                gamePopupDelayTimer = null;
+            }
+        };
+        tick();
+        gamePopupDelayTimer = setInterval(tick, 100);
+    }
+
+    overlay.classList.add("visible");
+    overlay.setAttribute("aria-hidden", "false");
+}
+
+function closeGamePopup() {
+    gamePopupOpen = false;
+    gamePopupMode = null;
+    clearInterval(gamePopupDelayTimer);
+    gamePopupDelayTimer = null;
+    const overlay = document.getElementById("gamePopupOverlay");
+    if (overlay) {
+        overlay.classList.remove("visible");
+        overlay.setAttribute("aria-hidden", "true");
+    }
+}
+
+function confirmGamePopup() {
+    const mode = gamePopupMode;
+    if (!gamePopupOpen) return;
+    if (mode === "solo" && performance.now() < gamePopupConfirmReadyAt) return;
+    closeGamePopup();
+
+    if (mode === "solo") {
+        if (!multiplayerMatchActive && ["playing", "transition", "cleared", "dead", "timeout"].includes(gameState)) {
+            finishGameOver();
+        }
+    } else if (mode === "multi") {
+        forfeitMultiplayerMatch();
+    }
+}
+
+document.getElementById("gamePopupConfirm")?.addEventListener("click", event => {
+    event.preventDefault();
+    if (event.currentTarget.disabled) return;
+    playUIClickSound();
+    confirmGamePopup();
+});
+document.getElementById("gamePopupContinue")?.addEventListener("click", event => {
+    event.preventDefault();
+    playUIClickSound();
+    closeGamePopup();
+});
+
+/* ---------- 멀티플레이 포기 ---------- */
+function applyLocalForfeit() {
+    if (!multiplayerMatchActive) return;
+    const winner = multiplayerRole === "host" ? "guest" : "host";
+    handleMultiplayerMessage({ type: "matchOver", winner, scores: multiplayerScores, reason: "forfeit" });
+    // 서버가 forfeit 메시지를 처리하지 못한 경우에도 연결 종료가 상대의 이탈 승리로 처리됩니다.
+    closeMultiplayerSocket();
+}
+
+function forfeitMultiplayerMatch() {
+    if (!multiplayerMatchActive) return;
+    movement = null;
+    setMessage("포기 처리 중...");
+    if (!multiplayerSend({ type: "forfeit" })) {
+        applyLocalForfeit();
+        return;
+    }
+    clearTimeout(forfeitFallbackTimer);
+    forfeitFallbackTimer = setTimeout(() => {
+        forfeitFallbackTimer = null;
+        applyLocalForfeit();
+    }, 2000);
+}
+
 
 /* =========================================================
    V28 계정 / 게스트 / 랭킹 상태
@@ -2233,6 +2593,7 @@ function closeMultiplayerSocket() {
     multiplayerRound = 0;
     multiplayerRoundTransition = false;
     multiplayerMatchType = null;
+    hideLoadingScreen();
     if (multiplayerSocket) { try { multiplayerSocket.close(); } catch (error) {} }
     multiplayerSocket = null;
 }
@@ -2356,6 +2717,13 @@ function connectMultiplayerSocket(onConnected) {
             multiplayerRole = null;
         } else {
             multiplayerStatus = "서버 연결 종료";
+            if (loadingActive) {
+                hideLoadingScreen();
+                multiplayerOpen = true;
+                multiplayerRole = null;
+                gameState = "start";
+                setMessage("서버 연결이 종료되었습니다. 다시 시도해 주세요.");
+            }
         }
         updateUI();
     });
@@ -2387,6 +2755,9 @@ function handleMultiplayerMessage(data) {
         multiplayerPeerJoined = true;
         multiplayerStatus = "상대 플레이어를 찾았습니다. 경기 준비 중...";
         multiplayerOpen = false;
+        if (multiplayerMatchType === "quick") {
+            showLoadingScreen(LOADING_MIN_MS, "상대 플레이어와 연결하는 중...");
+        }
         updateUI();
 
         // 빠른 대전에서는 양쪽 클라이언트가 matchFound를 실제로 수신한 뒤
@@ -2418,7 +2789,15 @@ function handleMultiplayerMessage(data) {
     if (data.type === "quickMatchReady") {
         logMultiplayerDebug("quickMatchReadyHandling");
         if (multiplayerMatchType === "quick" && multiplayerRole === "host" && !multiplayerMatchActive) {
-            startMultiplayerMatch();
+            // 로딩 화면(팁)을 최소 시간 동안 보여준 뒤 경기를 시작합니다.
+            const token = loadingToken;
+            const wait = loadingActive ? Math.max(0, LOADING_MIN_MS - (performance.now() - loadingShownAt)) : 0;
+            setTimeout(() => {
+                if (token !== loadingToken) return;
+                if (multiplayerMatchType === "quick" && multiplayerRole === "host" && !multiplayerMatchActive && multiplayerConnected) {
+                    startMultiplayerMatch();
+                }
+            }, wait);
         }
         return;
     }
@@ -2606,10 +2985,15 @@ function handleMultiplayerMessage(data) {
         resetOpponent();
         multiplayerPlayerVisible = true;
         multiplayerOpen = false;
-        gameState = "playing";
+        if (firstRound) {
+            hideLoadingScreen();
+            beginIntroCountdown();
+        } else {
+            gameState = "playing";
+        }
         // 방장이 보낸 맵을 적용하고 플레이어 위치를 초기화한 다음에 첫 위치를 보냅니다.
         sendMultiplayerPosition(true);
-        setMessage(multiplayerRound === 1 ? "경기 시작!" : `다음 맵 · ${multiplayerRound}라운드`);
+        setMessage(multiplayerRound === 1 ? "" : `다음 맵 · ${multiplayerRound}라운드`);
         updateUI();
         return;
     }
@@ -2710,6 +3094,7 @@ function startMultiplayerMatch() {
         logMultiplayerDebug("startMultiplayerMatchSkipped", { reason: "role-or-connection-not-ready" });
         return;
     }
+    hideLoadingScreen();
     multiplayerSeed = generateMatchSeed();
     multiplayerRound = 1;
     multiplayerMatchActive = true;
@@ -2724,10 +3109,9 @@ function startMultiplayerMatch() {
     multiplayerSelfDead = false;
     multiplayerRoundTransition = false;
     multiplayerOpen = false;
-    startNewGame();
+    startNewGame();   // 끝에서 3초 카운트다운이 시작됩니다.
     gameplayUIAccumulator = 0;
-    // 멀티플레이 시작 시 홈/대전 메뉴가 다시 표시되지 않도록 플레이 상태를 확정합니다.
-    gameState = "playing";
+    gameState = countdownActive ? "countdown" : "playing";
     multiplayerOpen = false;
     questOpen = false;
     shopOpen = false;
@@ -2744,7 +3128,7 @@ function startMultiplayerMatch() {
     });
     resetOpponent();
     multiplayerPlayerVisible = true;
-    gameState = "playing";
+    gameState = countdownActive ? "countdown" : "playing";
     updateUI();
     sendMultiplayerPosition(true);
 }
@@ -3948,44 +4332,13 @@ function playUIInvalidSound() {
     return playEffectSound("uiInvalid");
 }
 
-// 시작 효과음이 끝난 다음 실제 게임 화면으로 전환합니다.
+// 로딩 화면(팁) → 3초 카운트다운 → 게임 시작
 function playGameStartSoundAndThenStart() {
-    const src = AUDIO_FILES.gameStart;
-    if (!src || effectVolume <= 0) {
-        startNewGame();
-        return;
-    }
-
-    try {
-        let audio = effectAudioCache.get("gameStart");
-        if (!audio) {
-            audio = new Audio(src);
-            audio.preload = "auto";
-            audio.__soundType = "gameStart";
-            audio.setAttribute("playsinline", "");
-            effectAudioCache.set("gameStart", audio);
-        }
-
-        audio.volume = getSoundVolume("gameStart");
-        audio.currentTime = 0;
-
-        let transitioned = false;
-        const transition = () => {
-            if (transitioned) return;
-            transitioned = true;
-            startNewGame();
-        };
-
-        audio.addEventListener("ended", transition, { once: true });
-        setTimeout(transition, 2500);
-
-        const promise = audio.play();
-        if (promise && typeof promise.catch === "function") {
-            promise.catch(transition);
-        }
-    } catch (error) {
-        startNewGame();
-    }
+    if (loadingActive || gameState !== "start") return;
+    playEffectSound("gameStart");
+    runLoadingThen(() => {
+        if (gameState === "start") startNewGame();
+    }, LOADING_MIN_MS, "게임을 준비하는 중...");
 }
 
 /* =========================================================
@@ -4332,7 +4685,7 @@ function isGameplayMusicWanted() {
     // 실제 플레이 중이고, 사이트 탭/창이 활성화되어 있을 때만 BGM을 재생합니다.
     // 다른 탭으로 이동하거나 브라우저 창에서 벗어나면 재생을 멈춥니다.
     const pageIsActive = !document.hidden && (typeof document.hasFocus !== "function" || document.hasFocus());
-    return pageIsActive && gameAccessGranted && !["start", "gameover", "expResult", "multiplayerResult", "tutorial"].includes(gameState) && musicVolume > 0;
+    return pageIsActive && gameAccessGranted && !["start", "gameover", "expResult", "multiplayerResult", "tutorial", "countdown"].includes(gameState) && musicVolume > 0;
 }
 
 function startBackgroundMusic() {
@@ -7051,7 +7404,7 @@ function updateMapTransition(
             false;
 
         gameState =
-            tutorialActive ? "tutorial" : (multiplayerSelfDead && multiplayerMatchActive) ? "multiplayerWaitingResult" : "playing";
+            tutorialActive ? "tutorial" : countdownActive ? "countdown" : (multiplayerSelfDead && multiplayerMatchActive) ? "multiplayerWaitingResult" : "playing";
     }
 }
 
@@ -7963,6 +8316,9 @@ function startNewGame() {
     flash.alpha = 0;
 
     startRound();
+
+    // 로딩이 끝나 게임 화면이 켜지면 바로 시작하지 않고 3초 카운트다운 후 시작합니다.
+    beginIntroCountdown();
 }
 
 
@@ -8026,8 +8382,17 @@ function skipMap() {
         return;
     }
 
-    // 2인용 대전 중에는 맵 넘기기를 사용할 수 없습니다.
+    // 2인용 대전 중 더블 터치(G 키)는 맵 넘기기 대신 포기 확인 창을 엽니다.
     if (multiplayerMatchActive) {
+        if (gameState !== "multiplayerResult" && gameState !== "expResult") openGamePopup("multi");
+        return;
+    }
+
+    if (countdownActive || loadingActive || gamePopupOpen) {
+        return;
+    }
+
+    if (gameState === "multiplayerResult" || gameState === "expResult") {
         return;
     }
 
@@ -8044,9 +8409,8 @@ function skipMap() {
         if (openEnergyRecoveryChoice()) {
             showItemWarning("에너지 복구 장치를 사용할 수 있습니다.");
         } else {
-            setMessage(
-                "맵 넘기기 횟수를 모두 사용했습니다."
-            );
+            // 맵 넘기기를 모두 소진한 뒤 더블 터치 → 게임 종료 확인 창
+            openGamePopup("solo");
         }
 
         return;
@@ -8972,6 +9336,13 @@ window.addEventListener(
 
         if (guestNameOpen) return;
 
+        if (loadingActive) return;
+
+        if (gamePopupOpen) {
+            if (event.key === "Escape") closeGamePopup();
+            return;
+        }
+
         if (rewardListOpen) {
             if (event.key === "Escape") closeRewardList();
             return;
@@ -9004,7 +9375,7 @@ window.addEventListener(
             ) {
 
                 if (isMultiplayerPending()) return;
-                withGuestName(startNewGame);
+                withGuestName(playGameStartSoundAndThenStart);
 
             } else if (
                 gameState !==
@@ -9063,7 +9434,7 @@ window.addEventListener(
 
             if (isMultiplayerPending()) return;
 
-            withGuestName(startNewGame);
+            withGuestName(playGameStartSoundAndThenStart);
 
             return;
         }
@@ -9239,7 +9610,19 @@ gameWrapper.addEventListener(
             if (distance < SWIPE_MIN_DISTANCE && duration <= TAP_MAX_DURATION) startExperienceResult();
             return;
         }
-        if (gameState === "multiplayerWaitingResult") return;
+        if (gameState === "multiplayerWaitingResult") {
+            // 먼저 탈락해 관전 중이어도 더블 터치로 포기할 수 있습니다.
+            if (multiplayerMatchActive && !gamePopupOpen && distance < SWIPE_MIN_DISTANCE && duration <= TAP_MAX_DURATION) {
+                const spectateNow = performance.now();
+                if (spectateNow - lastTapTime <= DOUBLE_TAP_DELAY) {
+                    lastTapTime = 0;
+                    openGamePopup("multi");
+                } else {
+                    lastTapTime = spectateNow;
+                }
+            }
+            return;
+        }
         if (gameState === "expResult") {
             if (distance < SWIPE_MIN_DISTANCE && duration <= TAP_MAX_DURATION) finishExperienceResult();
             return;
@@ -9469,10 +9852,11 @@ gameWrapper.addEventListener(
 
             lastTapTime = 0;
 
-            if (
-                gameState !==
-                "gameover" &&
-                !multiplayerMatchActive &&
+            if (multiplayerMatchActive) {
+                // 2인 대전: 더블 터치 → 포기 확인 창
+                if (gameState !== "multiplayerResult") openGamePopup("multi");
+            } else if (
+                gameState !== "gameover" &&
                 gameState !== "multiplayerWaitingRound" &&
                 gameState !== "multiplayerWaitingResult" &&
                 gameState !== "multiplayerResult"
@@ -10570,6 +10954,19 @@ let gameplayUIAccumulator = 0;
 function update(delta) {
     if (gameState === "tutorial") updateMovement(delta);
     refreshDailyQuestIfNeeded();
+
+    // 시작 전 카운트다운: 끝나면 플레이 시작 (그 전에는 제한 시간이 흐르지 않음)
+    if (countdownActive && performance.now() >= countdownEndAt) {
+        finishIntroCountdown();
+    }
+
+    // 게임이 끝났거나 상태가 바뀌어 더 이상 의미 없는 팝업은 닫습니다.
+    if (gamePopupOpen) {
+        const stale = !GAME_POPUP_STATES.includes(gameState) ||
+            (gamePopupMode === "multi" && !multiplayerMatchActive) ||
+            (gamePopupMode === "solo" && multiplayerMatchActive);
+        if (stale) closeGamePopup();
+    }
 
     if (multiplayerMatchActive) {
         multiplayerSendAccumulator += delta;
@@ -13116,8 +13513,12 @@ function draw(now = performance.now()) {
     }
 
     drawGame();
-    if (gameState === "tutorial") drawTutorialOverlay();
-    else drawEnergyRecoveryChoice();
+    if (gameState === "tutorial") {
+        drawTutorialOverlay();
+    } else {
+        drawEnergyRecoveryChoice();
+        if (gameState === "countdown") drawIntroCountdown(now);
+    }
 }
 
 
@@ -13283,4 +13684,3 @@ requestAnimationFrame(
 
 </body>
     </html>
-    
