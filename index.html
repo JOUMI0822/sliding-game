@@ -3083,7 +3083,8 @@ const STREAK_EFFECTS = [
     { name: "눈보라", value: "snow" },
     { name: "독 포자", value: "spore" },
     { name: "황금 비", value: "goldRain" },
-    { name: "네온", value: "neon" }
+    { name: "네온", value: "neon" },
+    { name: "레인보우 네온", value: "rainbowNeon" }
 ];
 
 
@@ -10880,6 +10881,45 @@ const STREAK_RENDERERS = {
                 ctx.fillStyle = `hsla(${h ? 305 : 180},100%,${85 - i * 2}%,${f * (0.4 + 0.5 * k)})`;
                 ctx.shadowBlur = 10; ctx.shadowColor = h ? "#ff46dc" : "#37f5ff";
                 ctx.beginPath(); ctx.arc(p.x + p.nx * 6, p.y + p.ny * 6, (1.5 + 3.5 * k) * f, 0, Math.PI * 2); ctx.fill();
+            }
+        }
+        ctx.restore();
+    },
+    rainbowNeon(s) {
+        const k = Math.min(1, s), t = performance.now() * 0.001;
+        const P = 2 * (WIDTH + HEIGHT), m = 6;
+        const edges = [
+            { x1: m, y1: m, x2: WIDTH - m, y2: m, o: 0 },
+            { x1: WIDTH - m, y1: m, x2: WIDTH - m, y2: HEIGHT - m, o: WIDTH },
+            { x1: WIDTH - m, y1: HEIGHT - m, x2: m, y2: HEIGHT - m, o: WIDTH + HEIGHT },
+            { x1: m, y1: HEIGHT - m, x2: m, y2: m, o: 2 * WIDTH + HEIGHT }
+        ];
+        const hueAt = d => ((d / P) * 360 + t * 90) % 360;
+        ctx.save(); ctx.globalCompositeOperation = "screen"; ctx.lineCap = "round";
+        for (let layer = 0; layer < 2; layer++) {
+            const lw = layer === 0 ? 5 + 9 * k : 1.8 + 2.2 * k;
+            const alpha = layer === 0 ? 0.22 + 0.38 * k : 0.55 + 0.4 * k;
+            for (const e of edges) {
+                const len = Math.hypot(e.x2 - e.x1, e.y2 - e.y1);
+                const g = ctx.createLinearGradient(e.x1, e.y1, e.x2, e.y2);
+                for (let n = 0; n <= 8; n++) {
+                    g.addColorStop(n / 8, `hsla(${hueAt(e.o + len * n / 8)},100%,${layer ? 78 : 60}%,${alpha})`);
+                }
+                ctx.strokeStyle = g; ctx.lineWidth = lw;
+                ctx.shadowBlur = layer === 0 ? 22 : 10;
+                ctx.shadowColor = `hsla(${hueAt(e.o + len / 2)},100%,62%,0.95)`;
+                ctx.beginPath(); ctx.moveTo(e.x1, e.y1); ctx.lineTo(e.x2, e.y2); ctx.stroke();
+            }
+        }
+        const heads = 1 + Math.round(k * 2);
+        for (let h = 0; h < heads; h++) {
+            const head = t * 0.16 + h / heads;
+            for (let i = 0; i < 18; i++) {
+                const p = fxPerim(head - i * 0.004), f = 1 - i / 18;
+                const hue = hueAt(((head - i * 0.004) % 1 + 1) % 1 * P);
+                ctx.fillStyle = `hsla(${hue},100%,${88 - i * 2}%,${f * (0.45 + 0.5 * k)})`;
+                ctx.shadowBlur = 12; ctx.shadowColor = `hsla(${hue},100%,65%,1)`;
+                ctx.beginPath(); ctx.arc(p.x + p.nx * 9, p.y + p.ny * 9, (1.6 + 3.6 * k) * f, 0, Math.PI * 2); ctx.fill();
             }
         }
         ctx.restore();
