@@ -4691,6 +4691,7 @@ function saveMusicVolume() {
 }
 function setMusicVolume(value) {
     musicVolume = Math.max(0, Math.min(1, Number(value) || 0));
+    if (homeMusic) homeMusic.volume = musicVolume;
     if (backgroundMusic) backgroundMusic.volume = musicVolume;
     if (musicVolume <= 0 && backgroundMusic) {
         backgroundMusic.pause();
@@ -4700,6 +4701,67 @@ function setMusicVolume(value) {
     saveMusicVolume();
     requestSettingsRender();
 }
+ /* =========================================================
+   홈 화면 음악: 시작(홈) 화면에서만 반복 재생
+========================================================= */
+const HOME_MUSIC_URL = "https://raw.githubusercontent.com/JOUMI0822/sliding-game/main/Home.m4a";
+let homeMusic = null;
+let homeMusicBlocked = false;   // 브라우저가 자동 재생을 막았을 때, 다음 입력까지 재시도 중지
+
+function getHomeMusic() {
+    if (homeMusic) return homeMusic;
+    try {
+        homeMusic = new Audio(HOME_MUSIC_URL);
+        homeMusic.loop = true;
+        homeMusic.preload = "auto";
+        homeMusic.volume = musicVolume;
+        homeMusic.setAttribute("playsinline", "");
+        return homeMusic;
+    } catch (error) {
+        console.warn("홈 음악을 준비하지 못했습니다.", error);
+        return null;
+    }
+}
+
+function isHomeMusicWanted() {
+    const pageIsActive = !document.hidden && (typeof document.hasFocus !== "function" || document.hasFocus());
+    return pageIsActive && gameAccessGranted && gameState === "start" && !loadingActive && musicVolume > 0;
+}
+
+function startHomeMusic() {
+    if (!isHomeMusicWanted() || homeMusicBlocked) return;
+    const audio = getHomeMusic();
+    if (!audio || !audio.paused) return;
+    audio.volume = musicVolume;
+    const promise = audio.play();
+    if (promise && typeof promise.catch === "function") {
+        promise.catch(error => {
+            if (error && error.name === "NotAllowedError") homeMusicBlocked = true;
+        });
+    }
+}
+
+function stopHomeMusic(resetPosition = false) {
+    if (!homeMusic) return;
+    if (!homeMusic.paused) homeMusic.pause();
+    if (resetPosition) {
+        try { homeMusic.currentTime = 0; } catch (error) {}
+    }
+}
+
+function syncHomeMusic() {
+    if (isHomeMusicWanted()) {
+        startHomeMusic();
+    } else {
+        // 탭 전환 등은 위치 유지, 게임 시작/튜토리얼/로딩으로 넘어가면 처음으로 되감기
+        stopHomeMusic(gameState !== "start" || loadingActive);
+    }
+}
+
+// 자동 재생이 막혔다면 첫 터치/키 입력에서 다시 시도
+["pointerdown", "keydown", "touchend"].forEach(type => {
+    document.addEventListener(type, () => { homeMusicBlocked = false; }, { passive: true });
+});
 
 /* =========================================================
    배경음악: 실제 미로 플레이 중에만 반복 재생
@@ -13709,8 +13771,9 @@ function gameLoop(
     update(delta);
 
     // 게임 상태에 맞춰 배경음악을 시작/정지합니다.
-    syncBackgroundMusic();
-
+    function syncBackgroundMusic() {
+    syncHomeMusic();   // ← 이 줄 추가
+    // 홈/시작 화면으로 돌아오면 BGM을 정지하되, ...
     draw(now);
 
     requestAnimationFrame(
