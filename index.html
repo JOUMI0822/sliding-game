@@ -3063,7 +3063,10 @@ const DANGER_SKINS = [
     { name: "폭탄", value: "bomb" },
     { name: "전기", value: "electric" },
     { name: "독", value: "toxic" },
-    { name: "심연", value: "void" }
+    { name: "심연", value: "void" },
+    { name: "얼음", value: "ice" },
+    { name: "장미 덩굴", value: "thorn" },
+    { name: "황금 함정", value: "trap" }
 ];
 
 
@@ -3075,7 +3078,10 @@ const STREAK_EFFECTS = [
     { name: "꽃잎", value: "petals" },
     { name: "맥동", value: "pulse" },
     { name: "혜성", value: "comet" },
-    { name: "프리즘", value: "prism" }
+    { name: "프리즘", value: "prism" },
+    { name: "눈보라", value: "snow" },
+    { name: "독 포자", value: "spore" },
+    { name: "황금 비", value: "goldRain" }
 ];
 
 
@@ -3091,7 +3097,10 @@ const PLAYER_SKINS = [
     { name: "황금", value: "gold" },
     { name: "로봇", value: "robot" },
     { name: "다이아", value: "diamond" },
-    { name: "구슬", value: "orb" }
+    { name: "구슬", value: "orb" },
+    { name: "마그마", value: "magma" },
+    { name: "얼음 큐브", value: "ice" },
+    { name: "벚꽃", value: "blossom" }
 ];
 
 const PLAYER_TRAILS = [
@@ -3102,7 +3111,11 @@ const PLAYER_TRAILS = [
     { name: "별가루", value: "sparkle" },
     { name: "네온", value: "neon" },
     { name: "고스트", value: "ghost" },
-    { name: "글리치", value: "glitch" }
+    { name: "글리치", value: "glitch" },
+    { name: "거품", value: "bubble" },
+    { name: "서리", value: "frost" },
+    { name: "꽃잎", value: "petal" },
+    { name: "금화", value: "coin" }
 ];
 
 const GOAL_SKINS = [
@@ -3113,7 +3126,11 @@ const GOAL_SKINS = [
     { name: "수정", value: "crystal" },
     { name: "신호탑", value: "beacon" },
     { name: "보물상자", value: "chest" },
-    { name: "레이더", value: "radar" }
+    { name: "레이더", value: "radar" },
+    { name: "횃불", value: "torch" },
+    { name: "독 가마솥", value: "cauldron" },
+    { name: "눈꽃", value: "snowflake" },
+    { name: "도리이", value: "torii" }
 ];
 
 function getGoalSkinValue() {
@@ -3217,6 +3234,63 @@ function drawGoalSkin(skin, x, y, size = CELL - 10) {
             ctx.beginPath(); ctx.arc(15, 15, 2.4, 0, Math.PI * 2); ctx.fill();
             break;
         }
+        case "torch": {
+            ctx.fillStyle = "#6b4a2b"; ctx.beginPath(); ctx.roundRect(12.5, 13, 5, 16, 1.5); ctx.fill();
+            ctx.fillStyle = "#3a2412"; ctx.fillRect(10, 11, 10, 3.5);
+            const cols = ["#ff5a1f", "#ffa02e", "#fff1a0"];
+            for (let n = 0; n < 3; n++) {
+                const f = Math.sin(t * 9 + n * 2) * 1.4, h = 11 - n * 3;
+                ctx.fillStyle = cols[n]; ctx.shadowBlur = n === 0 ? 10 : 0; ctx.shadowColor = "#ff7a1f";
+                ctx.beginPath(); ctx.moveTo(9 + n * 1.6, 11);
+                ctx.quadraticCurveTo(10 + n + f, 11 - h * 0.55, 15 + f * 0.6, 11 - h);
+                ctx.quadraticCurveTo(20 - n + f, 11 - h * 0.55, 21 - n * 1.6, 11);
+                ctx.closePath(); ctx.fill();
+            }
+            break;
+        }
+        case "cauldron": {
+            ctx.fillStyle = "#1d2420"; ctx.beginPath(); ctx.ellipse(15, 27, 10, 2.5, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = "#2c3430"; ctx.beginPath(); ctx.moveTo(4, 13); ctx.quadraticCurveTo(2, 26, 15, 26); ctx.quadraticCurveTo(28, 26, 26, 13); ctx.closePath(); ctx.fill();
+            ctx.fillStyle = "#3b4540"; ctx.beginPath(); ctx.ellipse(15, 13, 11, 3.4, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = "#6bff6b"; ctx.shadowBlur = 8; ctx.shadowColor = "#6bff6b";
+            ctx.beginPath(); ctx.ellipse(15, 13, 9, 2.4, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.shadowBlur = 0;
+            for (let n = 0; n < 3; n++) {
+                const p = (t * 0.8 + n * 0.34) % 1;
+                ctx.strokeStyle = `rgba(170,255,150,${1 - p})`; ctx.lineWidth = 1.3;
+                ctx.beginPath(); ctx.arc(10 + n * 5 + Math.sin(t * 2 + n) * 1.5, 12 - p * 11, 1.6 + n * 0.5, 0, Math.PI * 2); ctx.stroke();
+            }
+            break;
+        }
+        case "snowflake": {
+            ctx.translate(15, 15); ctx.rotate(t * 0.5);
+            ctx.shadowBlur = 9; ctx.shadowColor = "rgba(150,225,255,0.9)";
+            ctx.strokeStyle = "#cdf3ff"; ctx.lineWidth = 2; ctx.lineCap = "round";
+            for (let a = 0; a < 6; a++) {
+                ctx.save(); ctx.rotate(a * Math.PI / 3); ctx.beginPath();
+                ctx.moveTo(0, 0); ctx.lineTo(0, -13);
+                ctx.moveTo(0, -8); ctx.lineTo(-3.5, -11.5);
+                ctx.moveTo(0, -8); ctx.lineTo(3.5, -11.5);
+                ctx.stroke(); ctx.restore();
+            }
+            ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(0, 0, 2.2, 0, Math.PI * 2); ctx.fill();
+            break;
+        }
+        case "torii": {
+            const glow = (Math.sin(t * 3) + 1) / 2;
+            ctx.shadowBlur = 5 + glow * 6; ctx.shadowColor = "rgba(255,110,130,0.8)";
+            ctx.fillStyle = "#d8394f";
+            ctx.fillRect(5, 10, 2.8, 19); ctx.fillRect(22.2, 10, 2.8, 19);
+            ctx.beginPath(); ctx.moveTo(1, 5); ctx.quadraticCurveTo(15, 8, 29, 5); ctx.lineTo(27.5, 9); ctx.quadraticCurveTo(15, 6.5, 2.5, 9); ctx.closePath(); ctx.fill();
+            ctx.fillRect(4, 12.5, 22, 2.6);
+            ctx.shadowBlur = 0; ctx.fillStyle = "#2a1418"; ctx.fillRect(13, 5.5, 4, 7);
+            ctx.fillStyle = "rgba(255,200,215,0.9)";
+            for (let n = 0; n < 2; n++) {
+                const p = (t * 0.5 + n * 0.5) % 1;
+                ctx.beginPath(); ctx.ellipse(8 + n * 14 + Math.sin(t * 2 + n) * 2, 18 + p * 10, 1.6, 1, p * 3, 0, Math.PI * 2); ctx.fill();
+            }
+            break;
+        }
         case "classic":
         default: {
             const p = (t % 1.3) / 1.3;
@@ -3229,6 +3303,35 @@ function drawGoalSkin(skin, x, y, size = CELL - 10) {
         }
     }
     ctx.restore();
+}
+
+/* 테마 세트: 같은 컨셉의 스킨을 한 번에 장착 */
+function skinIdx(list, value) { const i = list.findIndex(s => s.value === value); return i < 0 ? 0 : i; }
+const SKIN_THEME_KEYS = ["wall", "background", "dangerSkin", "streakEffect", "playerSkin", "playerTrail", "goalSkin"];
+const SKIN_THEMES = [
+    { name: "⚪ 기본",   wall: 1, background: 0, dangerSkin: skinIdx(DANGER_SKINS, "spike"), streakEffect: skinIdx(STREAK_EFFECTS, "aurora"), playerSkin: 0, playerTrail: 0, goalSkin: 0 },
+    { name: "🔥 화염",   wall: 5, background: 4, dangerSkin: skinIdx(DANGER_SKINS, "lava"),  streakEffect: skinIdx(STREAK_EFFECTS, "ember"),  playerSkin: skinIdx(PLAYER_SKINS, "magma"),   playerTrail: skinIdx(PLAYER_TRAILS, "fire"),   goalSkin: skinIdx(GOAL_SKINS, "torch") },
+    { name: "⚡ 사이버", wall: 1, background: 1, dangerSkin: skinIdx(DANGER_SKINS, "laser"), streakEffect: skinIdx(STREAK_EFFECTS, "lightning"), playerSkin: skinIdx(PLAYER_SKINS, "neon"), playerTrail: skinIdx(PLAYER_TRAILS, "glitch"), goalSkin: skinIdx(GOAL_SKINS, "radar") },
+    { name: "🌌 우주",   wall: 3, background: 2, dangerSkin: skinIdx(DANGER_SKINS, "void"),  streakEffect: skinIdx(STREAK_EFFECTS, "comet"),  playerSkin: skinIdx(PLAYER_SKINS, "orb"),     playerTrail: skinIdx(PLAYER_TRAILS, "sparkle"), goalSkin: skinIdx(GOAL_SKINS, "portal") },
+    { name: "☠ 독 늪",  wall: 4, background: 3, dangerSkin: skinIdx(DANGER_SKINS, "toxic"), streakEffect: skinIdx(STREAK_EFFECTS, "spore"),  playerSkin: skinIdx(PLAYER_SKINS, "slime"),   playerTrail: skinIdx(PLAYER_TRAILS, "bubble"), goalSkin: skinIdx(GOAL_SKINS, "cauldron") },
+    { name: "❄ 얼음",   wall: 2, background: 1, dangerSkin: skinIdx(DANGER_SKINS, "ice"),   streakEffect: skinIdx(STREAK_EFFECTS, "snow"),   playerSkin: skinIdx(PLAYER_SKINS, "ice"),     playerTrail: skinIdx(PLAYER_TRAILS, "frost"),  goalSkin: skinIdx(GOAL_SKINS, "snowflake") },
+    { name: "🌸 벚꽃",   wall: 6, background: 2, dangerSkin: skinIdx(DANGER_SKINS, "thorn"), streakEffect: skinIdx(STREAK_EFFECTS, "petals"), playerSkin: skinIdx(PLAYER_SKINS, "blossom"), playerTrail: skinIdx(PLAYER_TRAILS, "petal"),  goalSkin: skinIdx(GOAL_SKINS, "torii") },
+    { name: "👑 보물",   wall: 5, background: 5, dangerSkin: skinIdx(DANGER_SKINS, "trap"),  streakEffect: skinIdx(STREAK_EFFECTS, "goldRain"), playerSkin: skinIdx(PLAYER_SKINS, "gold"),  playerTrail: skinIdx(PLAYER_TRAILS, "coin"),   goalSkin: skinIdx(GOAL_SKINS, "chest") }
+];
+const SKIN_THEME_BUTTON = { x: 94, y: 550, w: 220, h: 26 };
+
+function getCurrentSkinThemeIndex() {
+    return SKIN_THEMES.findIndex(th => SKIN_THEME_KEYS.every(k => visualSettings[k] === th[k]));
+}
+
+function cycleSkinTheme() {
+    const next = (getCurrentSkinThemeIndex() + 1) % SKIN_THEMES.length;   // 직접 설정(-1)이면 첫 테마부터
+    const th = SKIN_THEMES[next];
+    SKIN_THEME_KEYS.forEach(k => { visualSettings[k] = th[k]; });
+    visualSettings.customWall = null;
+    visualSettings.customBackground = null;
+    saveVisualSettings();
+    requestSettingsRender();
 }
 
 // 스킨 화면의 행 구성 (그리기와 터치 판정이 같은 값을 사용합니다)
@@ -3394,6 +3497,40 @@ function drawPlayerSkin(skin, x, y, size = CELL - 10) {
             break;
         }
 
+        case "magma": {
+            const pulse = 0.6 + Math.sin(t * 4) * 0.4;
+            ctx.fillStyle = "#2a0d08"; ctx.beginPath(); ctx.roundRect(0, 0, 30, 30, 6); ctx.fill();
+            ctx.strokeStyle = `rgba(255,${Math.floor(120 + pulse * 80)},30,0.95)`; ctx.lineWidth = 2;
+            ctx.shadowBlur = 8; ctx.shadowColor = "#ff6a1a";
+            ctx.beginPath();
+            ctx.moveTo(4, 10); ctx.lineTo(11, 14); ctx.lineTo(9, 22); ctx.lineTo(18, 19); ctx.lineTo(24, 26);
+            ctx.moveTo(14, 3); ctx.lineTo(17, 11); ctx.lineTo(25, 9);
+            ctx.stroke();
+            ctx.shadowBlur = 0; ctx.strokeStyle = "#ff9a2a"; ctx.lineWidth = 1.5;
+            ctx.beginPath(); ctx.roundRect(0.75, 0.75, 28.5, 28.5, 6); ctx.stroke();
+            break;
+        }
+        case "ice": {
+            const g = ctx.createLinearGradient(0, 0, 30, 30); g.addColorStop(0, "#e8fbff"); g.addColorStop(1, "#6cc4f0");
+            ctx.fillStyle = g; ctx.beginPath(); ctx.roundRect(0, 0, 30, 30, 5); ctx.fill();
+            ctx.strokeStyle = "rgba(255,255,255,0.85)"; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.roundRect(1, 1, 28, 28, 5); ctx.stroke();
+            ctx.fillStyle = "rgba(255,255,255,0.5)"; ctx.beginPath(); ctx.moveTo(4, 4); ctx.lineTo(14, 4); ctx.lineTo(4, 14); ctx.closePath(); ctx.fill();
+            ctx.strokeStyle = "rgba(60,140,200,0.5)"; ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(18, 30); ctx.lineTo(22, 18); ctx.lineTo(30, 14); ctx.stroke();
+            const tw = (Math.sin(t * 4) + 1) / 2;
+            ctx.fillStyle = `rgba(255,255,255,${0.4 + tw * 0.5})`; ctx.beginPath(); ctx.arc(23, 7, 1.6 + tw, 0, Math.PI * 2); ctx.fill();
+            break;
+        }
+        case "blossom": {
+            ctx.fillStyle = "#ffd6e6"; ctx.beginPath(); ctx.roundRect(0, 0, 30, 30, 12); ctx.fill();
+            ctx.translate(15, 15); ctx.rotate(Math.sin(t * 1.5) * 0.15);
+            for (let i = 0; i < 5; i++) {
+                ctx.rotate(Math.PI * 2 / 5);
+                ctx.fillStyle = "#ff8fb8"; ctx.beginPath(); ctx.ellipse(0, -7, 4.6, 6.2, 0, 0, Math.PI * 2); ctx.fill();
+            }
+            ctx.fillStyle = "#ffe9a8"; ctx.beginPath(); ctx.arc(0, 0, 3.4, 0, Math.PI * 2); ctx.fill();
+            break;
+        }
         case "classic":
         default: {
             ctx.fillStyle = "#45e77b";
@@ -3488,6 +3625,49 @@ function drawTrailPoint(effect, x, y, k, i, t) {
             ctx.fillRect(cx - 12 - j + 3, cy - 12 + 2, 24, 24);
             ctx.fillStyle = `rgba(255,255,255,${k * 0.35})`;
             ctx.fillRect(cx - 14, cy - 3 + j, 28, 2);
+            break;
+        }
+
+        case "bubble": {
+            const rise = (1 - k) * 16;
+            const r = 3 + 7 * k * (0.6 + fxHash(i + x * 0.1) * 0.6);
+            const bx = cx + Math.sin(i * 2.1 + t * 3) * 6, by = cy - rise;
+            ctx.fillStyle = `rgba(120,255,140,${k * 0.16})`; ctx.strokeStyle = `rgba(150,255,150,${k * 0.85})`; ctx.lineWidth = 1.4;
+            ctx.beginPath(); ctx.arc(bx, by, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+            ctx.fillStyle = `rgba(255,255,255,${k * 0.7})`;
+            ctx.beginPath(); ctx.arc(bx - r * 0.35, by - r * 0.35, r * 0.22, 0, Math.PI * 2); ctx.fill();
+            break;
+        }
+
+        case "frost": {
+            ctx.globalCompositeOperation = "screen";
+            ctx.strokeStyle = `rgba(190,240,255,${k * 0.85})`; ctx.lineWidth = 1.6;
+            ctx.shadowBlur = 6; ctx.shadowColor = "rgba(150,220,255,0.9)";
+            const s = 3 + 8 * k, rot = i * 0.7 + t * 0.6;
+            for (let a = 0; a < 3; a++) {
+                const ang = rot + a * Math.PI / 3;
+                ctx.beginPath();
+                ctx.moveTo(cx - Math.cos(ang) * s, cy - Math.sin(ang) * s);
+                ctx.lineTo(cx + Math.cos(ang) * s, cy + Math.sin(ang) * s);
+                ctx.stroke();
+            }
+            break;
+        }
+
+        case "petal": {
+            const px = cx + Math.sin(i * 1.9 + t * 2) * 7, py = cy + (1 - k) * 8;
+            ctx.translate(px, py); ctx.rotate(i * 1.1 + t * 2);
+            ctx.fillStyle = `rgba(255,160,195,${k * 0.85})`;
+            ctx.beginPath(); ctx.ellipse(0, 0, 2.5 + 4 * k, 1.6 + 2.2 * k, 0, 0, Math.PI * 2); ctx.fill();
+            break;
+        }
+
+        case "coin": {
+            const sx = Math.abs(Math.cos(i * 1.3 + t * 6)), rise = (1 - k) * 10;
+            ctx.shadowBlur = 6; ctx.shadowColor = "rgba(255,210,80,0.9)";
+            ctx.fillStyle = `rgba(255,205,70,${k})`;
+            ctx.beginPath(); ctx.ellipse(cx + Math.sin(i * 2.7) * 6, cy - rise, (2 + 4.5 * k) * Math.max(0.25, sx), 2 + 4.5 * k, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = `rgba(150,100,10,${k})`; ctx.lineWidth = 1; ctx.stroke();
             break;
         }
 
@@ -10597,6 +10777,61 @@ const STREAK_RENDERERS = {
         }
         ctx.restore();
     },
+    snow(s) {
+        const k = Math.min(1, s), t = performance.now() * 0.001;
+        ctx.save(); ctx.globalCompositeOperation = "screen";
+        const lw = 8 + 10 * k;
+        ctx.strokeStyle = `rgba(170,225,255,${0.06 + 0.12 * k})`; ctx.lineWidth = lw;
+        ctx.shadowBlur = 16; ctx.shadowColor = "rgba(150,220,255,0.8)";
+        ctx.strokeRect(lw / 2, lw / 2, WIDTH - lw, HEIGHT - lw);
+        for (let i = 0; i < 40; i++) {
+            const ph = (t * (0.18 + fxHash(i) * 0.2) + fxHash(i + 70)) % 1;
+            const p = fxPerim(fxHash(i + 9));
+            const d = ph * (20 + 40 * k), sway = Math.sin(t * 2 + i) * 6;
+            const px = p.x + p.nx * d + p.ny * sway, py = p.y + p.ny * d - p.nx * sway;
+            ctx.fillStyle = `rgba(235,248,255,${(1 - ph) * (0.3 + 0.55 * k)})`;
+            ctx.shadowBlur = 6; ctx.shadowColor = "rgba(200,240,255,0.9)";
+            ctx.beginPath(); ctx.arc(px, py, (1 + fxHash(i + 3) * 2) * (0.7 + k * 0.5), 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.restore();
+    },
+    spore(s) {
+        const k = Math.min(1, s), t = performance.now() * 0.001;
+        ctx.save(); ctx.globalCompositeOperation = "screen";
+        const lw = 8 + 10 * k;
+        ctx.strokeStyle = `rgba(120,255,100,${0.05 + 0.1 * k})`; ctx.lineWidth = lw;
+        ctx.shadowBlur = 16; ctx.shadowColor = "rgba(110,255,100,0.7)";
+        ctx.strokeRect(lw / 2, lw / 2, WIDTH - lw, HEIGHT - lw);
+        for (let i = 0; i < 30; i++) {
+            const ph = (t * (0.15 + fxHash(i) * 0.2) + fxHash(i + 30)) % 1;
+            const p = fxPerim(fxHash(i + 5));
+            const d = 10 + ph * (30 + 40 * k), sway = Math.sin(t * 1.8 + i) * 6;
+            const px = p.x + p.nx * d + p.ny * sway, py = p.y + p.ny * d - p.nx * sway;
+            const r = (2 + fxHash(i + 2) * 4) * (0.6 + k * 0.5);
+            ctx.fillStyle = `rgba(110,230,100,${(1 - ph) * (0.08 + 0.12 * k)})`;
+            ctx.strokeStyle = `rgba(170,255,140,${(1 - ph) * (0.25 + 0.5 * k)})`;
+            ctx.lineWidth = 1.3; ctx.shadowBlur = 8; ctx.shadowColor = "rgba(120,255,110,0.8)";
+            ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        }
+        ctx.restore();
+    },
+    goldRain(s) {
+        const k = Math.min(1, s), t = performance.now() * 0.001;
+        ctx.save(); ctx.globalCompositeOperation = "screen";
+        const lw = 6 + 8 * k;
+        ctx.strokeStyle = `rgba(255,200,70,${0.06 + 0.12 * k})`; ctx.lineWidth = lw;
+        ctx.shadowBlur = 14; ctx.shadowColor = "rgba(255,200,60,0.7)";
+        ctx.strokeRect(lw / 2, lw / 2, WIDTH - lw, HEIGHT - lw);
+        for (let i = 0; i < 30; i++) {
+            const ph = (t * (0.25 + fxHash(i) * 0.25) + fxHash(i + 11)) % 1;
+            const px = (i % 2 ? 0 : WIDTH - 46) + fxHash(i + 3) * 46, py = ph * HEIGHT;
+            const sx = Math.max(0.25, Math.abs(Math.cos(t * 5 + i)));
+            ctx.fillStyle = `rgba(255,205,70,${0.25 + 0.5 * k})`;
+            ctx.shadowBlur = 8; ctx.shadowColor = "rgba(255,210,80,0.9)";
+            ctx.beginPath(); ctx.ellipse(px, py, (2 + 3 * k) * sx, 2 + 3 * k, 0, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.restore();
+    },
     prism(s) {
         const k = Math.min(1, s), t = performance.now() * 0.001;
         ctx.save(); ctx.globalCompositeOperation = "screen";
@@ -10700,6 +10935,45 @@ function drawDangerBlock(c, r, skin) {
             ctx.lineWidth = 2; ctx.shadowBlur = 7; ctx.shadowColor = "#b98cff"; ctx.strokeStyle = "#b98cff";
             ctx.setLineDash([5, 4]); ctx.lineDashOffset = -t * 20; ctx.beginPath(); ctx.arc(cx, cy, 13, 0, Math.PI * 2); ctx.stroke();
             ctx.lineDashOffset = t * 24; ctx.strokeStyle = "#e0ccff"; ctx.beginPath(); ctx.arc(cx, cy, 7, 0, Math.PI * 2); ctx.stroke();
+            break;
+        }
+        case "ice": {
+            for (let n = 0; n < 3; n++) {
+                const bx = x + 8 + n * 12, h = n === 1 ? 28 : 22;
+                ctx.fillStyle = n === 1 ? "#d9f6ff" : "#9fdcf7";
+                ctx.beginPath(); ctx.moveTo(bx - 6, y + CELL - 4); ctx.lineTo(bx, y + CELL - 4 - h); ctx.lineTo(bx + 6, y + CELL - 4); ctx.closePath(); ctx.fill();
+                ctx.strokeStyle = "#3b8fc4"; ctx.lineWidth = 1.3; ctx.stroke();
+            }
+            ctx.fillStyle = "rgba(255,255,255,0.7)"; ctx.beginPath(); ctx.arc(cx, y + 12, 1.5 + (Math.sin(t * 4) + 1) * 0.5, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = "rgba(120,210,255,0.5)"; ctx.lineWidth = 1.5; ctx.strokeRect(x + 3.5, y + 3.5, CELL - 7, CELL - 7);
+            break;
+        }
+        case "thorn": {
+            ctx.fillStyle = "rgba(40,10,25,0.55)"; ctx.fillRect(x + 3, y + 3, CELL - 6, CELL - 6);
+            ctx.strokeStyle = "#3f8f4a"; ctx.lineWidth = 2.6; ctx.lineCap = "round";
+            ctx.beginPath(); ctx.moveTo(x + 4, y + CELL - 6); ctx.bezierCurveTo(x + 12, y + 8, x + 26, y + 30, x + CELL - 4, y + 6); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(x + 4, y + 8); ctx.bezierCurveTo(x + 14, y + 26, x + 24, y + 10, x + CELL - 4, y + CELL - 6); ctx.stroke();
+            ctx.fillStyle = "#c9e8c0";
+            [[10, 14], [20, 20], [30, 12], [14, 28], [28, 28]].forEach(([px, py]) => {
+                ctx.beginPath(); ctx.moveTo(x + px - 2.5, y + py + 2); ctx.lineTo(x + px, y + py - 4); ctx.lineTo(x + px + 2.5, y + py + 2); ctx.closePath(); ctx.fill();
+            });
+            const pu = (Math.sin(t * 3) + 1) / 2;
+            ctx.fillStyle = "#e8325c"; ctx.shadowBlur = 5 + pu * 5; ctx.shadowColor = "#ff4d7a";
+            ctx.beginPath(); ctx.arc(cx, cy, 5, 0, Math.PI * 2); ctx.fill();
+            ctx.shadowBlur = 0; ctx.strokeStyle = "#7a0f2c"; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(cx, cy, 2.6, 0, Math.PI * 1.6); ctx.stroke();
+            ctx.strokeStyle = "rgba(232,50,92,0.6)"; ctx.lineWidth = 1.5; ctx.strokeRect(x + 3.5, y + 3.5, CELL - 7, CELL - 7);
+            break;
+        }
+        case "trap": {
+            ctx.fillStyle = "#2b2010"; ctx.fillRect(x + 3, y + 3, CELL - 6, CELL - 6);
+            const up = (Math.sin(t * 3 + c + r) + 1) / 2;
+            for (let ry = 0; ry < 2; ry++) for (let rx = 0; rx < 2; rx++) {
+                const px = x + 11 + rx * 18, py = y + 12 + ry * 17, h = 5 + up * 5;
+                const g = ctx.createLinearGradient(px, py - h, px, py + 5); g.addColorStop(0, "#fff3a8"); g.addColorStop(1, "#b8860b");
+                ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(px - 5, py + 5); ctx.lineTo(px, py - h); ctx.lineTo(px + 5, py + 5); ctx.closePath(); ctx.fill();
+            }
+            ctx.strokeStyle = "#f5c232"; ctx.lineWidth = 2; ctx.strokeRect(x + 3.5, y + 3.5, CELL - 7, CELL - 7);
+            ctx.strokeStyle = "rgba(220,50,60,0.75)"; ctx.lineWidth = 1.2; ctx.strokeRect(x + 6.5, y + 6.5, CELL - 13, CELL - 13);
             break;
         }
         case "solid":
@@ -11861,6 +12135,13 @@ function drawSkinPanel() {
         ctx.fillText(selected.name, WIDTH / 2 + 10, centerY);
     });
 
+    {
+        const themeIndex = getCurrentSkinThemeIndex();
+        drawSettingsButton(
+            SKIN_THEME_BUTTON.x, SKIN_THEME_BUTTON.y, SKIN_THEME_BUTTON.w, SKIN_THEME_BUTTON.h,
+            `🎨 테마: ${themeIndex >= 0 ? SKIN_THEMES[themeIndex].name : "직접 설정"} ▶`
+        );
+    }
     drawSettingsButton(WIDTH / 2 - 80, 550, 160, 26, "닫기");
 
     ctx.restore();
@@ -11906,6 +12187,11 @@ function handleQuestRewardTap(x, y) {
 
 function handleSkinSettingTap(x, y) {
     const panel = SKIN_PANEL;
+
+    if (isInsideRect(x, y, SKIN_THEME_BUTTON)) {
+        cycleSkinTheme();
+        return true;
+    }
 
     for (const row of SKIN_ROWS) {
         const centerY = row.centerY;
