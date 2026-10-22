@@ -1164,7 +1164,7 @@ html.fit-scale canvas {
                 <div class="start-menu-account" id="startMenuAccount">
                     <div class="start-account-main"><span class="start-account-level">Lv. 1</span><span class="start-account-name">게스트 모드</span></div>
                     <div class="start-account-exp"><div class="start-account-exp-fill"></div></div>
-                    <div class="start-account-exp-text">EXP · 랭킹/레벨 저장 제외</div>
+                    <div class="start-account-exp-text">랭킹 기록 가능 · 레벨 저장 제외</div>
                 </div>
             </div>
             <div class="start-menu-competitive"><button id="startMultiplayerButton" class="start-menu-button" type="button">⚔ 2인 대전</button></div>
@@ -1289,6 +1289,10 @@ let gameAccessGranted = false;
 let rankingMode = "today";
 let rankingLoading = false;
 
+/* 게스트 계정: 서버가 브라우저마다 만들어 주는 guest_ 계정 (랭킹 기록용) */
+let guestAccount = null;
+let guestSessionPromise = null;
+
 /* =========================================================
    V30 레벨 / EXP 시스템
 ========================================================= */
@@ -1385,6 +1389,7 @@ function showEntryGate() {
 function enterGameAsAccount(account) {
     currentAccount = account && typeof account === "object" ? account : null;
     guestMode = false;
+    guestAccount = null;
     gameAccessGranted = true;
     const gate = document.getElementById("entryGate");
     if (gate) {
@@ -1407,7 +1412,9 @@ function enterGameAsAccount(account) {
 function enterGameAsGuest() {
     currentAccount = null;
     guestMode = true;
+    guestAccount = null;
     gameAccessGranted = true;
+    ensureGuestSession();   // 백그라운드로 게스트 계정 준비 (랭킹 기록용)
     const gate = document.getElementById("entryGate");
     if (gate) {
         gate.classList.remove("session-checking");
@@ -1440,7 +1447,7 @@ function updateStartMenuOverlay() {
         const ratio=playerLevel>=MAX_LEVEL?1:Math.max(0,Math.min(1,playerExp/need));
         accountHTML=`<div class="start-account-main"><span class="start-account-level">Lv. ${playerLevel}</span><span class="start-account-name">👤 ${escapeHTML(currentAccount.nickname || currentAccount.id || "회원")}</span><span class="start-account-chevron">›</span></div><div class="start-account-exp"><div class="start-account-exp-fill" style="width:${ratio*100}%"></div></div><div class="start-account-exp-text">${playerLevel>=MAX_LEVEL?"MAX LEVEL":`EXP ${formatExp(playerExp)} / ${formatExp(need)}`}</div>`;
     } else {
-        accountHTML=`<div class="start-account-main"><span class="start-account-level">Lv. -</span><span class="start-account-name">👤 게스트 모드</span></div><div class="start-account-exp"><div class="start-account-exp-fill" style="width:0%"></div></div><div class="start-account-exp-text">EXP · 랭킹/레벨 저장 제외</div>`;
+        accountHTML=`<div class="start-account-main"><span class="start-account-level">Lv. -</span><span class="start-account-name">👤 게스트 모드</span></div><div class="start-account-exp"><div class="start-account-exp-fill" style="width:0%"></div></div><div class="start-account-exp-text">랭킹 기록 가능 · 레벨 저장 제외</div>`;
     }
     if (accountLabel.dataset.html !== accountHTML) {
         accountLabel.dataset.html = accountHTML;
@@ -1458,10 +1465,14 @@ function escapeHTML(value) {
 }
 
 const AUTH_TOKEN_KEY = "slidingMazeAuthToken_v2";
+const GUEST_TOKEN_KEY = "slidingMazeGuestToken_v1";
 
 async function apiJSON(path, options = {}) {
     let savedToken = "";
-    try { savedToken = localStorage.getItem(AUTH_TOKEN_KEY) || ""; } catch (error) {}
+    // 게스트 모드에서는 게스트 전용 토큰을, 로그인 상태에서는 계정 토큰을 보냅니다.
+    try {
+        savedToken = localStorage.getItem(guestMode && !currentAccount ? GUEST_TOKEN_KEY : AUTH_TOKEN_KEY) || "";
+    } catch (error) {}
 
     const requestHeaders = {
         "Content-Type": "application/json",
@@ -1483,10 +1494,56 @@ async function apiJSON(path, options = {}) {
 
     if (!response.ok) {
         const message = data?.message || data?.error || `요청 실패 (${response.status})`;
-        throw new Error(message);
+        const requestError = new Error(message);
+        requestError.status = response.status;
+        throw requestError;
     }
 
     return data;
+}
+
+// 게스트 계정을 준비합니다. (저장된 토큰이 유효하면 재사용, 없거나 만료되면 새로 발급)
+function ensureGuestSession() {
+    if (!guestMode || currentAccount) return Promise.resolve(null);
+    if (guestAccount) return Promise.resolve(guestAccount);
+    if (guestSessionPromise) return guestSessionPromise;
+
+    guestSessionPromise = (async () => {
+        try {
+            let token = "";
+            try { token = localStorage.getItem(GUEST_TOKEN_KEY) || ""; } catch (error) {}
+
+            if (token) {
+                try {
+                    const me = await apiJSON("/api/me");
+                    if (me && me.id) {
+                        guestAccount = { id: me.id, nickname: me.nickname };
+                        return guestAccount;
+                    }
+                } catch (error) {
+                    // 만료/삭제된 세션(401)만 버리고, 네트워크 오류는 토큰을 지키기 위해 그대로 실패 처리
+                    if (error && error.status === 401) {
+                        try { localStorage.removeItem(GUEST_TOKEN_KEY); } catch (e) {}
+                    } else {
+                        throw error;
+                    }
+                }
+            }
+
+            const data = await apiJSON("/api/guest", { method: "POST", body: "{}" });
+            if (!data?.sessionToken || !data?.user) throw new Error("게스트 세션을 만들지 못했습니다.");
+            try { localStorage.setItem(GUEST_TOKEN_KEY, data.sessionToken); } catch (error) {}
+            guestAccount = { id: data.user.id, nickname: data.user.nickname };
+            return guestAccount;
+        } catch (error) {
+            console.warn("게스트 세션 준비 실패", error);
+            return null;
+        } finally {
+            guestSessionPromise = null;
+        }
+    })();
+
+    return guestSessionPromise;
 }
 
 const LOGIN_REMEMBER_KEY = "slidingMazeRememberLogin_v1";
@@ -1652,6 +1709,7 @@ async function logoutToEntry() {
     closeMultiplayerSocket();
     currentAccount = null;
     guestMode = false;
+    guestAccount = null;
     gameAccessGranted = false;
     try { localStorage.setItem(LOGIN_REMEMBER_KEY, "0"); } catch (error) {}
     document.getElementById("loginId").value = "";
@@ -1673,11 +1731,17 @@ function calculateV28Score() {
 }
 
 async function submitV28Score() {
-    if (!currentAccount || guestMode || !gameAccessGranted) return false;
+    if (!gameAccessGranted || (!currentAccount && !guestMode)) return false;
 
     const score = calculateV28Score();
 
     try {
+        // 게스트는 랭킹 저장 전에 게스트 계정이 준비되어 있어야 합니다.
+        if (!currentAccount && guestMode) {
+            const guest = await ensureGuestSession();
+            if (!guest) return false;
+        }
+
         await apiJSON("/api/ranking/score", {
             method: "POST",
             body: JSON.stringify({
@@ -1691,7 +1755,7 @@ async function submitV28Score() {
 
         // 랭킹 창이 열려 있으면 저장이 끝난 뒤 현재 탭을 다시 불러옵니다.
         const panel = document.getElementById("rankingPanel");
-        if (panel && panel.hidden === false && currentAccount && !guestMode) {
+        if (panel && panel.hidden === false && (currentAccount || guestMode)) {
             await loadRanking(rankingMode);
         }
         return true;
@@ -1764,10 +1828,7 @@ window.addEventListener("focusin", event => {
 }, { passive: true });
 
 function openRankingPanel(mode = "today") {
-    if (!currentAccount) {
-        window.alert("게스트 모드에서는 랭킹을 볼 수 없습니다. 회원으로 로그인해 주세요.");
-        return;
-    }
+    if (!currentAccount && !guestMode) return;
 
     rankingMode = mode === "weekly" ? "weekly" : "today";
     const panel = document.getElementById("rankingPanel");
@@ -1794,7 +1855,7 @@ function updateRankingTabs() {
 }
 
 async function loadRanking(mode = rankingMode) {
-    if (!currentAccount) return;
+    if (!currentAccount && !guestMode) return;
     rankingLoading = true;
     rankingMode = mode === "weekly" ? "weekly" : "today";
     updateRankingTabs();
@@ -1828,9 +1889,10 @@ async function loadRanking(mode = rankingMode) {
             }).join("");
         }
 
-        status.textContent = rankingMode === "weekly"
+        status.textContent = (rankingMode === "weekly"
             ? "이번 주 월요일부터 일요일까지의 랭킹입니다."
-            : "오늘의 랭킹입니다.";
+            : "오늘의 랭킹입니다.") +
+            (guestMode && !currentAccount ? " (게스트 기록은 이 기기에서만 이어져요)" : "");
     } catch (error) {
         status.textContent = error.message || "랭킹을 불러오지 못했습니다.";
         body.innerHTML = `<tr><td colspan="6">랭킹 정보를 불러오지 못했습니다.</td></tr>`;
@@ -14276,15 +14338,13 @@ function refreshRankingAccountLabel() {
     if (!el) return;
     el.textContent = currentAccount
         ? `로그인 계정: ${currentAccount.nickname || currentAccount.id || "회원"}`
-        : "게스트 모드에서는 랭킹을 이용할 수 없습니다.";
+        : `게스트: ${guestAccount?.nickname || "준비 중..."}`;
 }
 
 const originalOpenRankingPanel = openRankingPanel;
 openRankingPanel = function(mode = "today") {
-    if (!currentAccount) {
-        window.alert("게스트 모드에서는 랭킹을 볼 수 없습니다. 회원으로 로그인해 주세요.");
-        return;
-    }
+    if (!currentAccount && !guestMode) return;
+    if (guestMode && !currentAccount) ensureGuestSession().then(() => refreshRankingAccountLabel());
     refreshRankingAccountLabel();
     originalOpenRankingPanel(mode);
 };
