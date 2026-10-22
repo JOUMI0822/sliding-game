@@ -3163,15 +3163,18 @@ function drawGoalSkin(skin, x, y, size = CELL - 10) {
             break;
         }
         case "flag": {
-            ctx.fillStyle = "#5d6877"; ctx.beginPath(); ctx.ellipse(11, 28, 9, 2.4, 0, 0, Math.PI * 2); ctx.fill();
-            ctx.fillStyle = "#e8edf2"; ctx.fillRect(9, 2, 2.4, 26);
-            ctx.fillStyle = "#ffd76a"; ctx.beginPath(); ctx.arc(10.2, 2.5, 2.2, 0, Math.PI * 2); ctx.fill();
-            ctx.beginPath(); ctx.moveTo(11.4, 4);
-            for (let i = 0; i <= 10; i++) ctx.lineTo(11.4 + i * 1.75, 4 + Math.sin(t * 6 - i * 0.7) * 1.6 * (i / 10));
-            for (let i = 10; i >= 0; i--) ctx.lineTo(11.4 + i * 1.75, 15 + Math.sin(t * 6 - i * 0.7) * 1.6 * (i / 10));
+            ctx.fillStyle = "#5d6877"; ctx.beginPath(); ctx.ellipse(9, 29, 10, 3, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = "#f0f4f8"; ctx.fillRect(7.5, -1, 3.5, 30);
+            ctx.shadowBlur = 8; ctx.shadowColor = "rgba(255,215,106,0.9)";
+            ctx.fillStyle = "#ffd76a"; ctx.beginPath(); ctx.arc(9.2, -1.5, 3.4, 0, Math.PI * 2); ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.beginPath(); ctx.moveTo(11, 1);
+            for (let i = 0; i <= 10; i++) ctx.lineTo(11 + i * 1.9, 1 + Math.sin(t * 6 - i * 0.7) * 2 * (i / 10));
+            for (let i = 10; i >= 0; i--) ctx.lineTo(11 + i * 1.9, 15 + Math.sin(t * 6 - i * 0.7) * 2 * (i / 10));
             ctx.closePath();
-            const g = ctx.createLinearGradient(11, 0, 29, 0); g.addColorStop(0, "#ff5d6e"); g.addColorStop(1, "#ff9d5c");
+            const g = ctx.createLinearGradient(11, 0, 30, 0); g.addColorStop(0, "#ff4d63"); g.addColorStop(1, "#ff9d5c");
             ctx.fillStyle = g; ctx.fill();
+            ctx.strokeStyle = "rgba(255,255,255,0.55)"; ctx.lineWidth = 1.2; ctx.stroke();
             break;
         }
         case "star": {
@@ -3201,15 +3204,21 @@ function drawGoalSkin(skin, x, y, size = CELL - 10) {
             break;
         }
         case "beacon": {
-            ctx.fillStyle = "#2b3441"; ctx.beginPath(); ctx.ellipse(15, 26, 12, 3.5, 0, 0, Math.PI * 2); ctx.fill();
-            const g = ctx.createLinearGradient(0, 26, 0, 0); g.addColorStop(0, "rgba(120,230,255,0.85)"); g.addColorStop(1, "rgba(120,230,255,0)");
-            ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(8, 26); ctx.lineTo(22, 26); ctx.lineTo(19, 0); ctx.lineTo(11, 0); ctx.closePath(); ctx.fill();
+            const pulse = 0.75 + Math.sin(t * 4) * 0.25;
+            const bg = ctx.createLinearGradient(0, 22, 0, -10);
+            bg.addColorStop(0, `rgba(120,235,255,${0.95 * pulse})`); bg.addColorStop(1, "rgba(120,235,255,0)");
+            ctx.fillStyle = bg; ctx.beginPath(); ctx.moveTo(8, 22); ctx.lineTo(22, 22); ctx.lineTo(27, -10); ctx.lineTo(3, -10); ctx.closePath(); ctx.fill();
             for (let i = 0; i < 2; i++) {
                 const p = (t * 0.9 + i * 0.5) % 1;
-                ctx.strokeStyle = `rgba(160,240,255,${1 - p})`; ctx.lineWidth = 1.6;
-                ctx.beginPath(); ctx.ellipse(15, 26, 4 + p * 10, 1.4 + p * 3, 0, 0, Math.PI * 2); ctx.stroke();
+                ctx.strokeStyle = `rgba(160,245,255,${1 - p})`; ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.ellipse(15, 28, 6 + p * 12, 2 + p * 4, 0, 0, Math.PI * 2); ctx.stroke();
             }
-            ctx.fillStyle = "#e9fbff"; ctx.beginPath(); ctx.ellipse(15, 26, 4, 1.5, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = "#39475a"; ctx.strokeStyle = "#7fdcf0"; ctx.lineWidth = 1.5;
+            ctx.beginPath(); ctx.ellipse(15, 28, 13, 3.5, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+            ctx.fillStyle = "#56677f"; ctx.beginPath(); ctx.moveTo(9, 28); ctx.lineTo(21, 28); ctx.lineTo(18, 13); ctx.lineTo(12, 13); ctx.closePath(); ctx.fill();
+            ctx.strokeStyle = "#a9ecff"; ctx.stroke();
+            ctx.shadowBlur = 14; ctx.shadowColor = "#6fe6ff";
+            ctx.fillStyle = `rgba(235,252,255,${0.7 + pulse * 0.3})`; ctx.beginPath(); ctx.arc(15, 10, 5.5, 0, Math.PI * 2); ctx.fill();
             break;
         }
         case "chest": {
@@ -3239,82 +3248,99 @@ function drawGoalSkin(skin, x, y, size = CELL - 10) {
             break;
         }
         case "torch": {
-            ctx.fillStyle = "#6b4a2b"; ctx.beginPath(); ctx.roundRect(12.5, 13, 5, 16, 1.5); ctx.fill();
-            ctx.fillStyle = "#3a2412"; ctx.fillRect(10, 11, 10, 3.5);
-            const cols = ["#ff5a1f", "#ffa02e", "#fff1a0"];
+            const glow = ctx.createRadialGradient(15, 6, 2, 15, 6, 22);
+            glow.addColorStop(0, `rgba(255,150,40,${0.5 + Math.sin(t * 8) * 0.08})`);
+            glow.addColorStop(1, "rgba(255,150,40,0)");
+            ctx.fillStyle = glow; ctx.fillRect(-8, -14, 46, 48);
+            ctx.fillStyle = "#8a5a2b"; ctx.beginPath(); ctx.roundRect(11, 16, 8, 15, 2); ctx.fill();
+            ctx.fillStyle = "#5a381a"; ctx.fillRect(11, 16, 2.6, 15);
+            ctx.fillStyle = "#59606b"; ctx.beginPath(); ctx.roundRect(7, 12.5, 16, 5, 2); ctx.fill();
+            ctx.strokeStyle = "#aab4c0"; ctx.lineWidth = 1; ctx.beginPath(); ctx.roundRect(7, 12.5, 16, 5, 2); ctx.stroke();
+            const cols = ["#ff4a14", "#ff9a24", "#fff0a0"];
             for (let n = 0; n < 3; n++) {
-                const f = Math.sin(t * 9 + n * 2) * 1.4, h = 11 - n * 3;
-                ctx.fillStyle = cols[n]; ctx.shadowBlur = n === 0 ? 10 : 0; ctx.shadowColor = "#ff7a1f";
-                ctx.beginPath(); ctx.moveTo(9 + n * 1.6, 11);
-                ctx.quadraticCurveTo(10 + n + f, 11 - h * 0.55, 15 + f * 0.6, 11 - h);
-                ctx.quadraticCurveTo(20 - n + f, 11 - h * 0.55, 21 - n * 1.6, 11);
+                const f = Math.sin(t * 9 + n * 2) * 1.8, h = 18 - n * 4.5, hw = 8.5 - n * 2.2;
+                ctx.fillStyle = cols[n]; ctx.shadowBlur = n === 0 ? 16 : 0; ctx.shadowColor = "#ff7a1f";
+                ctx.beginPath(); ctx.moveTo(15 - hw, 13);
+                ctx.quadraticCurveTo(15 - hw + f, 13 - h * 0.55, 15 + f * 0.7, 13 - h);
+                ctx.quadraticCurveTo(15 + hw + f, 13 - h * 0.55, 15 + hw, 13);
                 ctx.closePath(); ctx.fill();
+            }
+            ctx.shadowBlur = 0;
+            for (let n = 0; n < 3; n++) {
+                const p = (t * 0.9 + n * 0.33) % 1;
+                ctx.fillStyle = `rgba(255,200,90,${1 - p})`;
+                ctx.beginPath(); ctx.arc(15 + Math.sin(t * 3 + n * 2) * 6, 4 - p * 12, 1.4, 0, Math.PI * 2); ctx.fill();
             }
             break;
         }
         case "cauldron": {
-            ctx.fillStyle = "#1d2420"; ctx.beginPath(); ctx.ellipse(15, 27, 10, 2.5, 0, 0, Math.PI * 2); ctx.fill();
-            ctx.fillStyle = "#2c3430"; ctx.beginPath(); ctx.moveTo(4, 13); ctx.quadraticCurveTo(2, 26, 15, 26); ctx.quadraticCurveTo(28, 26, 26, 13); ctx.closePath(); ctx.fill();
-            ctx.fillStyle = "#3b4540"; ctx.beginPath(); ctx.ellipse(15, 13, 11, 3.4, 0, 0, Math.PI * 2); ctx.fill();
-            ctx.fillStyle = "#6bff6b"; ctx.shadowBlur = 8; ctx.shadowColor = "#6bff6b";
-            ctx.beginPath(); ctx.ellipse(15, 13, 9, 2.4, 0, 0, Math.PI * 2); ctx.fill();
+            const fog = ctx.createRadialGradient(15, 10, 2, 15, 10, 22);
+            fog.addColorStop(0, "rgba(110,255,90,0.35)"); fog.addColorStop(1, "rgba(110,255,90,0)");
+            ctx.fillStyle = fog; ctx.fillRect(-8, -12, 46, 44);
+            ctx.fillStyle = "rgba(0,0,0,0.4)"; ctx.beginPath(); ctx.ellipse(15, 30, 13, 3, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = "#59606b"; ctx.fillRect(5, 26, 4, 5); ctx.fillRect(21, 26, 4, 5);
+            const bodyG = ctx.createLinearGradient(0, 12, 0, 29); bodyG.addColorStop(0, "#5b6a62"); bodyG.addColorStop(1, "#242b27");
+            ctx.fillStyle = bodyG; ctx.beginPath(); ctx.moveTo(2, 12); ctx.quadraticCurveTo(-1, 28, 15, 28); ctx.quadraticCurveTo(31, 28, 28, 12); ctx.closePath(); ctx.fill();
+            ctx.strokeStyle = "#a9bdb1"; ctx.lineWidth = 1.6; ctx.stroke();
+            ctx.fillStyle = "#6b7b72"; ctx.beginPath(); ctx.ellipse(15, 12, 14, 4.5, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+            ctx.fillStyle = "#86ff5e"; ctx.shadowBlur = 14; ctx.shadowColor = "#6bff4a";
+            ctx.beginPath(); ctx.ellipse(15, 12, 11.5, 3.2, 0, 0, Math.PI * 2); ctx.fill();
             ctx.shadowBlur = 0;
-            for (let n = 0; n < 3; n++) {
-                const p = (t * 0.8 + n * 0.34) % 1;
-                ctx.strokeStyle = `rgba(170,255,150,${1 - p})`; ctx.lineWidth = 1.3;
-                ctx.beginPath(); ctx.arc(10 + n * 5 + Math.sin(t * 2 + n) * 1.5, 12 - p * 11, 1.6 + n * 0.5, 0, Math.PI * 2); ctx.stroke();
+            for (let n = 0; n < 4; n++) {
+                const p = (t * 0.8 + n * 0.25) % 1;
+                ctx.strokeStyle = `rgba(190,255,160,${1 - p})`; ctx.lineWidth = 1.6;
+                ctx.beginPath(); ctx.arc(8 + n * 5 + Math.sin(t * 2 + n) * 2, 11 - p * 14, 2 + n % 2 * 1.2, 0, Math.PI * 2); ctx.stroke();
             }
             break;
         }
         case "snowflake": {
+            const gl = ctx.createRadialGradient(15, 15, 2, 15, 15, 20);
+            gl.addColorStop(0, "rgba(150,225,255,0.38)"); gl.addColorStop(1, "rgba(150,225,255,0)");
+            ctx.fillStyle = gl; ctx.fillRect(-8, -8, 46, 46);
             ctx.translate(15, 15); ctx.rotate(t * 0.5);
-            ctx.shadowBlur = 9; ctx.shadowColor = "rgba(150,225,255,0.9)";
-            ctx.strokeStyle = "#cdf3ff"; ctx.lineWidth = 2; ctx.lineCap = "round";
+            ctx.shadowBlur = 12; ctx.shadowColor = "rgba(150,225,255,0.95)";
+            ctx.strokeStyle = "#dcf7ff"; ctx.lineWidth = 3; ctx.lineCap = "round";
             for (let a = 0; a < 6; a++) {
                 ctx.save(); ctx.rotate(a * Math.PI / 3); ctx.beginPath();
-                ctx.moveTo(0, 0); ctx.lineTo(0, -13);
-                ctx.moveTo(0, -8); ctx.lineTo(-3.5, -11.5);
-                ctx.moveTo(0, -8); ctx.lineTo(3.5, -11.5);
+                ctx.moveTo(0, 0); ctx.lineTo(0, -16);
+                ctx.moveTo(0, -10); ctx.lineTo(-5, -15);
+                ctx.moveTo(0, -10); ctx.lineTo(5, -15);
+                ctx.moveTo(0, -5.5); ctx.lineTo(-3.5, -9);
+                ctx.moveTo(0, -5.5); ctx.lineTo(3.5, -9);
                 ctx.stroke(); ctx.restore();
             }
-            ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(0, 0, 2.2, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(0, 0, 3.4, 0, Math.PI * 2); ctx.fill();
             break;
         }
         case "torii": {
             const glow = (Math.sin(t * 3) + 1) / 2;
-            ctx.shadowBlur = 5 + glow * 6; ctx.shadowColor = "rgba(255,110,130,0.8)";
-            ctx.fillStyle = "#d8394f";
-            ctx.fillRect(5, 10, 2.8, 19); ctx.fillRect(22.2, 10, 2.8, 19);
-            ctx.beginPath(); ctx.moveTo(1, 5); ctx.quadraticCurveTo(15, 8, 29, 5); ctx.lineTo(27.5, 9); ctx.quadraticCurveTo(15, 6.5, 2.5, 9); ctx.closePath(); ctx.fill();
-            ctx.fillRect(4, 12.5, 22, 2.6);
-            ctx.shadowBlur = 0; ctx.fillStyle = "#2a1418"; ctx.fillRect(13, 5.5, 4, 7);
-            ctx.fillStyle = "rgba(255,200,215,0.9)";
-            for (let n = 0; n < 2; n++) {
-                const p = (t * 0.5 + n * 0.5) % 1;
-                ctx.beginPath(); ctx.ellipse(8 + n * 14 + Math.sin(t * 2 + n) * 2, 18 + p * 10, 1.6, 1, p * 3, 0, Math.PI * 2); ctx.fill();
+            ctx.shadowBlur = 8 + glow * 8; ctx.shadowColor = "rgba(255,90,110,0.9)";
+            ctx.fillStyle = "#e0334a";
+            ctx.fillRect(5, 10, 4.6, 20); ctx.fillRect(20.4, 10, 4.6, 20);
+            ctx.beginPath(); ctx.moveTo(-3, 3); ctx.quadraticCurveTo(15, 8, 33, 3); ctx.lineTo(31, 10); ctx.quadraticCurveTo(15, 6, -1, 10); ctx.closePath(); ctx.fill();
+            ctx.fillRect(3, 14, 24, 3.6);
+            ctx.shadowBlur = 0; ctx.fillStyle = "#2a1418"; ctx.fillRect(13, 6, 4, 8);
+            ctx.fillStyle = "#6b2330"; ctx.fillRect(2, 29.5, 10, 2.5); ctx.fillRect(18, 29.5, 10, 2.5);
+            ctx.fillStyle = "rgba(255,205,220,0.95)";
+            for (let n = 0; n < 3; n++) {
+                const p = (t * 0.5 + n * 0.33) % 1;
+                ctx.beginPath(); ctx.ellipse(6 + n * 9 + Math.sin(t * 2 + n) * 2, 18 + p * 12, 1.8, 1.1, p * 3, 0, Math.PI * 2); ctx.fill();
             }
             break;
         }
         case "neon": {
-            const pulse = 0.7 + Math.sin(t * 5) * 0.3;
-            ctx.fillStyle = "#061a1f";
-            ctx.fillRect(0, 0, 30, 30);
-            ctx.strokeStyle = `rgba(55,245,255,${pulse})`;
-            ctx.lineWidth = 2.5;
-            ctx.shadowBlur = 12;
-            ctx.shadowColor = "#37f5ff";
+            const pulse = 0.75 + Math.sin(t * 5) * 0.25;
+            const ring = (t % 1.3) / 1.3;
+            ctx.translate(15, 15); ctx.scale(1.2, 1.2); ctx.translate(-15, -15);
+            ctx.strokeStyle = `rgba(55,245,255,${(1 - ring) * 0.7})`; ctx.lineWidth = 1.5;
+            ctx.strokeRect(-ring * 4, -ring * 4, 30 + ring * 8, 30 + ring * 8);
+            ctx.fillStyle = "#06181d"; ctx.fillRect(0, 0, 30, 30);
+            ctx.strokeStyle = `rgba(55,245,255,${pulse})`; ctx.lineWidth = 2.8;
+            ctx.shadowBlur = 12; ctx.shadowColor = "#37f5ff";
             ctx.strokeRect(2, 2, 26, 26);
-            ctx.save();
-            ctx.translate(15, 15);
-            ctx.rotate(t * 1.5);
-            ctx.strokeStyle = "rgba(255,70,220,0.95)";
-            ctx.lineWidth = 2;
-            ctx.shadowColor = "#ff46dc";
-            ctx.strokeRect(-6, -6, 12, 12);
-            ctx.restore();
             ctx.shadowBlur = 0;
-            ctx.fillStyle = `rgba(255,255,255,${0.6 + Math.sin(t * 6) * 0.3})`;
-            ctx.beginPath(); ctx.arc(15, 15, 2.4, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = "rgba(255,255,255,0.65)"; ctx.lineWidth = 1.2;
+            ctx.strokeRect(8, 8, 14, 14);
             break;
         }
         case "classic":
@@ -3427,20 +3453,20 @@ function drawPlayerSkin(skin, x, y, size = CELL - 10) {
 
         case "neon": {
             const pulse = 0.75 + Math.sin(t * 5) * 0.25;
-            ctx.fillStyle = "#08161d";
+            ctx.translate(15, 15); ctx.scale(1.2, 1.2); ctx.translate(-15, -15);
+            ctx.fillStyle = "#06170c";
             ctx.fillRect(0, 0, 30, 30);
-            ctx.strokeStyle = `rgba(55,245,255,${pulse})`;
-            ctx.lineWidth = 2.5;
-            ctx.shadowBlur = 10;
-            ctx.shadowColor = "#37f5ff";
+            ctx.strokeStyle = `rgba(70,255,120,${pulse})`;
+            ctx.lineWidth = 2.8;
+            ctx.shadowBlur = 12;
+            ctx.shadowColor = "#39ff6a";
             ctx.strokeRect(2, 2, 26, 26);
             ctx.shadowBlur = 0;
-            ctx.strokeStyle = "rgba(255,255,255,0.55)";
-            ctx.lineWidth = 1;
+            ctx.strokeStyle = "rgba(200,255,215,0.65)";
+            ctx.lineWidth = 1.2;
             ctx.strokeRect(8, 8, 14, 14);
             break;
         }
-
         case "gold": {
             const g = ctx.createLinearGradient(0, 0, 30, 30);
             g.addColorStop(0, "#fff3a8");
@@ -10993,12 +11019,16 @@ function drawDangerBlock(c, r, skin) {
             break;
         }
         case "bomb": {
-            ctx.strokeStyle = "rgba(255,70,80,0.55)"; ctx.lineWidth = 2; ctx.strokeRect(x + 4, y + 4, CELL - 8, CELL - 8);
-            ctx.fillStyle = "#1b1f27"; ctx.beginPath(); ctx.arc(cx, cy + 3, 12, 0, Math.PI * 2); ctx.fill();
-            ctx.fillStyle = "rgba(255,255,255,0.22)"; ctx.beginPath(); ctx.arc(cx - 4, cy - 1, 3, 0, Math.PI * 2); ctx.fill();
-            ctx.strokeStyle = "#b59a6b"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(cx + 5, cy - 7); ctx.quadraticCurveTo(cx + 12, cy - 9, cx + 10, cy - 15); ctx.stroke();
-            ctx.fillStyle = "#ffd24a"; ctx.shadowBlur = 8; ctx.shadowColor = "#ff9d2e";
-            ctx.beginPath(); ctx.arc(cx + 10, cy - 15, 2.5 + Math.sin(t * 20) * 1.2, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = "rgba(255,60,60,0.16)"; ctx.fillRect(x + 3, y + 3, CELL - 6, CELL - 6);
+            ctx.strokeStyle = "rgba(255,80,90,0.85)"; ctx.lineWidth = 2; ctx.strokeRect(x + 3.5, y + 3.5, CELL - 7, CELL - 7);
+            const bg = ctx.createRadialGradient(cx - 4, cy, 1, cx, cy + 3, 15); bg.addColorStop(0, "#7a8494"); bg.addColorStop(1, "#171b22");
+            ctx.fillStyle = bg; ctx.beginPath(); ctx.arc(cx, cy + 3, 13.5, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = "#9aa5b4"; ctx.lineWidth = 1.2; ctx.stroke();
+            ctx.fillStyle = "rgba(255,255,255,0.35)"; ctx.beginPath(); ctx.ellipse(cx - 5, cy - 2, 3.5, 2.2, -0.6, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = "#8b95a3"; ctx.fillRect(cx - 4, cy - 12, 8, 4);
+            ctx.strokeStyle = "#d1b57d"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(cx + 2, cy - 12); ctx.quadraticCurveTo(cx + 11, cy - 12, cx + 10, cy - 17); ctx.stroke();
+            ctx.fillStyle = "#ffd24a"; ctx.shadowBlur = 12; ctx.shadowColor = "#ff7a1f";
+            ctx.beginPath(); ctx.arc(cx + 10, cy - 17, 3 + Math.sin(t * 20) * 1.2, 0, Math.PI * 2); ctx.fill();
             break;
         }
         case "electric": {
