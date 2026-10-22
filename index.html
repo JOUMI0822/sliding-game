@@ -4685,7 +4685,7 @@ function isGameplayMusicWanted() {
     // 실제 플레이 중이고, 사이트 탭/창이 활성화되어 있을 때만 BGM을 재생합니다.
     // 다른 탭으로 이동하거나 브라우저 창에서 벗어나면 재생을 멈춥니다.
     const pageIsActive = !document.hidden && (typeof document.hasFocus !== "function" || document.hasFocus());
-    return pageIsActive && gameAccessGranted && !["start", "gameover", "expResult", "multiplayerResult", "tutorial", "countdown"].includes(gameState) && musicVolume > 0;
+    return pageIsActive && gameAccessGranted && !["start", "gameover", "expResult", "multiplayerResult", "tutorial"].includes(gameState) && musicVolume > 0;
 }
 
 function startBackgroundMusic() {
