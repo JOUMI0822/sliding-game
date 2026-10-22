@@ -690,7 +690,7 @@ canvas {
 #logoutConfirmOverlay {
     position: fixed;
     inset: 0;
-    z-index: 10000;
+    z-index: 10010;   /* 프로필/상점 위에 확인창이 뜨도록 */
     display: none;
     align-items: center;
     justify-content: center;
@@ -1007,6 +1007,15 @@ canvas {
 .profile-nick-note { min-height:18px; color:#9eabb9; font-size:12px; line-height:1.5; text-align:center; }
 .profile-nick-note.error { color:#ff8f9b; }
 .profile-nick-note.success { color:#7dff9d; }
+.profile-stat-grid + .profile-reset-box { margin-top:-8px; }
+.profile-reset-box { display:grid; gap:6px; margin-bottom:16px; }
+.profile-reset-box button {
+    height:38px; border:1px solid rgba(255,143,155,0.6); border-radius:9px;
+    background:rgba(184,59,73,0.25); color:#ffd0d5;
+    font:700 13px Pretendard, "Noto Sans KR", Arial, sans-serif;
+    cursor:pointer; touch-action:manipulation;
+}
+.profile-reset-box button:disabled { opacity:0.45; cursor:default; }
 
 /* ---------- 모바일 가로 모드: 게임 전체(상단바+캔버스+오버레이)를 통째로 축소 ---------- */
 /* html.fit-scale 클래스는 JS(fitGameToViewport)가 화면이 낮을 때만 붙입니다. */
@@ -1407,7 +1416,7 @@ let gameState = "start";
 /* =========================================================
    로딩 화면(팁) / 시작 카운트다운 / 종료·포기 확인 팝업
 ========================================================= */
-const LOADING_MIN_MS = 3000;            // 로딩 화면 최소 표시 시간
+const LOADING_MIN_MS = 7000;            // 로딩 화면 최소 표시 시간 (팁을 읽을 수 있도록 7초)
 const COUNTDOWN_MS = 3000;              // 게임 시작 전 카운트다운
 const SOLO_END_CONFIRM_DELAY_MS = 2000; // 싱글 '끝내기' 버튼 조작 딜레이
 
@@ -2186,7 +2195,13 @@ async function submitPlayStats(mode, result = null) {
     try {
         await apiJSON("/api/profile/record", {
             method: "POST",
-            body: JSON.stringify({ mode, result, seconds })
+            body: JSON.stringify({
+                mode, result, seconds,
+                clears: clearCount,
+                maxStreak: maxClearStreak,
+                skips: mapSkipCount,
+                lifeLosses: lifeLossCount
+            })
         });
     } catch (error) {
         console.warn("플레이 기록 저장 실패", error);
@@ -5600,6 +5615,30 @@ function buyItem(type) {
 
     showItemWarning(`${ITEM_DATA[type].name} ${quantity}개 구매 완료 · ${coins}코인 남음`);
     purchaseQuantities[type] = Math.min(purchaseQuantities[type], Math.max(1, getMaxAffordableQuantity(type) || 1));
+}
+
+// 상점 구매: 잘못 누르는 것을 막기 위해 최종 확인창을 거칩니다.
+async function requestBuyItem(type) {
+    if (logoutConfirmOpen) return;
+
+    const price = ITEM_PRICES[type];
+    const quantity = getPurchaseQuantity(type);
+    if (!quantity || coins < price * quantity) {
+        showItemWarning("재화가 부족합니다.");
+        playUIInvalidSound();
+        return;
+    }
+
+    const total = price * quantity;
+    const ok = await openLogoutConfirm({
+        title: "구매 확인",
+        message: `${ITEM_DATA[type].icon} ${ITEM_DATA[type].name} ${quantity}개를\n🪙 ${total}코인에 구매할까요?\n(구매 후 ${coins - total}코인 남음)`,
+        confirmLabel: "구매",
+        danger: false
+    });
+
+    if (!ok || !shopOpen) return;
+    buyItem(type);
 }
 
 function equipItem(type) {
@@ -9376,7 +9415,7 @@ window.addEventListener(
         }
 
         if (rewardListOpen) {
-            if (event.key === "Escape") closeRewardList();
+            if (event.key === "Escape" && !logoutConfirmOpen) closeRewardList();
             return;
         }
 
@@ -10129,6 +10168,15 @@ function formatRemainKo(ms) {
     return h > 0 ? `${h}시간 ${m}분` : `${m}분`;
 }
 
+const RECORD_RESET_COST = 100;
+let recordResetting = false;
+let recordNotice = { solo: null, multiplayer: null };
+
+function formatAvg(value) {
+    if (value === null || value === undefined || !Number.isFinite(Number(value))) return "-";
+    return Number(value).toLocaleString("ko-KR", { maximumFractionDigits: 1 });
+}
+
 function renderProfileStats() {
     const body = document.getElementById("rewardListBody");
     const subtitle = document.getElementById("rewardListSubtitle");
@@ -10156,15 +10204,40 @@ function renderProfileStats() {
             : { text: `변경 후 24시간 동안은 다시 바꿀 수 없어요. · 보유 🪙 ${coins}`, type: "" };
     }
 
+    const resetNote = scope => recordNotice[scope] || { text: `초기화하면 되돌릴 수 없어요. · 보유 🪙 ${coins}`, type: "" };
+    const soloNote = resetNote("solo");
+    const mpNote = resetNote("multiplayer");
+    const num = v => Math.max(0, Number(v) || 0).toLocaleString("ko-KR");
+
     body.innerHTML = `
-        <div class="profile-section-title">📊 플레이 기록</div>
+        <div class="profile-section-title">🎮 개인 도전 기록</div>
         <div class="profile-stat-grid">
-            <div class="profile-stat"><span>게임 도전 횟수</span><b>${d.playCount.toLocaleString("ko-KR")}회</b></div>
+            <div class="profile-stat"><span>게임 도전 횟수</span><b>${num(d.playCount)}회</b></div>
             <div class="profile-stat"><span>총 플레이 시간</span><b>${escapeHTML(formatPlayTime(d.playSeconds))}</b></div>
-            <div class="profile-stat win"><span>2인 대전 승리</span><b>${d.mpWins.toLocaleString("ko-KR")}승</b></div>
-            <div class="profile-stat loss"><span>2인 대전 패배</span><b>${d.mpLosses.toLocaleString("ko-KR")}패</b></div>
-            <div class="profile-stat rate wide"><span>2인 대전 승률</span><b>${rate}</b></div>
+            <div class="profile-stat"><span>평균 점수</span><b>${formatAvg(d.soloAvgScore)}${d.soloAvgScore == null ? "" : "점"}</b></div>
+            <div class="profile-stat"><span>평균 클리어 횟수</span><b>${formatAvg(d.soloAvgClears)}${d.soloAvgClears == null ? "" : "회"}</b></div>
+            <div class="profile-stat wide"><span>평균 연속 클리어 기록</span><b>${formatAvg(d.soloAvgStreak)}${d.soloAvgStreak == null ? "" : "회"}</b></div>
         </div>
+        <div class="profile-reset-box">
+            <button id="profileResetSoloButton" type="button">🗑 개인 기록 초기화 (🪙 ${RECORD_RESET_COST})</button>
+            <div class="profile-nick-note ${soloNote.type || ""}">${escapeHTML(soloNote.text)}</div>
+        </div>
+
+        <div class="profile-section-title">⚔ 2인 대전 기록</div>
+        <div class="profile-stat-grid">
+            <div class="profile-stat win"><span>2인 대전 승리</span><b>${num(d.mpWins)}승</b></div>
+            <div class="profile-stat loss"><span>2인 대전 패배</span><b>${num(d.mpLosses)}패</b></div>
+            <div class="profile-stat rate"><span>2인 대전 승률</span><b>${rate}</b></div>
+            <div class="profile-stat"><span>대전 플레이 시간</span><b>${escapeHTML(formatPlayTime(d.mpSeconds))}</b></div>
+            <div class="profile-stat"><span>평균 점수</span><b>${formatAvg(d.mpAvgScore)}${d.mpAvgScore == null ? "" : "점"}</b></div>
+            <div class="profile-stat"><span>평균 클리어 횟수</span><b>${formatAvg(d.mpAvgClears)}${d.mpAvgClears == null ? "" : "회"}</b></div>
+            <div class="profile-stat wide"><span>평균 연속 클리어 기록</span><b>${formatAvg(d.mpAvgStreak)}${d.mpAvgStreak == null ? "" : "회"}</b></div>
+        </div>
+        <div class="profile-reset-box">
+            <button id="profileResetMpButton" type="button">🗑 2인 대전 기록 초기화 (🪙 ${RECORD_RESET_COST})</button>
+            <div class="profile-nick-note ${mpNote.type || ""}">${escapeHTML(mpNote.text)}</div>
+        </div>
+
         <div class="profile-section-title">✏️ 닉네임 변경</div>
         <div class="profile-nick-box">
             <div class="profile-nick-current">현재 닉네임 <b>${escapeHTML(d.nickname)}</b></div>
@@ -10173,10 +10246,65 @@ function renderProfileStats() {
             <div class="profile-nick-note ${note.type || ""}">${escapeHTML(note.text)}</div>
         </div>`;
 
+    document.getElementById("profileResetSoloButton")?.addEventListener("click", () => requestRecordReset("solo"));
+    document.getElementById("profileResetMpButton")?.addEventListener("click", () => requestRecordReset("multiplayer"));
     document.getElementById("profileNicknameButton")?.addEventListener("click", changeNickname);
     document.getElementById("profileNicknameInput")?.addEventListener("keydown", event => {
         if (event.key === "Enter") { event.preventDefault(); changeNickname(); }
     });
+}
+
+// 기록 초기화: 코인 100 소모 + 최종 확인창. 서버에서 초기화가 확정된 뒤에만 코인을 차감합니다.
+async function requestRecordReset(scope) {
+    if (recordResetting || logoutConfirmOpen || !profileStatsData) return;
+
+    const isSolo = scope === "solo";
+    const label = isSolo ? "개인 도전 기록" : "2인 대전 기록";
+    const fail = text => {
+        recordNotice[scope] = { text, type: "error" };
+        playUIInvalidSound();
+        renderProfileStats();
+    };
+
+    if (coins < RECORD_RESET_COST) {
+        return fail(`코인이 부족합니다. (필요 ${RECORD_RESET_COST} / 보유 ${coins})`);
+    }
+
+    const ok = await openLogoutConfirm({
+        title: `${label} 초기화`,
+        message: (isSolo
+            ? "게임 도전 횟수 · 총 플레이 시간 ·\n평균 점수/클리어/연속 클리어 기록이 모두 0으로 돌아갑니다.\n"
+            : "2인 대전 승/패 · 승률 · 대전 플레이 시간 ·\n평균 점수/클리어/연속 클리어 기록이 모두 0으로 돌아갑니다.\n") +
+            `\n🪙 ${RECORD_RESET_COST}코인이 소모되며 되돌릴 수 없습니다.\n정말 초기화할까요?`,
+        confirmLabel: "초기화"
+    });
+    if (!ok || !rewardListOpen || recordResetting) return;
+
+    if (coins < RECORD_RESET_COST) {
+        return fail(`코인이 부족합니다. (필요 ${RECORD_RESET_COST} / 보유 ${coins})`);
+    }
+
+    recordResetting = true;
+    document.querySelectorAll(".profile-reset-box button").forEach(btn => { btn.disabled = true; });
+
+    try {
+        const data = await apiJSON("/api/profile/reset", {
+            method: "POST",
+            body: JSON.stringify({ scope })
+        });
+
+        coins = Math.max(0, coins - RECORD_RESET_COST);
+        saveCoins();
+        if (data?.profile) profileStatsData = data.profile;
+
+        recordNotice[scope] = { text: `${label}이 초기화되었어요! (🪙 -${RECORD_RESET_COST})`, type: "success" };
+        updateUI();
+    } catch (error) {
+        recordNotice[scope] = { text: error?.message || "기록을 초기화하지 못했습니다.", type: "error" };
+    } finally {
+        recordResetting = false;
+        if (rewardListOpen && profileTab === "stats") renderProfileStats();
+    }
 }
 
 async function changeNickname() {
@@ -10268,6 +10396,7 @@ async function openRewardList() {
     profileLoading = true;
     profileTab = "stats";
     nicknameNotice = null;
+    recordNotice = { solo: null, multiplayer: null };
     rewardListData = null; rewardListError = "";
     profileStatsData = null; profileStatsError = "";
 
@@ -13019,7 +13148,7 @@ function handleSettingsTap(x, y) {
             if (isInsideRect(x, y, { x: panel.x + 430, y: cy - 25, w: 30, h: 34 })) adjustPurchaseQuantity(type, -1);
             if (isInsideRect(x, y, { x: panel.x + 464, y: cy - 25, w: 50, h: 34 })) return;
             if (isInsideRect(x, y, { x: panel.x + 518, y: cy - 25, w: 30, h: 34 })) adjustPurchaseQuantity(type, 1);
-            if (isInsideRect(x, y, { x: panel.x + 550, y: cy - 25, w: 90, h: 34 })) buyItem(type);
+            if (isInsideRect(x, y, { x: panel.x + 550, y: cy - 25, w: 90, h: 34 })) requestBuyItem(type);
         });
         return true;
     }
@@ -13716,4 +13845,3 @@ requestAnimationFrame(
 
 </body>
     </html>
-    
