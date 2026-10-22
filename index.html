@@ -4241,9 +4241,25 @@ function unlockEffectAudio() {
             audio.__soundType = type;
             audio.volume = getSoundVolume(type);
             audio.setAttribute("playsinline", "");
+            audio.addEventListener("error", () => console.warn(`[SOUND] ${type} 파일을 불러오지 못했습니다: ${AUDIO_FILES[type]}`));
             effectAudioCache.set(type, audio);
 
             try { audio.load(); } catch (error) {}
+        }
+
+        // 사용자 제스처 안에서 무음 재생→정지를 해 두어야, 나중에(게임 오버처럼
+        // 제스처가 아닌 시점에) 재생해도 브라우저(특히 iOS)가 막지 않습니다.
+        for (const audio of effectAudioCache.values()) {
+            try {
+                audio.muted = true;
+                const p = audio.play();
+                const done = () => {
+                    try { audio.pause(); audio.currentTime = 0; } catch (error) {}
+                    audio.muted = false;
+                };
+                if (p && typeof p.then === "function") p.then(done).catch(() => { audio.muted = false; });
+                else done();
+            } catch (error) { audio.muted = false; }
         }
     } catch (error) {}
 }
@@ -4302,13 +4318,29 @@ function playEffectSound(type, oneShotKey = null) {
             effectAudioCache.set(type, audio);
         }
 
+        audio.muted = false;
         audio.volume = getSoundVolume(type);
-        audio.currentTime = 0;
+        try { audio.currentTime = 0; } catch (error) {}
 
         const promise = audio.play();
         if (promise && typeof promise.catch === "function") {
-            promise.catch(() => {
-                if (oneShotKey) oneShotEffectPlayed.delete(oneShotKey);
+            promise.catch(error => {
+                console.warn(`[SOUND] ${type} 재생 실패 (${src}):`, error && error.name, error && error.message);
+                // 캐시된 오디오가 막혔거나 꼬였을 때: 새 Audio 객체로 한 번 더 시도
+                try {
+                    const retry = new Audio(src);
+                    retry.setAttribute("playsinline", "");
+                    retry.volume = getSoundVolume(type);
+                    const retryPromise = retry.play();
+                    if (retryPromise && typeof retryPromise.then === "function") {
+                        retryPromise.then(() => effectAudioCache.set(type, retry)).catch(err2 => {
+                            console.warn(`[SOUND] ${type} 재시도 실패:`, err2 && err2.name, err2 && err2.message);
+                            if (oneShotKey) oneShotEffectPlayed.delete(oneShotKey);
+                        });
+                    }
+                } catch (error2) {
+                    if (oneShotKey) oneShotEffectPlayed.delete(oneShotKey);
+                }
             });
         }
 
@@ -13684,3 +13716,4 @@ requestAnimationFrame(
 
 </body>
     </html>
+    
