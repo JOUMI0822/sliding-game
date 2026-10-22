@@ -3082,7 +3082,8 @@ const STREAK_EFFECTS = [
     { name: "프리즘", value: "prism" },
     { name: "눈보라", value: "snow" },
     { name: "독 포자", value: "spore" },
-    { name: "황금 비", value: "goldRain" }
+    { name: "황금 비", value: "goldRain" },
+    { name: "네온", value: "neon" }
 ];
 
 
@@ -3294,18 +3295,25 @@ function drawGoalSkin(skin, x, y, size = CELL - 10) {
             break;
         }
         case "neon": {
-            const pulse = 0.7 + Math.sin(t * 4) * 0.3;
-            const p = (t % 1.2) / 1.2;
-            ctx.fillStyle = "#06150f"; ctx.fillRect(0, 0, 30, 30);
-            ctx.shadowBlur = 10; ctx.shadowColor = "#39ff88";
-            ctx.strokeStyle = `rgba(57,255,136,${pulse})`; ctx.lineWidth = 2.5;
+            const pulse = 0.7 + Math.sin(t * 5) * 0.3;
+            ctx.fillStyle = "#061a1f";
+            ctx.fillRect(0, 0, 30, 30);
+            ctx.strokeStyle = `rgba(55,245,255,${pulse})`;
+            ctx.lineWidth = 2.5;
+            ctx.shadowBlur = 12;
+            ctx.shadowColor = "#37f5ff";
             ctx.strokeRect(2, 2, 26, 26);
-            const inset = 5 + p * 7;
-            ctx.strokeStyle = `rgba(160,255,200,${(1 - p) * 0.9})`; ctx.lineWidth = 1.5;
-            ctx.strokeRect(inset, inset, 30 - inset * 2, 30 - inset * 2);
+            ctx.save();
+            ctx.translate(15, 15);
+            ctx.rotate(t * 1.5);
+            ctx.strokeStyle = "rgba(255,70,220,0.95)";
+            ctx.lineWidth = 2;
+            ctx.shadowColor = "#ff46dc";
+            ctx.strokeRect(-6, -6, 12, 12);
+            ctx.restore();
             ctx.shadowBlur = 0;
             ctx.fillStyle = `rgba(255,255,255,${0.6 + Math.sin(t * 6) * 0.3})`;
-            ctx.beginPath(); ctx.arc(15, 15, 2.6, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(15, 15, 2.4, 0, Math.PI * 2); ctx.fill();
             break;
         }
         case "classic":
@@ -3333,7 +3341,7 @@ const SKIN_THEMES = [
     { name: "☠ 독 늪",  wall: 4, background: 3, dangerSkin: skinIdx(DANGER_SKINS, "toxic"), streakEffect: skinIdx(STREAK_EFFECTS, "spore"),  playerSkin: skinIdx(PLAYER_SKINS, "slime"),   playerTrail: skinIdx(PLAYER_TRAILS, "bubble"), goalSkin: skinIdx(GOAL_SKINS, "cauldron") },
     { name: "❄ 얼음",   wall: 2, background: 1, dangerSkin: skinIdx(DANGER_SKINS, "ice"),   streakEffect: skinIdx(STREAK_EFFECTS, "snow"),   playerSkin: skinIdx(PLAYER_SKINS, "ice"),     playerTrail: skinIdx(PLAYER_TRAILS, "frost"),  goalSkin: skinIdx(GOAL_SKINS, "snowflake") },
     { name: "🌸 벚꽃",   wall: 6, background: 2, dangerSkin: skinIdx(DANGER_SKINS, "thorn"), streakEffect: skinIdx(STREAK_EFFECTS, "petals"), playerSkin: skinIdx(PLAYER_SKINS, "blossom"), playerTrail: skinIdx(PLAYER_TRAILS, "petal"),  goalSkin: skinIdx(GOAL_SKINS, "torii") },
-    { name: "💠 네온",   wall: 1, background: 6, dangerSkin: skinIdx(DANGER_SKINS, "neon"), streakEffect: skinIdx(STREAK_EFFECTS, "prism"), playerSkin: skinIdx(PLAYER_SKINS, "neon"), playerTrail: skinIdx(PLAYER_TRAILS, "neon"), goalSkin: skinIdx(GOAL_SKINS, "neon") },
+    { name: "💠 네온",   wall: 1, background: 6, dangerSkin: skinIdx(DANGER_SKINS, "neon"), streakEffect: skinIdx(STREAK_EFFECTS, "neon"), playerSkin: skinIdx(PLAYER_SKINS, "neon"), playerTrail: skinIdx(PLAYER_TRAILS, "neon"), goalSkin: skinIdx(GOAL_SKINS, "neon") },
     { name: "👑 보물",   wall: 5, background: 5, dangerSkin: skinIdx(DANGER_SKINS, "trap"),  streakEffect: skinIdx(STREAK_EFFECTS, "goldRain"), playerSkin: skinIdx(PLAYER_SKINS, "gold"),  playerTrail: skinIdx(PLAYER_TRAILS, "coin"),   goalSkin: skinIdx(GOAL_SKINS, "chest") }
 ];
 const SKIN_THEME_BUTTON = { x: 94, y: 550, w: 220, h: 26 };
@@ -10850,6 +10858,32 @@ const STREAK_RENDERERS = {
         }
         ctx.restore();
     },
+    neon(s) {
+        const k = Math.min(1, s), t = performance.now() * 0.001;
+        ctx.save(); ctx.globalCompositeOperation = "screen";
+        for (let i = 0; i < 2; i++) {
+            const g = ctx.createLinearGradient(0, 0, WIDTH, HEIGHT);
+            const a = (0.18 + 0.32 * k) * (0.75 + 0.25 * Math.sin(t * 4 + i * 2));
+            g.addColorStop(0, `hsla(180,100%,60%,${a})`);
+            g.addColorStop(0.5, `hsla(305,100%,62%,${a})`);
+            g.addColorStop(1, `hsla(180,100%,60%,${a})`);
+            const lw = 4 + 8 * k - i * 2;
+            ctx.strokeStyle = g; ctx.lineWidth = lw;
+            ctx.shadowBlur = 18; ctx.shadowColor = i ? "#ff46dc" : "#37f5ff";
+            ctx.strokeRect(lw / 2 + i * 5, lw / 2 + i * 5, WIDTH - lw - i * 10, HEIGHT - lw - i * 10);
+        }
+        const heads = 1 + Math.round(k);
+        for (let h = 0; h < heads; h++) {
+            const head = t * 0.18 + h / heads;
+            for (let i = 0; i < 16; i++) {
+                const p = fxPerim(head - i * 0.004), f = 1 - i / 16;
+                ctx.fillStyle = `hsla(${h ? 305 : 180},100%,${85 - i * 2}%,${f * (0.4 + 0.5 * k)})`;
+                ctx.shadowBlur = 10; ctx.shadowColor = h ? "#ff46dc" : "#37f5ff";
+                ctx.beginPath(); ctx.arc(p.x + p.nx * 6, p.y + p.ny * 6, (1.5 + 3.5 * k) * f, 0, Math.PI * 2); ctx.fill();
+            }
+        }
+        ctx.restore();
+    },
     prism(s) {
         const k = Math.min(1, s), t = performance.now() * 0.001;
         ctx.save(); ctx.globalCompositeOperation = "screen";
@@ -10995,18 +11029,17 @@ function drawDangerBlock(c, r, skin) {
             break;
         }
         case "neon": {
-            const pulse = 0.65 + Math.sin(t * 6 + c * 0.7 + r * 0.5) * 0.35;
-            ctx.fillStyle = "#1a0510"; ctx.fillRect(x + 3, y + 3, CELL - 6, CELL - 6);
-            ctx.strokeStyle = `rgba(255,45,120,${pulse})`; ctx.lineWidth = 2.5;
-            ctx.shadowBlur = 12; ctx.shadowColor = "#ff2d78";
-            ctx.strokeRect(x + 5, y + 5, CELL - 10, CELL - 10);
-            ctx.lineWidth = 2; ctx.lineCap = "round";
+            const pulse = 0.65 + Math.sin(t * 5 + c + r) * 0.35;
+            ctx.fillStyle = "#12060f"; ctx.fillRect(x + 3, y + 3, CELL - 6, CELL - 6);
+            ctx.strokeStyle = `rgba(255,40,120,${pulse})`; ctx.lineWidth = 2.5;
+            ctx.shadowBlur = 12; ctx.shadowColor = "#ff2878";
+            ctx.strokeRect(x + 4, y + 4, CELL - 8, CELL - 8);
+            ctx.strokeStyle = `rgba(255,130,200,${0.5 + pulse * 0.5})`; ctx.lineWidth = 2; ctx.lineCap = "round";
             ctx.beginPath();
-            ctx.moveTo(x + 13, y + 13); ctx.lineTo(x + CELL - 13, y + CELL - 13);
-            ctx.moveTo(x + CELL - 13, y + 13); ctx.lineTo(x + 13, y + CELL - 13);
+            ctx.moveTo(x + 12, y + 12); ctx.lineTo(x + CELL - 12, y + CELL - 12);
+            ctx.moveTo(x + CELL - 12, y + 12); ctx.lineTo(x + 12, y + CELL - 12);
             ctx.stroke();
-            ctx.shadowBlur = 0;
-            ctx.fillStyle = `rgba(255,255,255,${0.5 + pulse * 0.4})`;
+            ctx.shadowBlur = 0; ctx.fillStyle = "rgba(255,255,255,0.85)";
             ctx.beginPath(); ctx.arc(cx, cy, 2, 0, Math.PI * 2); ctx.fill();
             break;
         }
