@@ -1064,6 +1064,32 @@ html.fit-scale canvas {
     height: 600px;
     max-width: none;
 }
+
+/* 게스트 이름 입력창 */
+#guestNameOverlay {
+    position: fixed; inset: 0; z-index: 10002;
+    display: none; align-items: center; justify-content: center;
+    padding: 20px; background: rgba(0,0,0,0.68); touch-action: none;
+}
+#guestNameOverlay.visible { display: flex; }
+#guestNameDialog {
+    width: min(380px, calc(100vw - 40px));
+    padding: 24px 22px 20px;
+    border: 1px solid #4b596b; border-radius: 18px;
+    background: #171c25; box-shadow: 0 18px 50px rgba(0,0,0,0.5);
+    text-align: center;
+}
+#guestNameDialog h2 { margin: 0 0 8px; color: #fff; font-size: 21px; font-weight: 700; }
+#guestNameDialog p { margin: 0 0 14px; color: #aeb8c5; font-size: 14px; line-height: 1.5; }
+#guestNameInput {
+    width: 100%; height: 46px; border: 1px solid #46515f; border-radius: 10px;
+    background: #10151c; color: #f3f5f7; padding: 0 13px; text-align: center;
+    font: 600 17px Pretendard, "Noto Sans KR", Arial, sans-serif; outline: none;
+}
+#guestNameInput:focus { border-color: #63b8ff; box-shadow: 0 0 0 3px rgba(99,184,255,0.12); }
+#guestNameError { min-height: 20px; margin: 8px 0 12px; color: #ff8f9b; font-size: 12px; }
+#guestNameDialog .logout-confirm-actions button { color: #fff; background: #222934; }
+#guestNameOk { background: #236ea8 !important; border-color: rgba(99,184,255,0.75) !important; }
 </style>
 </head>
 
@@ -1078,6 +1104,19 @@ html.fit-scale canvas {
         <div class="logout-confirm-actions">
             <button id="logoutCancelButton" type="button">취소</button>
             <button id="logoutConfirmButton" type="button">로그아웃</button>
+        </div>
+    </div>
+</div>
+
+<div id="guestNameOverlay" aria-hidden="true">
+    <div id="guestNameDialog" role="dialog" aria-modal="true" aria-labelledby="guestNameTitle">
+        <h2 id="guestNameTitle">🎮 이름 입력</h2>
+        <p>랭킹에 표시될 이름을 적어주세요.<br>이전 이름이 보이면 지우고 새로 적으면 돼요.</p>
+        <input id="guestNameInput" type="text" maxlength="16" placeholder="이름 (2~16자)" autocomplete="off">
+        <div id="guestNameError"></div>
+        <div class="logout-confirm-actions">
+            <button id="guestNameCancel" type="button">취소</button>
+            <button id="guestNameOk" type="button">시작</button>
         </div>
     </div>
 </div>
@@ -1414,7 +1453,6 @@ function enterGameAsGuest() {
     guestMode = true;
     guestAccount = null;
     gameAccessGranted = true;
-    ensureGuestSession();   // 백그라운드로 게스트 계정 준비 (랭킹 기록용)
     const gate = document.getElementById("entryGate");
     if (gate) {
         gate.classList.remove("session-checking");
@@ -1945,7 +1983,7 @@ function bindEntryAndRankingUI() {
         event.preventDefault();
         event.stopPropagation();
         playUIClickSound();
-        openMultiplayerMenu();
+        withGuestName(openMultiplayerMenu);
     });
 
     document.getElementById("rankingClose")?.addEventListener("click", event => {
@@ -1986,6 +2024,95 @@ function bindEntryAndRankingUI() {
         button.addEventListener("pointerup", event => event.stopPropagation());
         button.addEventListener("touchstart", event => event.stopPropagation(), { passive: true });
         button.addEventListener("touchend", event => event.stopPropagation(), { passive: true });
+    });
+}
+
+/* =========================================================
+   게스트 이름 입력 (게임 시작 / 2인 대전 진입 때마다)
+========================================================= */
+const GUEST_LAST_NAME_KEY = "slidingMazeGuestLastName_v1";
+let guestNameOpen = false;
+
+async function applyGuestName(name) {
+    if (!(guestAccount && guestAccount.nickname === name)) {
+        const data = await apiJSON("/api/guest", {
+            method: "POST",
+            body: JSON.stringify({ nickname: name })
+        });
+        if (!data?.sessionToken || !data?.user) throw new Error("게스트 계정을 만들지 못했습니다.");
+        try { localStorage.setItem(GUEST_TOKEN_KEY, data.sessionToken); } catch (error) {}
+        guestAccount = { id: data.user.id, nickname: data.user.nickname };
+        name = data.user.nickname;
+    }
+    try { localStorage.setItem(GUEST_LAST_NAME_KEY, name); } catch (error) {}
+}
+
+// 게스트가 아니면 바로 true. 게스트면 이름 입력창을 띄우고, 확인하면 true / 취소하면 false.
+function requireGuestName() {
+    if (!guestMode || currentAccount) return Promise.resolve(true);
+    if (guestNameOpen) return Promise.resolve(false);
+
+    const overlay = document.getElementById("guestNameOverlay");
+    const input = document.getElementById("guestNameInput");
+    const errorEl = document.getElementById("guestNameError");
+    const okBtn = document.getElementById("guestNameOk");
+    const cancelBtn = document.getElementById("guestNameCancel");
+    if (!overlay || !input) return Promise.resolve(true);
+
+    guestNameOpen = true;
+    let last = "";
+    try { last = localStorage.getItem(GUEST_LAST_NAME_KEY) || ""; } catch (error) {}
+    input.value = last || guestAccount?.nickname || "";   // 직전에 쓴 이름을 먼저 보여줌
+    errorEl.textContent = "";
+    okBtn.disabled = false;
+    overlay.classList.add("visible");
+    overlay.setAttribute("aria-hidden", "false");
+    setTimeout(() => { input.focus(); input.select(); }, 50);   // 선택돼 있어서 바로 타이핑하면 교체됨
+
+    return new Promise(resolve => {
+        let busy = false;
+
+        const close = result => {
+            overlay.classList.remove("visible");
+            overlay.setAttribute("aria-hidden", "true");
+            okBtn.onclick = cancelBtn.onclick = input.onkeydown = null;
+            guestNameOpen = false;
+            resolve(result);
+        };
+
+        const submit = async () => {
+            if (busy) return;
+            const name = input.value.trim();
+            if (name.length < 2 || name.length > 16 || /[\u0000-\u001F\u007F]/.test(name)) {
+                errorEl.textContent = "이름은 2~16자로 입력해주세요.";
+                return;
+            }
+            busy = true;
+            okBtn.disabled = true;
+            errorEl.textContent = "확인 중...";
+            try {
+                await applyGuestName(name);
+                close(true);
+            } catch (error) {
+                errorEl.textContent = error?.message || "이름을 설정하지 못했습니다.";
+                busy = false;
+                okBtn.disabled = false;
+            }
+        };
+
+        okBtn.onclick = submit;
+        cancelBtn.onclick = () => { if (!busy) close(false); };
+        input.onkeydown = event => {
+            if (event.key === "Enter") { event.preventDefault(); submit(); }
+            else if (event.key === "Escape" && !busy) close(false);
+        };
+    });
+}
+
+// 시작 동작을 "이름 확인 → 실행" 순서로 감싸는 헬퍼
+function withGuestName(action) {
+    requireGuestName().then(ok => {
+        if (ok && gameState === "start") action();
     });
 }
 
@@ -8143,6 +8270,8 @@ window.addEventListener(
             return;
         }
 
+        if (guestNameOpen) return;
+
         if (rewardListOpen) {
             if (event.key === "Escape") closeRewardList();
             return;
@@ -8175,7 +8304,7 @@ window.addEventListener(
             ) {
 
                 if (isMultiplayerPending()) return;
-                startNewGame();
+                withGuestName(startNewGame);
 
             } else if (
                 gameState !==
@@ -8234,7 +8363,7 @@ window.addEventListener(
 
             if (isMultiplayerPending()) return;
 
-            startNewGame();
+            withGuestName(startNewGame);
 
             return;
         }
@@ -8494,7 +8623,7 @@ gameWrapper.addEventListener(
 
                 lastTapTime = 0;
 
-                playGameStartSoundAndThenStart();
+                withGuestName(playGameStartSoundAndThenStart);
 
             } else {
 
@@ -13768,7 +13897,7 @@ function handleSettingsTap(x, y) {
     }
 
     if (!settingsOpen && isInsideRect(x, y, { x: 570, y: 58, w: 200, h: 38 })) {
-        openMultiplayerMenu();
+        withGuestName(openMultiplayerMenu);
         return true;
     }
 
@@ -14344,7 +14473,6 @@ function refreshRankingAccountLabel() {
 const originalOpenRankingPanel = openRankingPanel;
 openRankingPanel = function(mode = "today") {
     if (!currentAccount && !guestMode) return;
-    if (guestMode && !currentAccount) ensureGuestSession().then(() => refreshRankingAccountLabel());
     refreshRankingAccountLabel();
     originalOpenRankingPanel(mode);
 };
