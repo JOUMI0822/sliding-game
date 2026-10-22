@@ -3105,6 +3105,350 @@ const STREAK_EFFECTS = [
 ];
 
 
+/* =========================================================
+   플레이어 스킨 / 잔상 효과
+========================================================= */
+
+const PLAYER_SKINS = [
+    { name: "기본", value: "classic" },
+    { name: "둥근", value: "round" },
+    { name: "슬라임", value: "slime" },
+    { name: "네온", value: "neon" },
+    { name: "황금", value: "gold" },
+    { name: "로봇", value: "robot" },
+    { name: "다이아", value: "diamond" },
+    { name: "구슬", value: "orb" }
+];
+
+const PLAYER_TRAILS = [
+    { name: "기본", value: "default" },
+    { name: "없음", value: "none" },
+    { name: "무지개", value: "rainbow" },
+    { name: "불꽃", value: "fire" },
+    { name: "별가루", value: "sparkle" },
+    { name: "네온", value: "neon" },
+    { name: "고스트", value: "ghost" },
+    { name: "글리치", value: "glitch" }
+];
+
+// 스킨 화면의 행 구성 (그리기와 터치 판정이 같은 값을 사용합니다)
+const SKIN_PANEL = { x: 70, y: 20, w: 660, h: 560 };
+const SKIN_ROWS = [
+    { key: "wall",         label: "벽 색상",          list: WALL_COLORS,       centerY: 130 },
+    { key: "background",   label: "배경 색상",        list: BACKGROUND_COLORS, centerY: 205 },
+    { key: "dangerSkin",   label: "위험 블록 스킨",   list: DANGER_SKINS,      centerY: 280 },
+    { key: "streakEffect", label: "연속 클리어 효과", list: STREAK_EFFECTS,    centerY: 355 },
+    { key: "playerSkin",   label: "플레이어 스킨",    list: PLAYER_SKINS,      centerY: 430 },
+    { key: "playerTrail",  label: "플레이어 잔상",    list: PLAYER_TRAILS,     centerY: 505 }
+];
+
+function getPlayerSkinValue() {
+    return (PLAYER_SKINS[visualSettings.playerSkin] || PLAYER_SKINS[0]).value;
+}
+
+function getPlayerTrailValue() {
+    return (PLAYER_TRAILS[visualSettings.playerTrail] || PLAYER_TRAILS[0]).value;
+}
+
+/* x, y = 그려질 정사각형의 왼쪽 위, size = 한 변 (게임에서는 CELL - 10 = 30) */
+function drawPlayerSkin(skin, x, y, size = CELL - 10) {
+    const t = performance.now() * 0.001;
+
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(size / 30, size / 30);
+
+    switch (skin) {
+        case "round": {
+            ctx.fillStyle = "#2ec4b6";
+            ctx.beginPath();
+            ctx.roundRect(0, 0, 30, 30, 10);
+            ctx.fill();
+            ctx.fillStyle = "rgba(255,255,255,0.30)";
+            ctx.beginPath();
+            ctx.roundRect(5, 5, 20, 5, 2.5);
+            ctx.fill();
+            break;
+        }
+
+        case "slime": {
+            const squish = Math.sin(t * 4) * 0.8;
+            ctx.fillStyle = "#7be36b";
+            ctx.beginPath();
+            ctx.roundRect(0 - squish / 2, 2 + squish, 30 + squish, 28 - squish, 12);
+            ctx.fill();
+            ctx.fillStyle = "rgba(255,255,255,0.35)";
+            ctx.beginPath();
+            ctx.ellipse(8, 8 + squish, 4, 2.2, -0.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = "#ffffff";
+            ctx.beginPath();
+            ctx.arc(10, 15 + squish, 4, 0, Math.PI * 2);
+            ctx.arc(20, 15 + squish, 4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = "#111820";
+            ctx.beginPath();
+            ctx.arc(11, 16 + squish, 2, 0, Math.PI * 2);
+            ctx.arc(21, 16 + squish, 2, 0, Math.PI * 2);
+            ctx.fill();
+            break;
+        }
+
+        case "neon": {
+            const pulse = 0.75 + Math.sin(t * 5) * 0.25;
+            ctx.fillStyle = "#08161d";
+            ctx.fillRect(0, 0, 30, 30);
+            ctx.strokeStyle = `rgba(55,245,255,${pulse})`;
+            ctx.lineWidth = 2.5;
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = "#37f5ff";
+            ctx.strokeRect(2, 2, 26, 26);
+            ctx.shadowBlur = 0;
+            ctx.strokeStyle = "rgba(255,255,255,0.55)";
+            ctx.lineWidth = 1;
+            ctx.strokeRect(8, 8, 14, 14);
+            break;
+        }
+
+        case "gold": {
+            const g = ctx.createLinearGradient(0, 0, 30, 30);
+            g.addColorStop(0, "#fff3a8");
+            g.addColorStop(0.5, "#f5c232");
+            g.addColorStop(1, "#b8860b");
+            ctx.fillStyle = g;
+            ctx.fillRect(0, 0, 30, 30);
+            ctx.strokeStyle = "#fff0b3";
+            ctx.lineWidth = 1.5;
+            ctx.strokeRect(0.75, 0.75, 28.5, 28.5);
+            ctx.fillStyle = "rgba(255,255,255,0.45)";
+            ctx.fillRect(5, 5, 20, 4);
+            // 반짝이는 빛줄기
+            const sweep = ((t * 0.7) % 1.6) * 50 - 20;
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(0, 0, 30, 30);
+            ctx.clip();
+            ctx.fillStyle = "rgba(255,255,255,0.35)";
+            ctx.beginPath();
+            ctx.moveTo(sweep, 30);
+            ctx.lineTo(sweep + 6, 30);
+            ctx.lineTo(sweep + 18, 0);
+            ctx.lineTo(sweep + 12, 0);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+            break;
+        }
+
+        case "robot": {
+            ctx.fillStyle = "#aab4c0";
+            ctx.beginPath();
+            ctx.roundRect(0, 0, 30, 30, 5);
+            ctx.fill();
+            ctx.fillStyle = "#0d1117";
+            ctx.beginPath();
+            ctx.roundRect(4, 8, 22, 10, 3);
+            ctx.fill();
+            const blink = Math.sin(t * 3) > 0.92 ? 1 : 4;
+            ctx.fillStyle = "#37f5ff";
+            ctx.shadowBlur = 6;
+            ctx.shadowColor = "#37f5ff";
+            ctx.fillRect(8, 11 + (4 - blink) / 2, 5, blink);
+            ctx.fillRect(17, 11 + (4 - blink) / 2, 5, blink);
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = "#5b6672";
+            ctx.fillRect(9, 22, 12, 2);
+            break;
+        }
+
+        case "diamond": {
+            ctx.translate(15, 15);
+            ctx.rotate(Math.PI / 4);
+            const g = ctx.createLinearGradient(-11, -11, 11, 11);
+            g.addColorStop(0, "#c9a8ff");
+            g.addColorStop(1, "#7b4dff");
+            ctx.fillStyle = g;
+            ctx.fillRect(-10.5, -10.5, 21, 21);
+            ctx.strokeStyle = "rgba(255,255,255,0.7)";
+            ctx.lineWidth = 1.5;
+            ctx.strokeRect(-10.5, -10.5, 21, 21);
+            ctx.fillStyle = "rgba(255,255,255,0.35)";
+            ctx.fillRect(-7, -7, 14, 3);
+            break;
+        }
+
+        case "orb": {
+            const g = ctx.createRadialGradient(11, 10, 1, 15, 15, 16);
+            g.addColorStop(0, "#ffe6fa");
+            g.addColorStop(0.45, "#ff7be0");
+            g.addColorStop(1, "#b0229a");
+            ctx.fillStyle = g;
+            ctx.beginPath();
+            ctx.arc(15, 15, 15, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = "rgba(255,255,255,0.55)";
+            ctx.beginPath();
+            ctx.ellipse(10, 9, 4.5, 2.6, -0.6, 0, Math.PI * 2);
+            ctx.fill();
+            break;
+        }
+
+        case "classic":
+        default: {
+            ctx.fillStyle = "#45e77b";
+            ctx.fillRect(0, 0, 30, 30);
+            ctx.fillStyle = "rgba(255,255,255,0.30)";
+            ctx.fillRect(5, 5, 20, 5);
+        }
+    }
+
+    ctx.restore();
+}
+
+/* x, y = 잔상이 남은 칸의 왼쪽 위, k = 0~1 선명도(오래될수록 작음), i = 순서 */
+function drawTrailPoint(effect, x, y, k, i, t) {
+    if (effect === "none" || k <= 0) return;
+
+    const cx = x + CELL / 2;
+    const cy = y + CELL / 2;
+
+    ctx.save();
+
+    switch (effect) {
+        case "rainbow": {
+            ctx.globalCompositeOperation = "screen";
+            ctx.fillStyle = `hsla(${(t * 160 + i * 28) % 360},100%,60%,${k * 0.65})`;
+            ctx.beginPath();
+            ctx.arc(cx, cy, 4 + 9 * k, 0, Math.PI * 2);
+            ctx.fill();
+            break;
+        }
+
+        case "fire": {
+            ctx.globalCompositeOperation = "screen";
+            const rise = (1 - k) * 14;
+            ctx.fillStyle = `hsla(${8 + 36 * k},100%,55%,${k * 0.6})`;
+            ctx.beginPath();
+            ctx.arc(cx + Math.sin(i * 2.3 + t * 8) * 3, cy - rise, 3 + 9 * k, 0, Math.PI * 2);
+            ctx.fill();
+            break;
+        }
+
+        case "sparkle": {
+            for (let m = 0; m < 2; m++) {
+                const a = i * 2.399 + m * 3.1 + x * 0.13;
+                const sx = cx + Math.sin(a) * 11;
+                const sy = cy + Math.cos(a * 1.7) * 11;
+                const s = (2 + 6 * k) * (m ? 0.65 : 1);
+                const n = s * 0.28;
+                ctx.fillStyle = `rgba(255,240,170,${Math.min(1, k * 1.1)})`;
+                ctx.shadowBlur = 6;
+                ctx.shadowColor = "rgba(255,230,120,0.9)";
+                ctx.beginPath();
+                ctx.moveTo(sx, sy - s);
+                ctx.lineTo(sx + n, sy - n);
+                ctx.lineTo(sx + s, sy);
+                ctx.lineTo(sx + n, sy + n);
+                ctx.lineTo(sx, sy + s);
+                ctx.lineTo(sx - n, sy + n);
+                ctx.lineTo(sx - s, sy);
+                ctx.lineTo(sx - n, sy - n);
+                ctx.closePath();
+                ctx.fill();
+            }
+            break;
+        }
+
+        case "neon": {
+            const size = 30 * (0.45 + 0.55 * k);
+            const hue = (300 + i * 12) % 360;
+            ctx.strokeStyle = `hsla(${hue},100%,65%,${k * 0.85})`;
+            ctx.lineWidth = 2;
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = `hsla(${hue},100%,65%,${k})`;
+            ctx.beginPath();
+            ctx.roundRect(cx - size / 2, cy - size / 2, size, size, 5);
+            ctx.stroke();
+            break;
+        }
+
+        case "ghost": {
+            ctx.globalAlpha = k * 0.32;
+            drawPlayerSkin(getPlayerSkinValue(), x + 5, y + 5, CELL - 10);
+            break;
+        }
+
+        case "glitch": {
+            ctx.globalCompositeOperation = "screen";
+            const j = Math.sin(i * 7.1 + t * 30) * 3;
+            ctx.fillStyle = `rgba(255,45,100,${k * 0.5})`;
+            ctx.fillRect(cx - 12 + j - 3, cy - 12, 24, 24);
+            ctx.fillStyle = `rgba(35,255,220,${k * 0.5})`;
+            ctx.fillRect(cx - 12 - j + 3, cy - 12 + 2, 24, 24);
+            ctx.fillStyle = `rgba(255,255,255,${k * 0.35})`;
+            ctx.fillRect(cx - 14, cy - 3 + j, 28, 2);
+            break;
+        }
+
+        case "default":
+        default: {
+            ctx.fillStyle = `rgba(91,205,255,${k * 0.18})`;
+            ctx.beginPath();
+            ctx.arc(cx, cy, 7, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+
+    ctx.restore();
+}
+
+/* 스킨 화면용: 선택한 스킨이 움직이며 잔상을 남기는 미리보기 */
+function drawTrailPreviewInBox(effect, name, box) {
+    const t = performance.now() * 0.001;
+    const POINTS = 12;
+
+    ctx.save();
+
+    ctx.fillStyle = "rgba(255,255,255,0.055)";
+    ctx.strokeStyle = "rgba(255,255,255,0.16)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(box.x, box.y, box.w, box.h, 10);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.roundRect(box.x, box.y, box.w, box.h, 10);
+    ctx.clip();
+
+    const phase = (t % 1.8) / 1.8;
+    const move = Math.min(1, phase / 0.6);
+    const eased = 1 - Math.pow(1 - move, 3);
+    const startX = box.x + 6;
+    const headX = startX + eased * 190;
+    const cellY = box.y + 1;
+    const fade = Math.max(0, phase - 0.6) * 3.5;
+
+    for (let j = POINTS - 1; j >= 0; j--) {
+        const px = headX - j * 11;
+        if (px < startX) continue;
+        const life = Math.max(0, 1 - j * 0.07 - fade);
+        const i = POINTS - 1 - j;
+        const k = ((i + 1) / POINTS) * life;
+        drawTrailPoint(effect, px, cellY, k, i, t);
+    }
+
+    drawPlayerSkin(getPlayerSkinValue(), headX + 5, cellY + 5, CELL - 10);
+
+    ctx.fillStyle = "rgba(255,255,255,0.94)";
+    ctx.font = "600 14px Pretendard, Noto Sans KR, sans-serif";
+    ctx.textAlign = "right";
+    ctx.textBaseline = "middle";
+    ctx.fillText(name, box.x + box.w - 12, box.y + box.h / 2);
+
+    ctx.restore();
+}
+
 const SETTINGS_KEY = "slidingMazeVisualSettings_v2";
 
 /* =========================================================
@@ -3428,6 +3772,8 @@ let visualSettings = {
     background: 0,
     dangerSkin: 1,
     streakEffect: 1,
+    playerSkin: 0,
+    playerTrail: 0,
     customWall: null,
     customBackground: null
 };
@@ -3547,6 +3893,16 @@ try {
                 Number.isInteger(savedVisualSettings.streakEffect)
                     ? savedVisualSettings.streakEffect
                     : 1,
+
+            playerSkin:
+                Number.isInteger(savedVisualSettings.playerSkin)
+                    ? savedVisualSettings.playerSkin
+                    : 0,
+
+            playerTrail:
+                Number.isInteger(savedVisualSettings.playerTrail)
+                    ? savedVisualSettings.playerTrail
+                    : 0,
 
             customWall:
                 isValidHexColor(savedVisualSettings.customWall)
@@ -12361,47 +12717,18 @@ function drawGame() {
 
 
     /* =====================================================
-       이동 흔적
+       이동 흔적 (플레이어 잔상 설정 적용)
     ===================================================== */
 
-    for (
-        let i = 0;
-        i < trail.length;
-        i++
-    ) {
+    {
+        const trailEffect = getPlayerTrailValue();
+        const trailTime = performance.now() * 0.001;
 
-        const point =
-            trail[i];
-
-        const alpha =
-            (
-                i + 1
-            ) /
-            trail.length *
-            0.18 *
-            (
-                point.life ??
-                1
-            );
-
-        ctx.fillStyle =
-            `rgba(91,205,255,${alpha})`;
-
-        ctx.beginPath();
-
-        ctx.arc(
-            point.x +
-            CELL / 2,
-
-            point.y +
-            CELL / 2,
-
-            7,
-            0,
-            Math.PI * 2
-        );
-
-        ctx.fill();
+        for (let i = 0; i < trail.length; i++) {
+            const point = trail[i];
+            const k = (i + 1) / trail.length * (point.life ?? 1);
+            drawTrailPoint(trailEffect, point.x, point.y, k, i, trailTime);
+        }
     }
 
 
@@ -12428,34 +12755,15 @@ function drawGame() {
 
 
     /* =====================================================
-       플레이어 - 초록색
+       플레이어 (스킨 설정 적용)
     ===================================================== */
 
     if (multiplayerPlayerVisible || !multiplayerMatchActive) {
-        const px =
-            player.x + 5;
-
-        const py =
-            player.y + 5;
-
-        ctx.fillStyle =
-            "#45e77b";
-
-    ctx.fillRect(
-        px,
-        py,
-        CELL - 10,
-        CELL - 10
-    );
-
-    ctx.fillStyle =
-        "rgba(255,255,255,0.30)";
-
-        ctx.fillRect(
-            px + 5,
-            py + 5,
-            CELL - 20,
-            5
+        drawPlayerSkin(
+            getPlayerSkinValue(),
+            player.x + 5,
+            player.y + 5,
+            CELL - 10
         );
     }
 
@@ -13070,411 +13378,121 @@ function drawSkinPanel() {
 
     ctx.save();
 
-    ctx.fillStyle =
-        "rgba(0,0,0,0.72)";
+    ctx.fillStyle = "rgba(0,0,0,0.72)";
+    ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
-    ctx.fillRect(
-        0,
-        0,
-        WIDTH,
-        HEIGHT
-    );
+    const panel = SKIN_PANEL;
 
-    const panel = {
-        x: 70,
-        y: 20,
-        w: 660,
-        h: 560
-    };
-
-    ctx.fillStyle =
-        "#171c25";
-
-    ctx.strokeStyle =
-        "#394352";
-
+    ctx.fillStyle = "#171c25";
+    ctx.strokeStyle = "#394352";
     ctx.lineWidth = 2;
-
     ctx.beginPath();
-
-    ctx.roundRect(
-        panel.x,
-        panel.y,
-        panel.w,
-        panel.h,
-        20
-    );
-
+    ctx.roundRect(panel.x, panel.y, panel.w, panel.h, 20);
     ctx.fill();
     ctx.stroke();
 
-    ctx.textAlign =
-        "center";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 28px Pretendard, Noto Sans KR, sans-serif";
+    ctx.fillText("👔 스킨", WIDTH / 2, 58);
 
-    ctx.textBaseline =
-        "middle";
+    SKIN_ROWS.forEach(row => {
+        const centerY = row.centerY;
+        const list = row.list;
+        const selected = list[visualSettings[row.key]] || list[0];
 
-    ctx.fillStyle =
-        "#ffffff";
+        const selectedBox = {
+            x: WIDTH / 2 - 155,
+            y: centerY - 21,
+            w: 310,
+            h: 42
+        };
 
-    ctx.font =
-        "bold 28px Pretendard, Noto Sans KR, sans-serif";
+        ctx.fillStyle = "#aeb8c5";
+        ctx.font = "600 15px Pretendard, Noto Sans KR, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(row.label, WIDTH / 2, centerY - 34);
 
-    ctx.fillText(
-        "👔 스킨",
-        WIDTH / 2,
-        62
-    );
+        drawSettingsButton(panel.x + 24, centerY - 21, 62, 42, "◀");
+        drawSettingsButton(panel.x + panel.w - 86, centerY - 21, 62, 42, "▶");
 
+        /* 벽 / 배경 색상 */
+        if (row.key === "wall" || row.key === "background") {
+            const displayColor = row.key === "wall" ? getWallColor() : getBackgroundColor();
 
-    const rows = [
-        {
-            key: "wall",
-            label: "벽 색상",
-            list: WALL_COLORS,
-            centerY: 112
-        },
+            ctx.fillStyle = displayColor;
+            ctx.beginPath();
+            ctx.roundRect(selectedBox.x, selectedBox.y, selectedBox.w, selectedBox.h, 10);
+            ctx.fill();
 
-        {
-            key: "background",
-            label: "배경 색상",
-            list: BACKGROUND_COLORS,
-            centerY: 180
-        },
+            const hex = displayColor.replace("#", "");
+            const r = parseInt(hex.slice(0, 2), 16);
+            const g = parseInt(hex.slice(2, 4), 16);
+            const b = parseInt(hex.slice(4, 6), 16);
+            const luminance = (r * 299 + g * 587 + b * 114) / 1000;
 
-        {
-            key: "dangerSkin",
-            label: "위험 블록 스킨",
-            list: DANGER_SKINS,
-            centerY: 305
-        },
+            ctx.fillStyle = luminance > 145 ? "#101318" : "#ffffff";
+            ctx.font = "600 16px Pretendard, Noto Sans KR, sans-serif";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(selected.name, WIDTH / 2, centerY);
 
-        {
-            key: "streakEffect",
-            label: "연속 클리어 효과",
-            list: STREAK_EFFECTS,
-            centerY: 440
-        }
-    ];
-
-
-    rows.forEach(
-        (
-            row
-        ) => {
-
-            const centerY =
-                row.centerY;
-
-            const list =
-                row.list;
-
-            const selected =
-                list[
-                    visualSettings[
-                        row.key
-                    ]
-                ] ||
-                list[0];
-
-
-            /* ---------------------------------------------
-               위험 블록 스킨은 높이를 크게 확보해서
-               "텍스트 → 이미지" 순서로 세로 정렬
-            --------------------------------------------- */
-
-            if (
-                row.key ===
-                "dangerSkin"
-            ) {
-
-                const selectedBox = {
-                    x: WIDTH / 2 - 155,
-                    y: centerY - 42,
-                    w: 310,
-                    h: 84
-                };
-
-                ctx.fillStyle =
-                    "#aeb8c5";
-
-                ctx.font =
-                    "600 15px Pretendard, Noto Sans KR, sans-serif";
-
-                ctx.textAlign =
-                    "center";
-
-                ctx.textBaseline =
-                    "middle";
-
-                ctx.fillText(
-                    row.label,
-                    WIDTH / 2,
-                    centerY - 58
-                );
-
-
-                drawSettingsButton(
-                    panel.x + 24,
-                    centerY - 21,
-                    62,
-                    42,
-                    "◀"
-                );
-
-                drawSettingsButton(
-                    panel.x + panel.w - 86,
-                    centerY - 21,
-                    62,
-                    42,
-                    "▶"
-                );
-
-
-                ctx.fillStyle =
-                    "rgba(255,255,255,0.055)";
-
-                ctx.strokeStyle =
-                    "rgba(255,255,255,0.16)";
-
-                ctx.lineWidth = 1;
-
-                ctx.beginPath();
-
-                ctx.roundRect(
-                    selectedBox.x,
-                    selectedBox.y,
-                    selectedBox.w,
-                    selectedBox.h,
-                    10
-                );
-
-                ctx.fill();
-                ctx.stroke();
-
-
-                /* 이름 - 위쪽 중앙 */
-
-                ctx.fillStyle =
-                    "#f0f3f6";
-
-                ctx.font =
-                    "600 15px Pretendard, Noto Sans KR, sans-serif";
-
-                ctx.textAlign =
-                    "center";
-
-                ctx.textBaseline =
-                    "middle";
-
-                ctx.fillText(
-                    selected.name,
-                    WIDTH / 2,
-                    centerY - 20
-                );
-
-
-                /* 위험 블록 이미지 - 아래쪽 중앙 */
-
-                const previewSize = 32;
-
-                const previewBox = {
-                    x: WIDTH / 2 - previewSize / 2,
-                    y: centerY + 2,
-                    w: previewSize,
-                    h: previewSize
-                };
-
-                drawDangerPreviewInBox(
-                    selected.value,
-                    previewBox
-                );
-
-                return;
+            if (selected.custom) {
+                ctx.font = "11px Pretendard, Noto Sans KR, sans-serif";
+                ctx.fillStyle = luminance > 145 ? "rgba(16,19,24,0.72)" : "rgba(255,255,255,0.72)";
+                ctx.fillText("눌러서 색상 코드 입력", WIDTH / 2, centerY + 15);
             }
 
-
-            /* ---------------------------------------------
-               일반 설정 항목
-            --------------------------------------------- */
-
-            ctx.fillStyle =
-                "#aeb8c5";
-
-            ctx.font =
-                "600 15px Pretendard, Noto Sans KR, sans-serif";
-
-            ctx.textAlign =
-                "center";
-
-            ctx.textBaseline =
-                "middle";
-
-            ctx.fillText(
-                row.label,
-                WIDTH / 2,
-                centerY - 27
-            );
-
-
-            drawSettingsButton(
-                panel.x + 24,
-                centerY - 1,
-                62,
-                42,
-                "◀"
-            );
-
-
-            drawSettingsButton(
-                panel.x + panel.w - 86,
-                centerY - 1,
-                62,
-                42,
-                "▶"
-            );
-
-
-            const selectedBox = {
-                x: WIDTH / 2 - 155,
-                y: centerY - 21,
-                w: 310,
-                h: 42
-            };
-
-
-            if (
-                row.key === "wall" ||
-                row.key === "background"
-            ) {
-
-                const displayColor =
-                    row.key === "wall"
-                        ? getWallColor()
-                        : getBackgroundColor();
-
-                ctx.fillStyle =
-                    displayColor;
-
-                ctx.beginPath();
-
-                ctx.roundRect(
-                    selectedBox.x,
-                    selectedBox.y,
-                    selectedBox.w,
-                    selectedBox.h,
-                    10
-                );
-
-                ctx.fill();
-
-
-                const hex =
-                    displayColor.replace(
-                        "#",
-                        ""
-                    );
-
-                const r =
-                    parseInt(
-                        hex.slice(0, 2),
-                        16
-                    );
-
-                const g =
-                    parseInt(
-                        hex.slice(2, 4),
-                        16
-                    );
-
-                const b =
-                    parseInt(
-                        hex.slice(4, 6),
-                        16
-                    );
-
-                const luminance =
-                    (
-                        r * 299 +
-                        g * 587 +
-                        b * 114
-                    ) / 1000;
-
-                ctx.fillStyle =
-                    luminance > 145
-                        ? "#101318"
-                        : "#ffffff";
-
-                ctx.font =
-                    "600 16px Pretendard, Noto Sans KR, sans-serif";
-
-                ctx.textAlign =
-                    "center";
-
-                ctx.textBaseline =
-                    "middle";
-
-                ctx.fillText(
-                    selected.name,
-                    WIDTH / 2,
-                    centerY
-                );
-
-                if (selected.custom) {
-                    ctx.font =
-                        "11px Pretendard, Noto Sans KR, sans-serif";
-                    ctx.fillStyle =
-                        luminance > 145
-                            ? "rgba(16,19,24,0.72)"
-                            : "rgba(255,255,255,0.72)";
-                    ctx.fillText(
-                        "눌러서 색상 코드 입력",
-                        WIDTH / 2,
-                        centerY + 15
-                    );
-                }
-
-                ctx.strokeStyle =
-                    "rgba(255,255,255,0.34)";
-
-                ctx.lineWidth = 1.5;
-
-                ctx.beginPath();
-
-                ctx.roundRect(
-                    selectedBox.x,
-                    selectedBox.y,
-                    selectedBox.w,
-                    selectedBox.h,
-                    10
-                );
-
-                ctx.stroke();
-
-            } else {
-
-                drawEffectPreviewInBox(
-                    selected.value,
-                    selected.name,
-                    selectedBox
-                );
-            }
+            ctx.strokeStyle = "rgba(255,255,255,0.34)";
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.roundRect(selectedBox.x, selectedBox.y, selectedBox.w, selectedBox.h, 10);
+            ctx.stroke();
+            return;
         }
-    );
-    ctx.fillStyle =
-        "#8f9aa8";
 
-    ctx.font =
-        "13px Pretendard, Noto Sans KR, sans-serif";
+        /* 연속 클리어 효과 */
+        if (row.key === "streakEffect") {
+            drawEffectPreviewInBox(selected.value, selected.name, selectedBox);
+            return;
+        }
 
-    drawSettingsButton(
-        WIDTH / 2 - 80,
-        550,
-        160,
-        26,
-        "닫기"
-    );
+        /* 잔상: 움직이는 미리보기 */
+        if (row.key === "playerTrail") {
+            drawTrailPreviewInBox(selected.value, selected.name, selectedBox);
+            return;
+        }
 
+        /* 위험 블록 / 플레이어 스킨: 왼쪽에 미리보기, 가운데에 이름 */
+        ctx.fillStyle = "rgba(255,255,255,0.055)";
+        ctx.strokeStyle = "rgba(255,255,255,0.16)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.roundRect(selectedBox.x, selectedBox.y, selectedBox.w, selectedBox.h, 10);
+        ctx.fill();
+        ctx.stroke();
+
+        if (row.key === "dangerSkin") {
+            drawDangerPreviewInBox(selected.value, {
+                x: selectedBox.x + 14,
+                y: selectedBox.y + 5,
+                w: 32,
+                h: 32
+            });
+        } else if (row.key === "playerSkin") {
+            drawPlayerSkin(selected.value, selectedBox.x + 15, selectedBox.y + 6, 30);
+        }
+
+        ctx.fillStyle = "#f0f3f6";
+        ctx.font = "600 15px Pretendard, Noto Sans KR, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(selected.name, WIDTH / 2 + 10, centerY);
+    });
+
+    drawSettingsButton(WIDTH / 2 - 80, 550, 160, 26, "닫기");
 
     ctx.restore();
 }
@@ -13630,23 +13648,24 @@ function handleQuestRewardTap(x, y) {
 }
 
 function handleSkinSettingTap(x, y) {
-    const panel = { x: 70, y: 20, w: 660, h: 560 };
-    const rows = [
-        { key: "wall", list: WALL_COLORS, centerY: 112 },
-        { key: "background", list: BACKGROUND_COLORS, centerY: 180 },
-        { key: "dangerSkin", list: DANGER_SKINS, centerY: 305 },
-        { key: "streakEffect", list: STREAK_EFFECTS, centerY: 440 }
-    ];
-    for (const row of rows) {
+    const panel = SKIN_PANEL;
+
+    for (const row of SKIN_ROWS) {
         const centerY = row.centerY;
-        if ((row.key === "wall" || row.key === "background") && row.list[visualSettings[row.key]]?.custom && isInsideRect(x, y, { x: WIDTH / 2 - 155, y: centerY - 21, w: 310, h: 42 })) {
-            setCustomColor(row.key); return true;
+
+        if ((row.key === "wall" || row.key === "background") &&
+            row.list[visualSettings[row.key]]?.custom &&
+            isInsideRect(x, y, { x: WIDTH / 2 - 155, y: centerY - 21, w: 310, h: 42 })) {
+            setCustomColor(row.key);
+            return true;
         }
         if (isInsideRect(x, y, { x: panel.x + 24, y: centerY - 21, w: 62, h: 42 })) {
-            cycleSetting(row.key, row.list, -1); return true;
+            cycleSetting(row.key, row.list, -1);
+            return true;
         }
         if (isInsideRect(x, y, { x: panel.x + panel.w - 86, y: centerY - 21, w: 62, h: 42 })) {
-            cycleSetting(row.key, row.list, 1); return true;
+            cycleSetting(row.key, row.list, 1);
+            return true;
         }
     }
     return true;
