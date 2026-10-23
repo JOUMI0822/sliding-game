@@ -11171,13 +11171,27 @@ function performDoubleAction() {
     if (!useSecondPathGuide()) skipMap();
 }
 
-// PC: 게임 화면 밖(빈 배경) 더블클릭 = 더블 터치
+// 메뉴/결과 화면에서 시작한 마우스 입력은 직후 더블클릭 동작을 막기 위해 기록합니다.
+let lastBlockedPressTime = 0;
+document.addEventListener("pointerdown", event => {
+    if (event.pointerType !== "mouse") return;
+    const menuOpen = settingsOpen || questOpen || shopOpen || inventoryOpen ||
+                     skinOpen || multiplayerOpen;
+    const resultScreen = ["gameover", "multiplayerResult", "expResult"].includes(gameState);
+    if (menuOpen || resultScreen) lastBlockedPressTime = performance.now();
+}, true); // capture 단계에서 상태가 바뀌기 전에 기록
+
+// PC: 게임 영역(캔버스 포함) 또는 화면 밖 빈 배경 더블클릭 = 더블 터치
 document.addEventListener("dblclick", event => {
     const t = event.target;
-    if (t === document.body || t === document.documentElement || t === gameWrapper) {
-        event.preventDefault();
-        performDoubleAction();
-    }
+    const onGameArea = t === document.body || t === document.documentElement ||
+        t === gameWrapper || t === canvas || t === canvasStage;
+    if (!onGameArea) return;
+
+    event.preventDefault();
+    // 메뉴를 닫거나 결과 화면을 넘긴 직후 발생한 더블클릭은 무시합니다.
+    if (performance.now() - lastBlockedPressTime < 700) return;
+    performDoubleAction();
 });
 
 // PC: 결과 화면에서는 화면 안/밖 클릭으로도 다음 단계로 이동
@@ -11190,6 +11204,43 @@ document.addEventListener("click", event => {
 
     if (gameState === "gameover" || gameState === "multiplayerResult") startExperienceResult();
     else if (gameState === "expResult") finishExperienceResult();
+});
+
+
+/* =========================================================
+   PC: 시작 화면에서 게임 캔버스 바깥의 빈 배경을 클릭하면 열린 메뉴 닫기
+   - 모바일 터치 동작은 기존 캔버스 입력 처리를 그대로 사용합니다.
+   - 로그인/팝업/랭킹 등 별도 UI 클릭에는 개입하지 않습니다.
+========================================================= */
+document.addEventListener("click", event => {
+    // 마우스/트랙패드 환경에서만 적용하여 모바일 터치 동작과 충돌하지 않게 합니다.
+    if (!window.matchMedia("(hover: hover) and (pointer: fine)").matches) return;
+    if (!gameAccessGranted || gameState !== "start") return;
+    if (loadingActive || gamePopupOpen || guestNameOpen || logoutConfirmOpen || rewardListOpen) return;
+    if (document.getElementById("rankingPanel")?.hidden === false) return;
+
+    const target = event.target;
+    const clickedBlankOutsideCanvas =
+        target === document.body ||
+        target === document.documentElement ||
+        target === gameWrapper;
+    if (!clickedBlankOutsideCanvas) return;
+
+    const hasOpenMenu = settingsOpen || questOpen || shopOpen || inventoryOpen || skinOpen || multiplayerOpen;
+    if (!hasOpenMenu) return;
+
+    // 메뉴 상태를 한 번에 닫되, 게임 진행/기록/인벤토리 내용은 변경하지 않습니다.
+    settingsOpen = false;
+    questOpen = false;
+    shopOpen = false;
+    inventoryOpen = false;
+    closeInventoryDetail();
+    skinOpen = false;
+    if (multiplayerOpen) closeMultiplayerMenu();
+
+    syncQuestRewardOverlay(true);
+    requestSettingsRender();
+    positionVolumeTouchArea();
 });
 
 let volumeSliderDragging = false;
