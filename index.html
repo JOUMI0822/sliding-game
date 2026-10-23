@@ -9542,6 +9542,18 @@ window.addEventListener(
 
             event.preventDefault();
 
+            // 스페이스 더블 입력 = 더블 터치 (게임 시작 / 맵 넘기기 / 포기 등)
+            if (event.code === "Space" &&
+                !["gameover", "multiplayerResult", "expResult"].includes(gameState)) {
+                const spaceNow = performance.now();
+                if (spaceNow - lastSpacePressTime <= DOUBLE_TAP_DELAY) {
+                    lastSpacePressTime = 0;
+                    performDoubleAction();
+                    return;
+                }
+                lastSpacePressTime = spaceNow;
+            }
+
             if (gameState === "gameover") { startExperienceResult(); return; }
             if (gameState === "multiplayerResult") { startExperienceResult(); return; }
             if (gameState === "expResult") { finishExperienceResult(); return; }
@@ -9647,7 +9659,17 @@ const SWIPE_MIN_DISTANCE = 25;
 const TAP_MAX_DURATION = 250;
 
 
-gameWrapper.addEventListener(
+function addGameTouchListener(type, handler, options) {
+    document.addEventListener(type, event => {
+        const t = event.target;
+        // 게임 영역 또는 게임 밖 빈 배경에서 시작된 터치만 처리 (로그인창/팝업/입력창은 제외)
+        if (t === document.body || t === document.documentElement || gameWrapper.contains(t)) {
+            handler(event);
+        }
+    }, options);
+}
+
+addGameTouchListener(
     "touchstart",
     event => {
 
@@ -9678,7 +9700,7 @@ gameWrapper.addEventListener(
 );
 
 
-gameWrapper.addEventListener(
+addGameTouchListener(
     "touchmove",
     event => {
 
@@ -9692,7 +9714,7 @@ gameWrapper.addEventListener(
 );
 
 
-gameWrapper.addEventListener(
+addGameTouchListener(
     "touchend",
     event => {
 
@@ -11069,7 +11091,7 @@ canvas.addEventListener("pointerup", event => {
     if (handleTutorialTap(x, y)) lastTutorialTapTime = performance.now();
 });
 
-gameWrapper.addEventListener("touchend", event => {
+addGameTouchListener("touchend", event => {
     if (gameState !== "tutorial" || event.changedTouches.length !== 1) return;
 
     const touch = event.changedTouches[0];
@@ -11112,6 +11134,62 @@ window.addEventListener("keydown", event => {
         if (tutorialNextWaitMs() > 0) return;
         tutorialAdvance();
     }
+});
+
+/* =========================================================
+   더블 동작 (스페이스 더블 / PC 화면 밖 더블클릭 공용)
+   - 시작 화면: 게임 시작 / 플레이 중: 경로 안내 재사용 → 맵 넘기기
+   - 2인 대전: 포기 확인창 / 튜토리얼: 맵 넘기기 단계 동작
+========================================================= */
+let lastSpacePressTime = 0;
+
+function performDoubleAction() {
+    if (!gameAccessGranted || loadingActive || gamePopupOpen || guestNameOpen ||
+        rewardListOpen || logoutConfirmOpen || energyRecoveryChoiceOpen) return;
+    if (document.getElementById("rankingPanel")?.hidden === false) return;
+
+    if (gameState === "start") {
+        if (isMultiplayerPending()) return;
+        if (settingsOpen || questOpen || shopOpen || inventoryOpen || skinOpen || multiplayerOpen) return;
+        withGuestName(playGameStartSoundAndThenStart);
+        return;
+    }
+
+    if (gameState === "tutorial") {
+        if (!tutorialAwaitingNext) skipMap();
+        return;
+    }
+
+    if (multiplayerMatchActive) {
+        if (gameState !== "multiplayerResult" && gameState !== "expResult") openGamePopup("multi");
+        return;
+    }
+
+    if (["gameover", "multiplayerResult", "expResult",
+         "multiplayerWaitingRound", "multiplayerWaitingResult"].includes(gameState)) return;
+
+    if (!useSecondPathGuide()) skipMap();
+}
+
+// PC: 게임 화면 밖(빈 배경) 더블클릭 = 더블 터치
+document.addEventListener("dblclick", event => {
+    const t = event.target;
+    if (t === document.body || t === document.documentElement || t === gameWrapper) {
+        event.preventDefault();
+        performDoubleAction();
+    }
+});
+
+// PC: 결과 화면에서는 화면 안/밖 클릭으로도 다음 단계로 이동
+document.addEventListener("click", event => {
+    if (!gameAccessGranted) return;
+    const t = event.target;
+    const onGameArea = t === document.body || t === document.documentElement ||
+        t === gameWrapper || t === canvas || t === canvasStage;
+    if (!onGameArea) return;
+
+    if (gameState === "gameover" || gameState === "multiplayerResult") startExperienceResult();
+    else if (gameState === "expResult") finishExperienceResult();
 });
 
 let volumeSliderDragging = false;
