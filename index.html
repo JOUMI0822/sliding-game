@@ -1353,6 +1353,10 @@ const canvasStage = document.getElementById("canvasStage");
 const questRewardOverlay = document.getElementById("questRewardOverlay");
 const ctx = canvas.getContext("2d");
 
+// 실제 캔버스 픽셀 해상도 배율. 게임 내부 좌표계(800x600)는 유지합니다.
+let renderScale = 1;
+let lastResolutionCheck = -Infinity;
+
 // 이모지 아이콘만 전용 폰트로 그려 기기별 컬러 이모지가 선명하게 보이도록 합니다.
 const EMOJI_FONT = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
 function drawClearEmoji(emoji, x, y, size = 24) {
@@ -11558,7 +11562,8 @@ const STREAK_RENDERERS = {
             ctx.translate(px, py); ctx.rotate(t * 1.3 + i);
             ctx.fillStyle = `hsla(${335 + fxHash(i + 2) * 25},90%,${75 + fxHash(i) * 12}%,${0.22 + 0.45 * k})`;
             ctx.beginPath(); ctx.ellipse(0, 0, 3 + 3.5 * k, 1.8 + 1.6 * k, 0, 0, Math.PI * 2); ctx.fill();
-            ctx.setTransform(canvas.width / WIDTH * 0 + 1, 0, 0, 1, 0, 0);
+            // 캔버스 해상도가 커져도 논리 좌표계(800x600)를 유지합니다.
+            ctx.setTransform(renderScale, 0, 0, renderScale, 0, 0);
             ctx.restore(); ctx.save();
         }
         ctx.restore();
@@ -13889,6 +13894,31 @@ function draw(now = performance.now()) {
    메인 루프
 ========================================================= */
 
+/* 캔버스 해상도 자동 조절 (PC에서 크게 표시할 때 선명도 개선) */
+function updateCanvasResolution(now) {
+    if (now - lastResolutionCheck < 400) return;
+    lastResolutionCheck = now;
+
+    const isDesktop = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width <= 0) return;
+
+    let nextScale = 1;
+    if (isDesktop) {
+        const dpr = window.devicePixelRatio || 1;
+        nextScale = Math.min(2, Math.max(1, (rect.width / WIDTH) * dpr));
+        nextScale = Math.round(nextScale * 4) / 4;
+    }
+
+    if (nextScale !== renderScale) {
+        renderScale = nextScale;
+        canvas.width = Math.round(WIDTH * renderScale);
+        canvas.height = Math.round(HEIGHT * renderScale);
+        // width/height 변경은 캔버스를 초기화하므로 컨텍스트 변환은 매 프레임 다시 설정합니다.
+        settingsRenderRequested = true;
+    }
+}
+
 function gameLoop(
     now
 ) {
@@ -13912,6 +13942,9 @@ function gameLoop(
 
     // 게임 상태에 맞춰 배경음악을 시작/정지합니다.
     syncBackgroundMusic();
+
+    updateCanvasResolution(now);
+    ctx.setTransform(renderScale, 0, 0, renderScale, 0, 0);
 
     draw(now);
 
@@ -14020,12 +14053,19 @@ function fitGameToViewport() {
     const h = window.innerHeight;
     const NEED_W = 800;
     const NEED_H = 644;
-    const needsFit = w < NEED_W || h < NEED_H;
-    const scale = Math.min(w / NEED_W, h / NEED_H, 1);
     const root = document.documentElement;
 
-    // 세로 모드의 폰은 기존 반응형 CSS가 이미 잘 맞으므로 가로(또는 낮은 화면)일 때만 적용합니다.
-    const useFit = needsFit && w > h;
+    // 마우스/정밀 포인터를 사용하는 PC에서만 확대를 허용합니다.
+    const isDesktop = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+    const MAX_UPSCALE = 2.5;
+    const raw = Math.min(w / NEED_W, h / NEED_H);
+    const needsShrink = (w < NEED_W || h < NEED_H) && w > h;
+    const needsGrow = isDesktop && raw > 1.02;
+    const useFit = needsShrink || needsGrow;
+    const scale = needsGrow
+        ? Math.min(raw * 0.97, MAX_UPSCALE)
+        : Math.min(raw, 1);
+
     root.classList.toggle("fit-scale", useFit);
     root.style.setProperty("--fit-scale", String(scale));
 
